@@ -34,10 +34,16 @@ from electrum.gui.qt.util import (read_QIcon, EnterButton, WWLabel, icon_path,
                                   WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton)
 from electrum.gui.qt.qrtextedit import ScanQRTextEdit
 from electrum.gui.qt.main_window import StatusBarButton
-from .amountedit import PercAmountEdit
+from electrum.gui.qt.password_dialog import PasswordDialog
+
 from .bal import BalPlugin
 from .heirs import Heirs
-from .locktimeedit import HeirsLockTimeEdit
+
+from .balqt.locktimeedit import HeirsLockTimeEdit
+from .balqt.willexecutor_dialog import WillExecutorDialog
+from .balqt.heir_list import HeirList
+from .balqt.amountedit import PercAmountEdit
+
 
 class Plugin(BalPlugin):
 
@@ -97,7 +103,6 @@ class Plugin(BalPlugin):
         return EnterButton(_('Settings'), partial(w.settings_dialog))
 
     def password_dialog(self, msg=None, parent=None):
-        from electrum.gui.qt.password_dialog import PasswordDialog
         parent = parent or self
         d = PasswordDialog(parent, msg)
         return d.run()
@@ -151,12 +156,10 @@ class BalWindow:
         return _('BAL - ') + _(title) 
 
     def willexecutor_dialog(self):
-        from .willexecutor_dialog import WillExecutorDialog
         h = WillExecutorDialog(self)
         h.exec_()
 
     def create_heirs_tab(self):
-        from .heir_list import HeirList
         self.heir_list = l = HeirList(self)
         tab = self.window.create_list_tab(l)
         tab.is_shown_cv = True

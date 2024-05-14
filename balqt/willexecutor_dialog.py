@@ -36,7 +36,8 @@ from electrum.gui.qt.my_treeview import MyTreeView
 import json
 import urllib.request
 import urllib.parse
-from .bal import BalPlugin
+from ..bal import BalPlugin
+
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
