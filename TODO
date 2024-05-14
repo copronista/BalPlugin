@@ -1,0 +1,37 @@
+**finestra preferenze:**
+	-[test]impostare il refresh time/block(due campi), ovvero quanto tempo prima dello scadere le transazioni vanno rinnovate
+	-[working]fee per vbyte o per kvbyte da usare statico nelle transazioni, o scegliere se usare le fee attuali(calcolate al momento di costruzione delle transazioni o al loro rinnovo)
+	-[working]chiedere se si desira chiedere sempre conferma prima di pusshare o invalidare le transazioni
+	-[working]chiedere se si desidera utilizzare il servizio bal per tutte le transazioni con nlocktime nel futuro
+
+
+**funzionalita' core:**
+	-[working]invalidare le transazioni
+	-[todo]build transactions nel caso ci siano piu' locktime, e piu' willexecutors esplodere le transazioni
+	-[todo]secondo impostazioni chiedere conferma prima di firmare le transazioni e mostrare la finestra di preview
+	-[todo]secondo impostazioni chiedere conferma prima di invalidare le transazioni
+		
+**finestra eredi**
+	-[todo]permettere l'inserimento di una xpub/descriptor invece che indirizzo
+
+**finestra preview txs**
+	-[todo]permettere la visualizzazione del elenco delle transazioni generate, esplodere il dettaglio, visualizzare un qr con la tx serializzata.
+
+**permettere l'inserimento di messaggi nelle transazioni**
+	-[todo]tothink
+	-si potrebbe aggiungere un pulsante alla videata eredi per mostrare tutti i vari locktime ordinati(ogni locktime differente corrisponde ad una transazione) e da li inserire il messaggio da mettere nell'opreturn
+
+
+**finestra history:**
+[half done]salvare le tx mandate all'willexecutors nel wallet come tx locali e mostrarle nella history (nascondibili da menu view)
+
+**[todo]interfaccia android**
+	-finestra gestione eredi
+	-finestra gestione willexecutors
+	-finestra impostazioni
+
+
+analizzare una soluzione per lightning network(chiusura cooperativa credo che sia infattibile, si potrebbe chiedere una chiusura forzata, ma andrebbe aggiornata di continuo, e pure invalidata senza causare la chiusura prematura del canale
+
+
+considerare gli hardware wallet
