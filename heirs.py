@@ -422,12 +422,13 @@ class Heirs(dict, Logger):
                 balance += utxo.value_sats()
                 len_utxo_set += 1
                 available_utxos.append(utxo)
-        j=-1
+        j=-2
         willexecutorsitems = list(willexecutors.items())
         willexecutorslen = len(willexecutorsitems)
         alltxs = []
         mytxs = []
         while True:
+            j+=1
             print("hello",willexecutorslen)
             if j >= willexecutorslen:
                 break
@@ -440,7 +441,6 @@ class Heirs(dict, Logger):
                 url = willexecutor = False
             else:
                 break
-            j+=1
             fees = {}
             i=0
             while True:

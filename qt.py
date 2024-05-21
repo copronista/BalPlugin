@@ -238,7 +238,8 @@ class BalWindow:
                 if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
                     self.preview_dialog(txs)
 
-
+        else:
+            self.window.show_message(_("no tx to be created"))
         self.window.history_list.update()
         self.window.utxo_list.update()
         self.window.labels_changed_signal.emit()
@@ -308,19 +309,27 @@ class BalWindow:
     #TODO IMPLEMENT PREVIEW DIALOG
     #tx list display txid, willexecutor, qrcode, button to sign
     def preview_dialog(self, txs):
-        d = WindowModalDialog(self.window, self.get_window_title("Transactions Preview"))
-        d.setMinimumSize(100, 200)
-        i=0
+        PreviewWindow(self,txs).exec_()
+
+class PreviewWindow(WindowModalDialog):
+    def __init__(self, bal_window, txs):
+        self.bal_window=bal_window
+        self.txs=txs
+        WindowModalDialog.__init__(self, parent, self.get_window_title("Preview"))
+        self.setMinimumSize(100,200)
         grid=QGridLayout(d)
+        i=0
         for tx in txs:
             grid.addWidget(QLabel(_(tx.txid())),i,0)
-            b = QPushButton(_('Details'))
+            b = QPushButton(_('Detail'))
             b.clicked.connect(partial(self.window.show_transaction,tx))
             grid.addWidget(b,i,1)
             i+=1
 
-        if not d.exec_():
-            return
+        b = QPushButton(_('export_to_file'))
+        b.clicked.connect(partial(self.window.show_transaction,tx))
+
+
 
 class bal_checkbox(QCheckBox):
     def __init__(self, plugin,variable):
