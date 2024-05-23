@@ -41,6 +41,7 @@ import urllib.request
 import urllib.parse
 from electrum import constants
 from .bal import BalPlugin
+from decimal import Decimal
 
 if TYPE_CHECKING:
     from .wallet_db import WalletDB
@@ -62,6 +63,7 @@ class AliasNotFoundException(Exception):
 def reduce_outputs(in_amount, out_amount, fee, outputs):
     if in_amount < out_amount:
         for output in outputs:
+            print("reduce_amount",output.value)
             output.value = int((in_amount-fee)/out_amount * output.value)
 
 #TODO: put this method inside wallet.db to replace or complete get_locktime_for_new_transaction
@@ -359,22 +361,25 @@ class Heirs(dict, Logger):
             newbalance -= willexecutors_amount
 
         for key in self.keys():
-            print(key)
+            print("mario",key)
             if is_perc(self[key][HEIR_AMOUNT]):
                 percent_amount += float(self[key][HEIR_AMOUNT][:-1])
                 percent_heirs[key] =list(self[key])
             else:
-                if int(self[key][HEIR_AMOUNT])>wallet.dust_threshold():
-                    fixed_amount += int(self[key][HEIR_AMOUNT])
+                heir_amount = int(Decimal(self[key][HEIR_AMOUNT])* pow(10,self.decimal_point))
+                if heir_amount>wallet.dust_threshold():
+                    fixed_amount += heir_amount
                     fixed_heirs[key] = list(self[key])
-                    fixed_heirs[key].insert(HEIR_REAL_AMOUNT,int(self[key][HEIR_AMOUNT]))
+                    fixed_heirs[key].insert(HEIR_REAL_AMOUNT,heir_amount)
                     #find_regex += self[key]
+                else:
+                    print("heir amount<dust threshold",) 
 
         if fixed_amount > newbalance:
             print(f"warning fixed_amount({fixed_amount}) > balance-fee({newbalance})")
             amount = 0
             for key in fixed_heirs:
-                value = int(newbalance/fixed_amount*float(fixed_heirs[key][HEIR_AMOUNT]))
+                value = int(newbalance/fixed_amount*int(fixed_heirs[key][HEIR_AMOUNT]))
                 if value < wallet.dust_threshold():
                     value=0
                 fixed_heirs[key].insert(HEIR_REAL_AMOUNT, value)
@@ -415,7 +420,8 @@ class Heirs(dict, Logger):
         utxos = wallet.get_utxos()
         willexecutors = bal_plugin.config_get(BalPlugin.WILLEXECUTORS) or {}
         selected_willexecutors = bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
-        tx_fees = bal_plugin.config.get(BalPlugin.TX_FEES)
+        tx_fees = bal_plugin.config_get(BalPlugin.TX_FEES)
+        self.decimal_point=bal_plugin.config.get_decimal_point()
 
         for utxo in utxos:
             if utxo.value_sats()> 68*tx_fees:

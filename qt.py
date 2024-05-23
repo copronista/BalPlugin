@@ -309,25 +309,25 @@ class BalWindow:
     #TODO IMPLEMENT PREVIEW DIALOG
     #tx list display txid, willexecutor, qrcode, button to sign
     def preview_dialog(self, txs):
-        PreviewWindow(self,txs).exec_()
-
+        w=PreviewWindow(self,txs)
+        w.exec_()
 class PreviewWindow(WindowModalDialog):
     def __init__(self, bal_window, txs):
+        WindowModalDialog.__init__(self, bal_window.window, bal_window.get_window_title("Preview"))
         self.bal_window=bal_window
         self.txs=txs
-        WindowModalDialog.__init__(self, parent, self.get_window_title("Preview"))
         self.setMinimumSize(100,200)
-        grid=QGridLayout(d)
+        grid=QGridLayout(self)
         i=0
         for tx in txs:
             grid.addWidget(QLabel(_(tx.txid())),i,0)
             b = QPushButton(_('Detail'))
-            b.clicked.connect(partial(self.window.show_transaction,tx))
+            b.clicked.connect(partial(self.bal_window.window.show_transaction,tx))
             grid.addWidget(b,i,1)
             i+=1
 
         b = QPushButton(_('export_to_file'))
-        b.clicked.connect(partial(self.window.show_transaction,tx))
+        b.clicked.connect(partial(self.bal_window.window.show_transaction,tx))
 
 
 
