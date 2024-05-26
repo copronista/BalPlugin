@@ -451,7 +451,8 @@ class Heirs(dict, Logger):
             else: locktimes[strlocktime][key]=value
 
         return locktimes, onlyfixed
-        
+    def is_perc(self,key):
+        return is_perc(self[key][HEIR_AMOUNT])
     def buildTransactions(self,bal_plugin,wallet):
         balance = 0.0
         len_utxo_set = 0

@@ -39,7 +39,7 @@ import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
 from ..heirs import push_transactions_to_willexecutors
-
+from ..util import str_to_locktime,locktime_to_str
 class PreviewList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         LOCKTIME = enum.auto()
@@ -121,7 +121,7 @@ class PreviewList(MyTreeView):
         
     def show_transaction(self,selected_keys):
         for key in selected_keys:
-            show_transaction(self.will[key], parent=self.bal_window.window)
+            show_transaction(self.will[key]['tx'], parent=self.bal_window.window)
 
         self.update()
 
@@ -156,6 +156,7 @@ class PreviewList(MyTreeView):
     def update_will(self,will):
         self.will=will
         self.update()
+
     def update(self):
         print("update will")
         if self.will is None:
@@ -175,7 +176,8 @@ class PreviewList(MyTreeView):
             print("tx",dir(bal_tx))
             tx=bal_tx['tx']
             labels = [""] * len(self.Columns)
-            labels[self.Columns.LOCKTIME] = tx.locktime
+            print("willlocktime",tx.locktime)
+            labels[self.Columns.LOCKTIME] = locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
             labels[self.Columns.DESCRIPTION] = bal_tx['description']
             labels[self.Columns.VALUE] = bal_tx['heirsvalue']

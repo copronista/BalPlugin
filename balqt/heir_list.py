@@ -37,7 +37,8 @@ from electrum.plugin import run_hook
 
 from electrum.gui.qt.util import webopen
 from electrum.gui.qt.my_treeview import MyTreeView
-
+from datetime import datetime
+from ..util import str_to_locktime,locktime_to_str
 if TYPE_CHECKING:
     from electrum.gui.qt.main_window import ElectrumWindow
 
@@ -79,6 +80,8 @@ class HeirList(MyTreeView):
         print("prior_name",prior_name)
         col = idx.column()
         try:
+            if col == Columns.LOCKTIME:
+                text = str_to_locktime(text)
             prior_name[col-1] = text
             prior_name.insert(0,edit_key)
             prior_name = tuple(prior_name)
@@ -131,7 +134,7 @@ class HeirList(MyTreeView):
             labels[self.Columns.NAME] = key
             labels[self.Columns.ADDRESS] = heir[0]
             labels[self.Columns.AMOUNT] = heir[1]
-            labels[self.Columns.LOCKTIME] = str(heir[2])
+            labels[self.Columns.LOCKTIME] =  str(locktime_to_str(heir[2]))
 
             items = [QStandardItem(x) for x in labels]
             items[self.Columns.NAME].setEditable(False)
