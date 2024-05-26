@@ -77,10 +77,11 @@ class HeirList(MyTreeView):
 
     def on_edited(self, idx, edit_key, *, text):
         prior_name = self.bal_window.heirs.pop(edit_key)
-        print("prior_name",prior_name)
+        print("prior_name",prior_name,text)
         col = idx.column()
+        print("column",col,self.Columns.LOCKTIME)
         try:
-            if col == Columns.LOCKTIME:
+            if col == 3 :
                 text = str_to_locktime(text)
             prior_name[col-1] = text
             prior_name.insert(0,edit_key)

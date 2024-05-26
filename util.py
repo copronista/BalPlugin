@@ -4,8 +4,8 @@ def locktime_to_str(locktime):
         locktime=int(locktime)
         print(locktime,locktime > 500000000)
         if locktime > 500000000:
-            dt_object = datetime.fromtimestamp(locktime)
-            return dt_object.strftime("%d/%m/%Y %H:%M")
+            dt = datetime.fromtimestamp(locktime).isoformat()[:-3]
+            return dt
 
     except Exception as e:
         print(e)
@@ -13,13 +13,14 @@ def locktime_to_str(locktime):
     return str(locktime)
 
 def str_to_locktime(locktime):
+    print("str_to_locktime",locktime)
     try:
         if locktime[-1] in ('y','d','b'):
-            return locktime
+          print("return relative locktime",locktime)
+          return locktime
         else: return int(locktime)
     except Exception as e:
         print(e)
-    dt_object = datetime.strptime(locktime, "%d/%m/%Y %H:%M")
+    dt_object = datetime.fromisoformat(locktime)
     timestamp = dt_object.timestamp()
     return int(timestamp)
-

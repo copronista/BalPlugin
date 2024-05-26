@@ -240,6 +240,11 @@ class BalWindow:
         self.heirs[heir[0]]=heir[1:]
         self.heir_list.update()
         return True
+
+    def delete_heirs(self,heir):
+        del self.heirs[heir[0]]
+        self.heir_list.update()
+        return True
     
     def import_heirs(self,):
         import_meta_gui(self.window, _('heirs'), self.heirs.import_file, self.heir_list.update)
