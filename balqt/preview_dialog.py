@@ -66,7 +66,7 @@ class PreviewList(MyTreeView):
             #editable_columns=[self.Columns.URL,self.Columns.BASE_FEE,self.Columns.ADDRESS],
 
         )
-        print("will",will)
+        #print("will",will)
         if not will is None:
             self.will = will
         else:
@@ -158,7 +158,7 @@ class PreviewList(MyTreeView):
         self.update()
 
     def update(self):
-        print("update will")
+        #print("update will")
         if self.will is None:
             return
 
@@ -173,10 +173,9 @@ class PreviewList(MyTreeView):
 
         for txid,bal_tx in self.will.items():
             #self.ping_server(url)
-            print("tx",dir(bal_tx))
             tx=bal_tx['tx']
             labels = [""] * len(self.Columns)
-            print("willlocktime",tx.locktime)
+            #print("willlocktime",tx.locktime)
             labels[self.Columns.LOCKTIME] = locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
             labels[self.Columns.DESCRIPTION] = bal_tx['description']
@@ -194,7 +193,7 @@ class PreviewList(MyTreeView):
                     except Exception as e:
                         print("e cazzo",e)
                 else:
-                    print(labels)
+                    #print(labels)
                     items.append(QStandardItem(str(e)))
             """
             items[self.Columns.SELECTED].setEditable(False)

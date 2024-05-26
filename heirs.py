@@ -88,22 +88,30 @@ def get_current_height(network:'Network'):
 
 
 def parse_locktime_string(locktime,w):
-    now = datetime.datetime.now()
-    if locktime[-1] == 'y':
-        locktime = str(int(locktime[:-1])*365) + "d"
-    if locktime[-1] == 'd':
-        return int((now + datetime.timedelta(days = int(locktime[:-1]))).replace(hour=0,minute=0,second=0,microsecond=0).timestamp())
-    if locktime[-1] == 'b':
-        locktime = int(locktime[:-1])
-        height = get_current_height(w.network)
-        locktime+=int(height)
+    try:
+        return int(locktime)
 
-    return int(locktime)
-
+    except Exception as e:
+        print("parse_locktime_string",e)
+    try:
+        now = datetime.datetime.now()
+        if locktime[-1] == 'y':
+            locktime = str(int(locktime[:-1])*365) + "d"
+        if locktime[-1] == 'd':
+            return int((now + datetime.timedelta(days = int(locktime[:-1]))).replace(hour=0,minute=0,second=0,microsecond=0).timestamp())
+        if locktime[-1] == 'b':
+            locktime = int(locktime[:-1])
+            height = get_current_height(w.network)
+            locktime+=int(height)
+        return int(locktime)
+    except Exception as e:
+        print("parse_locktime_string",e)
 
 
 def is_perc(value):
-    return value[-1] == '%'
+    if len(value)>0:
+        return value[-1] == '%'
+    else: return False
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
 

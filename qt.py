@@ -63,7 +63,6 @@ class Plugin(BalPlugin):
                 if isinstance(child,QMenuBar):
                     for menu_child in child.children():
                         if isinstance(menu_child,QMenu):
-                            print(dir(menu_child))
                             try:
                                 print(menu_child.title())
                                 if menu_child.title()==_("&Tools"):
@@ -75,7 +74,6 @@ class Plugin(BalPlugin):
                                 
 
             tools_menu = window.getMenuBar()
-            print(dir(tools_menu))
             self.init_menubar_tools(self,window,window.tools_menu)
 
     @hook
@@ -269,6 +267,8 @@ class BalWindow:
             tx['heirsvalue'] = txs[txid].heirsvalue
             tx['description'] = txs[txid].description
             tx['willexecutor'] = txs[txid].willexecutor
+            print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
+            
             print(tx)
             will[txid] = self.will[txid] = tx
 
