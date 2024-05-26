@@ -6,8 +6,15 @@ from typing import NamedTuple, Optional, Dict, Tuple
 from electrum.plugin import BasePlugin
 from electrum.util import to_bytes, bfh
 from electrum import json_db
+from electrum.transaction import tx_from_any
 
 json_db.register_dict('heirs', tuple, None)
+json_db.register_dict('will', lambda x: get_will(x), None)
+
+def get_will(x):
+    x['tx']=tx_from_any(x['tx'])
+    return x
+
 
 class BalPlugin(BasePlugin):
     LOCKTIME_TIME = "bal_locktime_time"

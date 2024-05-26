@@ -31,7 +31,7 @@ from electrum.plugin import hook
 from electrum.i18n import _
 from electrum.util import make_dir, InvalidPassword, UserCancelled
 from electrum.gui.qt.util import (read_QIcon, EnterButton, WWLabel, icon_path,
-                                  WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton)
+                                  WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton,HelpButton)
 from electrum.gui.qt.qrtextedit import ScanQRTextEdit
 from electrum.gui.qt.main_window import StatusBarButton
 from electrum.gui.qt.password_dialog import PasswordDialog
@@ -41,6 +41,7 @@ from .heirs import Heirs
 
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
+from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
 
@@ -55,6 +56,8 @@ class Plugin(BalPlugin):
     def init_qt(self,gui_object):
         self.gui_object=gui_object
         for window in gui_object.windows:
+            wallet = window.wallet
+
             self.bal_windows[window.winId]= BalWindow(self,window)
             for child in window.children():
                 if isinstance(child,QMenuBar):
@@ -138,10 +141,11 @@ class BalWindow:
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
         self.heirs=Heirs(self.window.wallet.db)
-
+        self.will=self.window.wallet.db.get_dict('will')
         tools_menu.addSeparator()
         tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
         self.heirs_tab = self.create_heirs_tab()
+        self.will_tab = self.create_will_tab()
 
         def add_optional_tab(tabs, tab, icon, description):
             tab.tab_icon = icon
@@ -151,6 +155,7 @@ class BalWindow:
                 tabs.addTab(tab, icon, description.replace("&", ""))
 
         add_optional_tab(self.window.tabs, self.heirs_tab, read_QIcon("will.png"), _("&Heirs"))
+        add_optional_tab(self.window.tabs, self.will_tab, read_QIcon("will.png"), _("&Will"))
 
     def get_window_title(self,title):
         return _('BAL - ') + _(title) 
@@ -163,6 +168,13 @@ class BalWindow:
         self.heir_list = l = HeirList(self)
         tab = self.window.create_list_tab(l)
         tab.is_shown_cv = True
+        return tab
+
+    def create_will_tab(self):
+        self.will_list = l = PreviewList(self,None)
+        tab = self.window.create_list_tab(l)
+        tab.is_shown_cv = True
+        #self.will_tab.update_will(self.will)
         return tab
 
     def new_heir_dialog(self):
@@ -183,15 +195,27 @@ class BalWindow:
 
         grid.addWidget(QLabel(_("Name")), 1, 0)
         grid.addWidget(heir_name, 1, 1)
+        grid.addWidget(HelpButton("Unique name or description about heir"),1,2)
 
         grid.addWidget(QLabel(_("Address")), 2, 0)
         grid.addWidget(heir_address, 2, 1)
+        grid.addWidget(HelpButton("heir bitcoin address"),2,2)
 
         #grid.addWidget(QLabel(_("xPub")), 2, 2)
         grid.addWidget(QLabel(_("Amount")),3,0)
         grid.addWidget(heir_amount,3,1)
+        grid.addWidget(HelpButton("Fixed or Percentage amount if end with %"),3,2)
+
         grid.addWidget(QLabel(_("LockTime")), 4, 0)
         grid.addWidget(heir_locktime, 4, 1)
+        grid.addWidget(HelpButton("if you choose Raw, you can insert various options based on suffix:\n " 
+                                  +" - b: number of blocks after current block(ex: 144b means tomorrow)\n" 
+                                  +" - d: number of days after current day(ex: 1d means tomorrow)\n"  
+                                  +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n" 
+                                  +"when using d or y time will be set to 00:00 for privacy reasons\n" 
+                                  +"when used without suffix it can be used to indicate:\n" 
+                                  +" - exact block(if value is less than 500,000,000)\n"
+                                  +" - exact block timestamp(if value greater than 500,000,000"),4,2)
 
         vbox.addLayout(grid)
         vbox.addLayout(Buttons(CancelButton(d), OkButton(d)))
@@ -231,18 +255,31 @@ class BalWindow:
             #password = self.window.wallet.password
         
         txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
-        if len(txs)>0:
+        will = {}
+        
+        for txid in txs:
+            tx = {}
+            tx['tx'] = txs[txid]
+            tx['my_locktime'] = txs[txid].my_locktime
+            tx['heirsvalue'] = txs[txid].heirsvalue
+            tx['description'] = txs[txid].description
+            tx['willexecutor'] = txs[txid].willexecutor
+            print(tx)
+            will[txid] = self.will[txid] = tx
+
+        if len(will)>0:
             if self.bal_plugin.config_get(BalPlugin.PREVIEW):
-                self.preview_dialog(txs)
+                self.preview_dialog(will)
             elif self.bal_plugin.config_get(BalPlugin.BROADCAST):
                 if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
-                    self.preview_dialog(txs)
+                    self.preview_dialog(will)
 
         else:
             self.window.show_message(_("no tx to be created"))
         self.window.history_list.update()
         self.window.utxo_list.update()
         self.window.labels_changed_signal.emit()
+        self.will_list.update_will(will)
         return txs
 
 
@@ -292,16 +329,16 @@ class BalWindow:
         
 
         grid=QGridLayout(d)
-        add_widget(grid,"Refresh Time Days",heir_locktime_time,0)
-        add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1)
-        add_widget(grid,"Transaction fees",heir_tx_fees,2)
-        add_widget(grid,"Broadcast transactions",heir_broadcast,3)
-        add_widget(grid," - Ask before",heir_ask_broadcast,4)
-        add_widget(grid,"Invalidate transactions",heir_invalidate,5)
-        add_widget(grid," - Ask before",heir_ask_invalidate,6)
-        add_widget(grid,"Show preview before sign",heir_preview,7)
-        add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8)
-        add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9)
+        add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
+        add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1,"Delta blocks for inputs to be invalidated and transaction resubmitted")
+        add_widget(grid,"Transaction fees",heir_tx_fees,2,"default transaction fees")
+        add_widget(grid,"Broadcast transactions",heir_broadcast,3,"")
+        add_widget(grid," - Ask before",heir_ask_broadcast,4,"")
+        add_widget(grid,"Invalidate transactions",heir_invalidate,5,"")
+        add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
+        add_widget(grid,"Show preview before sign",heir_preview,7,"")
+        #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
+        #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 
 
         if not d.exec_():
@@ -309,37 +346,19 @@ class BalWindow:
     #TODO IMPLEMENT PREVIEW DIALOG
     #tx list display txid, willexecutor, qrcode, button to sign
     def preview_dialog(self, txs):
-        w=PreviewWindow(self,txs)
-        w.exec_()
-class PreviewWindow(WindowModalDialog):
-    def __init__(self, bal_window, txs):
-        WindowModalDialog.__init__(self, bal_window.window, bal_window.get_window_title("Preview"))
-        self.bal_window=bal_window
-        self.txs=txs
-        self.setMinimumSize(100,200)
-        grid=QGridLayout(self)
-        i=0
-        for tx in txs:
-            grid.addWidget(QLabel(_(tx.txid())),i,0)
-            b = QPushButton(_('Detail'))
-            b.clicked.connect(partial(self.bal_window.window.show_transaction,tx))
-            grid.addWidget(b,i,1)
-            i+=1
-
-        b = QPushButton(_('export_to_file'))
-        b.clicked.connect(partial(self.bal_window.window.show_transaction,tx))
-
-
+        w=PreviewDialog(self,txs)
+        w.show()
 
 class bal_checkbox(QCheckBox):
     def __init__(self, plugin,variable):
         QCheckBox.__init__(self)
         self.setChecked(plugin.config_get(variable))
         def on_check(v):
-            plugin.config.set_key(variable, v == QT.Checked, save=True)
+            plugin.config.set_key(variable, v == Qt.Checked, save=True)
         self.stateChanged.connect(on_check)
     
         
-def add_widget(grid,label,widget,row):
+def add_widget(grid,label,widget,row,help_):
     grid.addWidget(QLabel(_(label)),row,0)
     grid.addWidget(widget,row,1)
+    grid.addWidget(HelpButton(help_),row,2)

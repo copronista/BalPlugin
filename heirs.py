@@ -50,7 +50,6 @@ if TYPE_CHECKING:
 
 _logger = get_logger(__name__)
 
-
 HEIR_ADDRESS = 0
 HEIR_AMOUNT = 1
 HEIR_LOCKTIME = 2
@@ -107,14 +106,20 @@ def is_perc(value):
     return value[-1] == '%'
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
+
     total_used_utxos = []
-    txsout=[]
+    txsout={}
     for locktime,heirs in locktimes.items():
+
         fee=fees.get(locktime,0) 
         out_amount = 0.0
-        for heir in heirs:
+        description = ""
+        for name,heir in heirs.items():
+
             try:
                 out_amount += int(heir[HEIR_REAL_AMOUNT])
+
+                description += f"{name}\n"
             except:
                 pass
 
@@ -138,18 +143,27 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
             #raise Exception(f"error building heirs transactions in_amount < out_amount ({in_amount}<{out_amount}) not enought funds")
             ####TODO: costruire le transazioni
         outputs = []
-        for heir in heirs:
+        for name,heir in heirs.items():
+
             try:
                 outputs.append(PartialTxOutput.from_address_and_value(heir[HEIR_ADDRESS], int(heir[HEIR_REAL_AMOUNT])))
+
             except Exception as e:
+                e.heir=heir
+                e.heirname=name
                 print("impossible to append output abort")
                 raise e
+
         
         #tx = wallet.make_unsigned_transaction(
         #    coins=used_utxos,
         #    outputs=outputs,
         #    fee=1000,
         #    is_sweep=False)
+        heirsvalue=out_amount
+        
+
+
         change = get_change_output(wallet, in_amount, out_amount, fee)
         have_change=False
         if change:
@@ -158,14 +172,18 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
 
         #reduce_outputs(in_amount,out_amount,fees[locktime],outputs)
         tx = PartialTransaction.from_io(used_utxos, outputs, locktime=parse_locktime_string(locktime,wallet), version=2)
+        if len(description)>0: tx.description = description[:-1]
+        else: tx.description = ""
+        tx.heirsvalue = heirsvalue
         tx.set_rbf(True) 
 #        tx.remove_signatures()
 #        wallet.sign_transaction(tx, password, ignore_warnings=True)
-        if tx.txid() is None:
+        txid = tx.txid()
+        if txid is None:
             raise Exception("txid is none",tx)
         
         tx.my_locktime = locktime
-        txsout.append(tx)
+        txsout[txid]=tx
         
         changes= tx.get_change_outputs()
         for change in changes:
@@ -233,8 +251,15 @@ def invalidate_inheritance_transactions(wallet):
 
 
 #TODO push transactions to willexecutors servers
-def push_transactions_to_willexecutors(txs,willexecutors,selected_willexecutors):
-    strtxs = "\n".join(str(tx) for tx in txs)
+def push_transactions_to_willexecutors(txs):
+    willexecutors ={}
+    for txid,tx in txs.items():
+        if not tx.willexecutor: continue
+        willexecutors[tx.willexecutor]=True
+    willexecutors=willexecutors.keys()
+    if not willexecutors:
+        return
+    strtxs = "\n".join(str(tx) for tx in txs.values())
     for url,willexecutor in willexecutors.items():
         push_transactions_to_willexecutor(txs,selected_willexecutors,url)
 
@@ -249,7 +274,20 @@ def push_transactions_to_willexecutor(txs,selected_willexecutors, url):
                     print(f"error{response.status} pushing txs to: {url}")
         except:  
             print(f"error contacting {url} for pushing txs")
-
+def getinfo_willexecutor(url,willexecutor):
+    try:
+        print("GETINFO_WILLEXECUTOR")
+        print(url)
+        req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info", method='GET')
+        with urllib.request.urlopen(req) as response:
+            response_data=response.read().decode('utf-8')
+            print("response_data", response_data)
+            if response.status != 200:
+                print(f"error{response.status} pushing txs to: {url}")
+    except Exception as e:
+        print(f"error {e} contacting {url}")
+    w={}
+    return {"address":w.get("address",willexecutor["address"]),"base_fee":w.get("base_fee",willexecutor["base_fee"])}
 def print_transaction(heirs,tx,locktimes,tx_fees):
     jtx=tx.to_json()
     print(f"TX: {tx.txid()}\t-\tLocktime: {jtx['locktime']}")
@@ -356,7 +394,7 @@ class Heirs(dict, Logger):
                 h[HEIR_REAL_AMOUNT] = base_fee
                 h[HEIR_LOCKTIME] = locktime
                 h[HEIR_ADDRESS] = willexecutor['address']
-                willexecutors["w!ll3x3c-"+willexecutor['url']+str(locktime)] = h
+                willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
 
@@ -379,7 +417,7 @@ class Heirs(dict, Logger):
             print(f"warning fixed_amount({fixed_amount}) > balance-fee({newbalance})")
             amount = 0
             for key in fixed_heirs:
-                value = int(newbalance/fixed_amount*int(fixed_heirs[key][HEIR_AMOUNT]))
+                value = int(newbalance/fixed_amount*float(fixed_heirs[key][HEIR_AMOUNT]))
                 if value < wallet.dust_threshold():
                     value=0
                 fixed_heirs[key].insert(HEIR_REAL_AMOUNT, value)
@@ -408,8 +446,9 @@ class Heirs(dict, Logger):
 
         locktimes = {}
         for key, value in heir_list:
-            if not value[HEIR_LOCKTIME] in  locktimes: locktimes[str(value[HEIR_LOCKTIME])]=[value]
-            else: locktimes[str(value[HEIR_LOCKTIME])].append(value)
+            strlocktime=str(value[HEIR_LOCKTIME])
+            if not strlocktime in  locktimes: locktimes[strlocktime]={key:value}
+            else: locktimes[strlocktime][key]=value
 
         return locktimes, onlyfixed
         
@@ -428,22 +467,31 @@ class Heirs(dict, Logger):
                 balance += utxo.value_sats()
                 len_utxo_set += 1
                 available_utxos.append(utxo)
+        if len_utxo_set==0: return
         j=-2
         willexecutorsitems = list(willexecutors.items())
         willexecutorslen = len(willexecutorsitems)
-        alltxs = []
-        mytxs = []
+        alltxs = {}
+        print(willexecutorsitems)
         while True:
             j+=1
-            print("hello",willexecutorslen)
             if j >= willexecutorslen:
+                print("j> willexecutorslen")
                 break
-            if 0 <= j:
+            elif 0 <= j:
+                print("hello",j,willexecutorslen,willexecutorsitems[j])
                 url, willexecutor = willexecutorsitems[j]
-                if url not in selected_willexecutors:
+                if not url in selected_willexecutors:
+                    print(f"{url}is not in {selected_willexecutors}")
                     continue
                 willexecutor["url"]=url
-            if j == -1:
+                willexecutor_info=getinfo_willexecutor(url,willexecutor)
+                if not willexecutor_info["address"]:
+                    print(f"{willexecutor_info} no address")
+                    continue
+                willexecutor["address"]=willexecutor_info["address"]
+                willexecutor["base_fee"]=willexecutor_info["base_fee"]
+            elif j == -1:
                 url = willexecutor = False
             else:
                 break
@@ -460,12 +508,18 @@ class Heirs(dict, Logger):
                 newbalance = balance 
                 locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor)
                 print("locktimes",locktimes)
-                txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)
+                try:
+                    txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)
+                except Exception as e:
+                    print(e,e.heirname,url,selected_willexecutors)
+                    if "w!ll3x3c" in e.heirname:
+                        selected_willexecutors.remove(url)
+                        break 
                 print("txs",txs)
                 total_fees = 0
                 total_fees_real = 0
                 total_in = 0
-                for tx in txs:
+                for txid,tx in txs.items():
                     tx.willexecutor = willexecutor
                     fee = tx.estimated_size() * tx_fees    
                     total_fees += fee
@@ -485,7 +539,7 @@ class Heirs(dict, Logger):
                     break
                 if i>=10:
                     break
-            alltxs+=txs
+            alltxs.update(txs)
             
         return alltxs
         
