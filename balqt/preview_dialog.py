@@ -66,6 +66,7 @@ class PreviewList(MyTreeView):
             #editable_columns=[self.Columns.URL,self.Columns.BASE_FEE,self.Columns.ADDRESS],
 
         )
+        self.decimal_point=parent.bal_plugin.config.get_decimal_point
         #print("will",will)
         if not will is None:
             self.will = will
@@ -179,7 +180,8 @@ class PreviewList(MyTreeView):
             labels[self.Columns.LOCKTIME] = locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
             labels[self.Columns.DESCRIPTION] = bal_tx['description']
-            labels[self.Columns.VALUE] = bal_tx['heirsvalue']
+            labels[self.Columns.VALUE] = float(float(bal_tx['heirsvalue'])/ pow(10,self.decimal_point()))
+
             if tx.is_complete():labels[self.Columns.STATUS] = 'C'
             else:labels[self.Columns.STATUS] = '-'
 

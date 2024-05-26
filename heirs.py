@@ -100,17 +100,18 @@ def parse_locktime_string(locktime,w):
             return int((now + datetime.timedelta(days = int(locktime[:-1]))).replace(hour=0,minute=0,second=0,microsecond=0).timestamp())
         if locktime[-1] == 'b':
             locktime = int(locktime[:-1])
-            height = get_current_height(w.network)
+            height = 0
+            if w:
+                height = get_current_height(w.network)
             locktime+=int(height)
         return int(locktime)
     except Exception as e:
         print("parse_locktime_string",e)
+        raise e
 
 
 def is_perc(value):
-    if len(value)>0:
-        return value[-1] == '%'
-    else: return False
+    return value[-1] == '%'
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
 
@@ -394,41 +395,50 @@ class Heirs(dict, Logger):
         locktimes = self.get_locktimes();
         if willexecutor:
             for locktime in locktimes:
-                base_fee = int(willexecutor['base_fee'])
-                willexecutors_amount += base_fee
-                h = [None] * 4
-                h[HEIR_AMOUNT] = base_fee
-                h[HEIR_REAL_AMOUNT] = base_fee
-                h[HEIR_LOCKTIME] = locktime
-                h[HEIR_ADDRESS] = willexecutor['address']
-                willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
+                try:
+                    base_fee = int(willexecutor['base_fee'])
+                    willexecutors_amount += base_fee
+                    h = [None] * 4
+                    h[HEIR_AMOUNT] = base_fee
+                    h[HEIR_REAL_AMOUNT] = base_fee
+                    h[HEIR_LOCKTIME] = locktime
+                    h[HEIR_ADDRESS] = willexecutor['address']
+                    willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
+                except Exception as e:
+                    print("error willexecutor:",e)
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
 
         for key in self.keys():
             print("mario",key)
-            if is_perc(self[key][HEIR_AMOUNT]):
-                percent_amount += float(self[key][HEIR_AMOUNT][:-1])
-                percent_heirs[key] =list(self[key])
-            else:
-                heir_amount = int(float(self[key][HEIR_AMOUNT])* pow(10,self.decimal_point))
-                if heir_amount>wallet.dust_threshold():
-                    fixed_amount += heir_amount
-                    fixed_heirs[key] = list(self[key])
-                    fixed_heirs[key].insert(HEIR_REAL_AMOUNT,heir_amount)
-                    #find_regex += self[key]
+            try:
+                if is_perc(self[key][HEIR_AMOUNT]):
+                    percent_amount += float(self[key][HEIR_AMOUNT][:-1])
+                    percent_heirs[key] =list(self[key])
                 else:
-                    print("heir amount<dust threshold",) 
-
+                    heir_amount = int(float(self[key][HEIR_AMOUNT])* pow(10,self.decimal_point))
+                    if heir_amount>wallet.dust_threshold():
+                        fixed_amount += heir_amount
+                        fixed_heirs[key] = list(self[key])
+                        fixed_heirs[key].insert(HEIR_REAL_AMOUNT,heir_amount)
+                        #find_regex += self[key]
+                    else:
+                        print("heir amount<dust threshold",) 
+            except Exception as e: 
+                print("Error getting heir info",e)
         if fixed_amount > newbalance:
             print(f"warning fixed_amount({fixed_amount}) > balance-fee({newbalance})")
             amount = 0
             for key in fixed_heirs:
-                value = int(newbalance/fixed_amount*float(fixed_heirs[key][HEIR_AMOUNT]))
-                if value < wallet.dust_threshold():
-                    value=0
-                fixed_heirs[key].insert(HEIR_REAL_AMOUNT, value)
-                amount += value
+                try:
+                    value = int(newbalance/fixed_amount*float(fixed_heirs[key][HEIR_AMOUNT]))
+                    if value < wallet.dust_threshold():
+                        value=0
+                    fixed_heirs[key].insert(HEIR_REAL_AMOUNT, value)
+                    amount += value
+                except Exception as e:
+                    print("error getting fixed heirs",e,key,fixed_heirs[key],newbalance,fixed_amount)
+
             fixed_amount=amount
             onlyfixed = True
 
@@ -439,10 +449,13 @@ class Heirs(dict, Logger):
         if newbalance > 0:
             perc_amount=0 
             for key,value in percent_heirs.items():
-                value = int(newbalance/percent_amount*float(value[HEIR_AMOUNT][:-1]))
-                if value > wallet.dust_threshold(): 
-                    percent_heirs[key].insert(HEIR_REAL_AMOUNT, value)
-                perc_amount += value
+                try:
+                    value = int(newbalance/percent_amount*float(value[HEIR_AMOUNT][:-1]))
+                    if value > wallet.dust_threshold(): 
+                        percent_heirs[key].insert(HEIR_REAL_AMOUNT, value)
+                        perc_amount += value
+                except Exception as e: 
+                    print("error getting perc heirs",e,key,percent_heirs[key],newbalance,perc_amount,value)
             newbalance -= perc_amount
             heir_list.update(percent_heirs)
 
@@ -461,6 +474,11 @@ class Heirs(dict, Logger):
     def is_perc(self,key):
         return is_perc(self[key][HEIR_AMOUNT])
     def buildTransactions(self,bal_plugin,wallet):
+        print(self)
+        print(dir(self))
+        Heirs._validate(self)
+        if len(self)<=0:
+            return
         balance = 0.0
         len_utxo_set = 0
         available_utxos = []
@@ -634,16 +652,58 @@ class Heirs(dict, Logger):
         except AttributeError:
             return None
 
-    #TODO validate heirs json import file
-    def _validate(self, data):
-        #for k, v in list(data.items()):
-        #    if k == 'heirs':
-        #        return self._validate(v)
-        #    if not bitcoin.is_address(k):
-        #        data.pop(k)
-        #    else:
-        #        _type, _ = v
-        #        if _type != 'address':
-        #            data.pop(k)
+                
+    def validate_address(address):
+        if not bitcoin.is_address(address):
+            print("notandaddress")
+            raise NotAnAddress(f"not an address,{address}")
+        return address
+
+    def validate_amount(amount):
+        try:
+            if is_perc(amount):
+                famount = float(amount[:-1])
+            else:
+                famount = float(amount)
+            if famount <= 0.00000001:
+                raise AmountNotValid(f"amount have to be positive {famount} < 0")
+        except Exception as e:
+            print("amountnotvalid")
+            raise AmountNotValid(f"amount not properly formatted, {e}")
+        return amount
+
+    def validate_locktime(locktime):
+        try:
+            flocktime = parse_locktime_string(locktime,None)
+        except Exception as e:
+            print("locktimenotvalid")
+            raise LocktimeNotValid(f"locktime string not properly formatted, {e}")
+        return locktime
+
+    def validate_heir(k,v):     
+        address = Heirs.validate_address(v[HEIR_ADDRESS])
+        amount = Heirs.validate_amount(v[HEIR_AMOUNT])
+        locktime = Heirs.validate_locktime(v[HEIR_LOCKTIME])
+        return (address,amount,locktime)
+
+    def _validate(data):
+        print("validating data,self")
+        print(data)
+        for k, v in list(data.items()):
+            print(f"validating{k},{v}")
+            if k == 'heirs':
+                return Heirs._validate(v)
+                       #data.pop(k)
+            try:
+                Heirs.validate_heir(k,v)
+            except Exception as e:
+                print(e)
+                data.pop(k)
         return data
 
+class NotAnAddress(ValueError):
+    pass
+class AmountNotValid(ValueError):
+    pass
+class LocktimeNotValid(ValueError):
+    pass

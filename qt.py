@@ -4,10 +4,6 @@ Bal
 Do you have something to hide?
 Secret backup plug-in for the electrum wallet.
 
-Copyright:
-    2017 Tiago Romagnani Silveira
-    2023 Soren Stoutner <soren@debian.org>
-
 Distributed under the MIT software license, see the accompanying
 file LICENCE or http://www.opensource.org/licenses/mit-license.php
 
@@ -23,6 +19,8 @@ from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
 from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
                          QColor, QDesktopServices, qRgba, QPainterPath)
+from PyQt5.QtCore import QObject, pyqtSignal, Qt
+
 from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit)
 
@@ -50,6 +48,7 @@ class Plugin(BalPlugin):
     def __init__(self, parent, config, name):
         BalPlugin.__init__(self, parent, config, name)
         self.bal_windows={}
+
 
     @hook
     def init_qt(self,gui_object):
@@ -130,14 +129,24 @@ class Plugin(BalPlugin):
         except Exception as e:
             print("error closing plugin",e)
             
-class BalWindow:
+class BalWindow(QObject):
+    error_signal = pyqtSignal(object, object)
     def __init__(self,bal_plugin: 'BalPlugin',window: 'ElectrumWindow'):
+        QObject.__init__(self)
         self.bal_plugin = bal_plugin
         self.window = window
+        self.error_signal.connect(self.error_dialog)
+
+    def error_dialog(self, msg):
+        self.window.show_error(msg, parent=self.window.top_level_window())
+
+    def show_error(self, msg, blocking=False):
+        self.error_signal.emit(msg, blocking)
+
 
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
-        self.heirs=Heirs(self.window.wallet.db)
+        self.heirs = Heirs._validate(Heirs(self.window.wallet.db))
         self.will=self.window.wallet.db.get_dict('will')
         tools_menu.addSeparator()
         tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
@@ -216,7 +225,7 @@ class BalWindow:
 
         vbox.addLayout(grid)
         vbox.addLayout(Buttons(CancelButton(d), OkButton(d)))
-        if d.exec_():
+        while d.exec_():
             #TODO SAVE HEIR
             heir = [
                     heir_name.text(),
@@ -224,7 +233,11 @@ class BalWindow:
                     heir_amount.text(),
                     str(heir_locktime.get_locktime()),
                     ]
-            self.set_heir(heir)
+            try:
+                self.set_heir(heir)
+                break
+            except Exception as e:
+                self.window.show_error(str(e))
 
     def export_inheritance_handler(self,path):
         txs = self.build_inheritance_transaction()
@@ -234,7 +247,10 @@ class BalWindow:
                 f.write('\n')
  
     def set_heir(self,heir):
-        self.heirs[heir[0]]=heir[1:]
+        h=Heirs.validate_heir(heir[0],heir[1:])
+        print("print_h",h)
+        self.heirs[heir[0]]=h
+        print("cazz")
         self.heir_list.update()
         return True
 
@@ -251,40 +267,43 @@ class BalWindow:
 
                    
     def build_inheritance_transaction(self):
+        will = {}
         password=None
         if self.window.wallet.has_keystore_encryption():            
             password = self.bal_plugin.password_dialog(parent=self.window)
             #password = self.window.wallet.password
-        
-        txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
-        will = {}
-        
-        for txid in txs:
-            tx = {}
-            tx['tx'] = txs[txid]
-            tx['my_locktime'] = txs[txid].my_locktime
-            tx['heirsvalue'] = txs[txid].heirsvalue
-            tx['description'] = txs[txid].description
-            tx['willexecutor'] = txs[txid].willexecutor
-            print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
+        try: 
+            txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
             
-            print(tx)
-            will[txid] = self.will[txid] = tx
+            for txid in txs:
+                tx = {}
+                tx['tx'] = txs[txid]
+                tx['my_locktime'] = txs[txid].my_locktime
+                tx['heirsvalue'] = txs[txid].heirsvalue
+                tx['description'] = txs[txid].description
+                tx['willexecutor'] = txs[txid].willexecutor
+                print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
+                
+                print(tx)
+                will[txid] = self.will[txid] = tx
 
-        if len(will)>0:
-            if self.bal_plugin.config_get(BalPlugin.PREVIEW):
-                self.preview_dialog(will)
-            elif self.bal_plugin.config_get(BalPlugin.BROADCAST):
-                if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
+            if len(will)>0:
+                if self.bal_plugin.config_get(BalPlugin.PREVIEW):
                     self.preview_dialog(will)
+                elif self.bal_plugin.config_get(BalPlugin.BROADCAST):
+                    if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
+                        self.preview_dialog(will)
 
-        else:
-            self.window.show_message(_("no tx to be created"))
-        self.window.history_list.update()
-        self.window.utxo_list.update()
-        self.window.labels_changed_signal.emit()
-        self.will_list.update_will(will)
-        return txs
+            else:
+                self.window.show_message(_("no tx to be created"))
+            self.window.history_list.update()
+            self.window.utxo_list.update()
+            self.window.labels_changed_signal.emit()
+            self.will_list.update_will(will)
+        except Exception as e:
+            print(e)
+            self.window.show_message(e)
+        return will 
 
 
     def export_inheritance_transactions(self):

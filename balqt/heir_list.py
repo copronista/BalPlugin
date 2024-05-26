@@ -35,7 +35,7 @@ from electrum.bitcoin import is_address
 from electrum.util import block_explorer_URL
 from electrum.plugin import run_hook
 
-from electrum.gui.qt.util import webopen
+from electrum.gui.qt.util import webopen, MessageBoxMixin
 from electrum.gui.qt.my_treeview import MyTreeView
 from datetime import datetime
 from ..util import str_to_locktime,locktime_to_str
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from electrum.gui.qt.main_window import ElectrumWindow
 
 
-class HeirList(MyTreeView):
+class HeirList(MyTreeView,MessageBoxMixin):
 
     class Columns(MyTreeView.BaseColumnsEnum):
         NAME = enum.auto()
@@ -64,6 +64,7 @@ class HeirList(MyTreeView):
 
     def __init__(self, bal_window: 'BalWindow'):
         super().__init__(
+            parent=bal_window.window,
             main_window=bal_window.window,
             stretch_column=self.Columns.NAME,
             editable_columns=[self.Columns.ADDRESS,self.Columns.AMOUNT,self.Columns.LOCKTIME],
@@ -76,22 +77,44 @@ class HeirList(MyTreeView):
         self.update()
 
     def on_edited(self, idx, edit_key, *, text):
-        prior_name = self.bal_window.heirs.pop(edit_key)
+        print("self",self)
+        print("idx",idx)
+        print("edit key",edit_key)
+        print("text",text)
+       
+        original = prior_name = self.bal_window.heirs.get(edit_key)
         print("prior_name",prior_name,text)
+        if not prior_name:
+            return
         col = idx.column()
         print("column",col,self.Columns.LOCKTIME)
         try:
             if col == 3 :
-                text = str_to_locktime(text)
+                try:
+                    text = str_to_locktime(text)
+                except:
+                    print("not a valid locktime")
+                    pass
             prior_name[col-1] = text
             prior_name.insert(0,edit_key)
             prior_name = tuple(prior_name)
-        except:
+        except Exception as e:
+            print("eccezione tupla",e)
             prior_name = (edit_key,)+prior_name[:col-1]+(text,)+prior_name[col:]
-        
-        print("prior_name",prior_name)
-        self.bal_window.set_heir(prior_name)
-        self.update()
+        print("prior_name",prior_name,original)
+       
+        try:
+            self.bal_window.set_heir(prior_name)
+            print("setheir")
+        except Exception as e:
+
+            print("heir non valido ripristino l'originale",e)
+            try:
+                print("setup_original",(edit_key,)+original)
+                self.bal_window.set_heir((edit_key,)+original)
+            except:
+                print("errore nellimpostare original",original)
+                self.update()
 
     def create_menu(self, position):
         menu = QMenu()
@@ -115,7 +138,7 @@ class HeirList(MyTreeView):
                     menu.addAction(_("Edit {}").format(column_title), lambda p=persistent: self.edit(QModelIndex(p)))
             menu.addAction(_("Pay to"), lambda: self.bal_window.payto_heirs(selected_keys))
             menu.addAction(_("Delete"), lambda: self.bal_window.delete_heirs(selected_keys))
-            URLs = [block_explorer_URL(self.config, 'addr', key) for key in filter(is_address, selected_keys)]
+            URLs = [block_explorer_URL(self.config, 'addr', key) for key in filter(s_address, selected_keys)]
             if URLs:
                 menu.addAction(_("View on block explorer"), lambda: [webopen(u) for u in URLs])
 
