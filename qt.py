@@ -19,7 +19,6 @@ from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
 from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
                          QColor, QDesktopServices, qRgba, QPainterPath)
-from PyQt5.QtCore import QObject, pyqtSignal, Qt
 
 from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit)
@@ -41,7 +40,6 @@ from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
-
 
 class Plugin(BalPlugin):
 
@@ -129,19 +127,10 @@ class Plugin(BalPlugin):
         except Exception as e:
             print("error closing plugin",e)
             
-class BalWindow(QObject):
-    error_signal = pyqtSignal(object, object)
+class BalWindow():
     def __init__(self,bal_plugin: 'BalPlugin',window: 'ElectrumWindow'):
-        QObject.__init__(self)
         self.bal_plugin = bal_plugin
         self.window = window
-        self.error_signal.connect(self.error_dialog)
-
-    def error_dialog(self, msg):
-        self.window.show_error(msg, parent=self.window.top_level_window())
-
-    def show_error(self, msg, blocking=False):
-        self.error_signal.emit(msg, blocking)
 
 
     def init_menubar_tools(self,tools_menu):
