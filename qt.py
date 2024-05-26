@@ -16,7 +16,6 @@ file LICENCE or http://www.opensource.org/licenses/mit-license.php
 import os
 import random
 import traceback
-from decimal import Decimal
 from functools import partial
 import sys
 

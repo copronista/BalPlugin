@@ -41,7 +41,6 @@ import urllib.request
 import urllib.parse
 from electrum import constants
 from .bal import BalPlugin
-from decimal import Decimal
 
 if TYPE_CHECKING:
     from .wallet_db import WalletDB
@@ -412,7 +411,7 @@ class Heirs(dict, Logger):
                 percent_amount += float(self[key][HEIR_AMOUNT][:-1])
                 percent_heirs[key] =list(self[key])
             else:
-                heir_amount = int(Decimal(self[key][HEIR_AMOUNT])* pow(10,self.decimal_point))
+                heir_amount = int(float(self[key][HEIR_AMOUNT])* pow(10,self.decimal_point))
                 if heir_amount>wallet.dust_threshold():
                     fixed_amount += heir_amount
                     fixed_heirs[key] = list(self[key])
