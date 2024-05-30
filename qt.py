@@ -40,7 +40,8 @@ from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
-
+from electrum.transaction import tx_from_any
+from time import time
 class Plugin(BalPlugin):
 
     def __init__(self, parent, config, name):
@@ -87,7 +88,7 @@ class Plugin(BalPlugin):
     def get_window(self,window):
         w = self.bal_windows.get(window.winId,None)
         if w is None:
-            w=BalWindow(self,window)
+            w=BalWindow(self,window.top_level_window())
             self.bal_windows[window.winId]=w
         return w
   
@@ -141,7 +142,8 @@ class BalWindow():
         tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
         self.heirs_tab = self.create_heirs_tab()
         self.will_tab = self.create_will_tab()
-
+        for txid,willtx in self.will.items():
+            self.add_info_from_will(willtx['tx'])
         def add_optional_tab(tabs, tab, icon, description):
             tab.tab_icon = icon
             tab.tab_description = description
@@ -257,24 +259,22 @@ class BalWindow():
                    
     def build_inheritance_transaction(self):
         will = {}
-        password=None
-        if self.window.wallet.has_keystore_encryption():            
-            password = self.bal_plugin.password_dialog(parent=self.window)
-            #password = self.window.wallet.password
         try: 
             txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
-            
-            for txid in txs:
-                tx = {}
-                tx['tx'] = txs[txid]
-                tx['my_locktime'] = txs[txid].my_locktime
-                tx['heirsvalue'] = txs[txid].heirsvalue
-                tx['description'] = txs[txid].description
-                tx['willexecutor'] = txs[txid].willexecutor
-                print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
+            if txs: 
+                willid = time()
+                for txid in txs:
+                    tx = {}
+                    tx['tx'] = tx_from_any(str(txs[txid]))
+                    tx['my_locktime'] = txs[txid].my_locktime
+                    tx['heirsvalue'] = txs[txid].heirsvalue
+                    tx['description'] = txs[txid].description
+                    tx['willexecutor'] = txs[txid].willexecutor
+                    tx['willid'] =willid
+                    print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
                 
-                print(tx)
-                will[txid] = self.will[txid] = tx
+                    print(tx)
+                    will[txid] = self.will[txid] = tx
 
             if len(will)>0:
                 if self.bal_plugin.config_get(BalPlugin.PREVIEW):
@@ -292,6 +292,7 @@ class BalWindow():
         except Exception as e:
             print(e)
             self.window.show_message(e)
+            raise e
         return will 
 
 
@@ -360,6 +361,12 @@ class BalWindow():
     def preview_dialog(self, txs):
         w=PreviewDialog(self,txs)
         w.show()
+    def add_info_from_will(self,tx):
+        print(dir(tx))
+        for input in tx.inputs():
+            print(dir(input))
+
+
 
 class bal_checkbox(QCheckBox):
     def __init__(self, plugin,variable):
@@ -374,3 +381,4 @@ def add_widget(grid,label,widget,row,help_):
     grid.addWidget(QLabel(_(label)),row,0)
     grid.addWidget(widget,row,1)
     grid.addWidget(HelpButton(help_),row,2)
+

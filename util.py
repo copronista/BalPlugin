@@ -21,3 +21,45 @@ def str_to_locktime(locktime):
     dt_object = datetime.fromisoformat(locktime)
     timestamp = dt_object.timestamp()
     return int(timestamp)
+
+def encode_amount(amount, decimal_point):
+    if is_perc(amount):
+        return amount
+    else:
+        return int(float(amount)*pow(10,decimal_point))
+
+def decode_amount(amount,decimal_point):
+    if is_perc(amount):
+        return amount
+    else:
+        return str(float(amount)/pow(10,decimal_point))
+
+def is_perc(value): 
+        try:
+            return value[-1] == '%'
+        except:
+            return False
+
+
+def print_var(var):
+    try:
+        print("str:",str(var))
+    except Exception as e:
+        print(e)
+    try:
+        print("repr:",repr(var))
+    except Exception as e: 
+        print(e)
+    try:
+        print("dict:",dict(var))
+    except Exception as e: 
+        print(e)
+    try:
+        print("dir:",dir(var))
+    except Exception as e:
+        print(e)
+    try:
+        print("type:",type(var))
+    except Exception as e:
+        print(e)
+

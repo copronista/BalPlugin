@@ -38,7 +38,7 @@ from electrum.plugin import run_hook
 from electrum.gui.qt.util import webopen, MessageBoxMixin
 from electrum.gui.qt.my_treeview import MyTreeView
 from datetime import datetime
-from ..util import str_to_locktime,locktime_to_str
+from ..util import str_to_locktime,locktime_to_str,encode_amount,decode_amount
 if TYPE_CHECKING:
     from electrum.gui.qt.main_window import ElectrumWindow
 
@@ -69,6 +69,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
             stretch_column=self.Columns.NAME,
             editable_columns=[self.Columns.ADDRESS,self.Columns.AMOUNT,self.Columns.LOCKTIME],
         )
+        self.decimal_point = bal_window.bal_plugin.config.get_decimal_point()
         self.bal_window = bal_window
         self.setModel(QStandardItemModel(self))
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -89,12 +90,16 @@ class HeirList(MyTreeView,MessageBoxMixin):
         col = idx.column()
         print("column",col,self.Columns.LOCKTIME)
         try:
-            if col == 3 :
+            if col == 3:
                 try:
                     text = str_to_locktime(text)
                 except:
                     print("not a valid locktime")
                     pass
+            if col == 2:
+                text = encode_amount(text,self.decimal_point)
+            else:
+                print("porco dio di colonna",col)
             prior_name[col-1] = text
             prior_name.insert(0,edit_key)
             prior_name = tuple(prior_name)
@@ -138,7 +143,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
                     menu.addAction(_("Edit {}").format(column_title), lambda p=persistent: self.edit(QModelIndex(p)))
             menu.addAction(_("Pay to"), lambda: self.bal_window.payto_heirs(selected_keys))
             menu.addAction(_("Delete"), lambda: self.bal_window.delete_heirs(selected_keys))
-            URLs = [block_explorer_URL(self.config, 'addr', key) for key in filter(s_address, selected_keys)]
+            URLs = [block_explorer_URL(self.config, 'addr', key) for key in filter(is_address, selected_keys)]
             if URLs:
                 menu.addAction(_("View on block explorer"), lambda: [webopen(u) for u in URLs])
 
@@ -157,7 +162,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
             labels = [""] * len(self.Columns)
             labels[self.Columns.NAME] = key
             labels[self.Columns.ADDRESS] = heir[0]
-            labels[self.Columns.AMOUNT] = heir[1]
+            labels[self.Columns.AMOUNT] = decode_amount(heir[1],self.decimal_point)
             labels[self.Columns.LOCKTIME] =  str(locktime_to_str(heir[2]))
 
             items = [QStandardItem(x) for x in labels]

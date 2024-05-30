@@ -37,7 +37,7 @@ import json
 import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
-
+from ..util import encode_amount,decode_amount
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -68,7 +68,7 @@ class WillExecutorList(MyTreeView):
         self.setModel(QStandardItemModel(self))
         self.setSortingEnabled(True)
         self.std_model = self.model()
-
+        self.config =parent.bal_plugin.config
         self.selected = self.parent.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
            
 
@@ -135,7 +135,7 @@ class WillExecutorList(MyTreeView):
             self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
             del self.parent.willexecutors_list[edit_key]
         if col == self.Columns.BASE_FEE:
-            self.parent.willexecutors_list[edit_key]["base_fee"] = text
+            self.parent.willexecutors_list[edit_key]["base_fee"] = encode_amount(text)
         if col == self.Columns.ADDRESS:
             self.parent.willexecutors_list[edit_key]["info"] = text
         self.update()
@@ -162,7 +162,7 @@ class WillExecutorList(MyTreeView):
                 labels[self.Columns.SELECTED] = [read_QIcon('confirmed.png'),'']
             else:
                 labels[self.Columns.SELECTED] = ''
-            labels[self.Columns.BASE_FEE] = str(value.get('base_fee',0))
+            labels[self.Columns.BASE_FEE] = decode_amount(value.get('base_fee',0),self.config.get_decimal_point())
             if str(value.get('status',0)) == "200":
                 labels[self.Columns.STATUS] = [read_QIcon('status_connected.png'),'']
             else:

@@ -41,7 +41,7 @@ import urllib.request
 import urllib.parse
 from electrum import constants
 from .bal import BalPlugin
-
+from .util import is_perc
 if TYPE_CHECKING:
     from .wallet_db import WalletDB
     from .simple_config import SimpleConfig
@@ -110,8 +110,6 @@ def parse_locktime_string(locktime,w):
         raise e
 
 
-def is_perc(value):
-    return value[-1] == '%'
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
 
@@ -257,31 +255,40 @@ def invalidate_inheritance_transactions(wallet):
     from pprint import pprint
     pprint(remaining)
 
+def completed_willitem(will):
+    for txid,willitem in will.items():
+        if willitem['tx'].is_complete():
+            yield willitem
+        else:
+            print(f"tx:{txid} is not complete")
 
 #TODO push transactions to willexecutors servers
-def push_transactions_to_willexecutors(txs):
+def push_transactions_to_willexecutors(will,selected_willexecutors):
     willexecutors ={}
-    for txid,tx in txs.items():
-        if not tx.willexecutor: continue
-        willexecutors[tx.willexecutor]=True
-    willexecutors=willexecutors.keys()
+    strtxs=""
+    for willitem in completed_willitem(will):
+        willexecutor=willitem['willexecutor']
+        if  willexecutor: 
+            willexecutors[str(willexecutor)]=willexecutor
+        strtxs += str(willitem['tx'])+"\n"
+        
     if not willexecutors:
         return
-    strtxs = "\n".join(str(tx) for tx in txs.values())
     for url,willexecutor in willexecutors.items():
-        push_transactions_to_willexecutor(txs,selected_willexecutors,url)
+        push_transactions_to_willexecutor(strtxs,selected_willexecutors,willexecutor['url'])
 
-def push_transactions_to_willexecutor(txs,selected_willexecutors, url):
+def push_transactions_to_willexecutor(strtxs,selected_willexecutors, url):
     if url in selected_willexecutors:
         try:
+            print(strtxs.encode('ascii'))
             req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
             req.add_header('Content-Type', 'text/plain')
             with urllib.request.urlopen(req) as response:
                 response_data = response.read().decode('utf-8')
                 if response.status != 200:
                     print(f"error{response.status} pushing txs to: {url}")
-        except:  
-            print(f"error contacting {url} for pushing txs")
+        except Exception as e:  
+            print(f"error contacting {url} for pushing txs",e)
 def getinfo_willexecutor(url,willexecutor):
     try:
         print("GETINFO_WILLEXECUTOR")
@@ -351,7 +358,6 @@ class Heirs(dict, Logger):
         invalidate_inheritance_transactions(wallet)
 
     def save(self):
-        print(dict(self))
         self.db.put('heirs', dict(self))
 
     def import_file(self, path):
@@ -416,7 +422,7 @@ class Heirs(dict, Logger):
                     percent_amount += float(self[key][HEIR_AMOUNT][:-1])
                     percent_heirs[key] =list(self[key])
                 else:
-                    heir_amount = int(float(self[key][HEIR_AMOUNT])* pow(10,self.decimal_point))
+                    heir_amount = int(float(self[key][HEIR_AMOUNT]))
                     if heir_amount>wallet.dust_threshold():
                         fixed_amount += heir_amount
                         fixed_heirs[key] = list(self[key])
@@ -541,7 +547,6 @@ class Heirs(dict, Logger):
                     if "w!ll3x3c" in e.heirname:
                         selected_willexecutors.remove(url)
                         break 
-                print("txs",txs)
                 total_fees = 0
                 total_fees_real = 0
                 total_in = 0

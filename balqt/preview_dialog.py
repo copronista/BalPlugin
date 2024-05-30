@@ -24,13 +24,14 @@
 # SOFTWARE.
 
 import enum
+import copy
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu)
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView)
 
 from electrum.i18n import _
-from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin)
+from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin,BlockingWaitingDialog,WaitingDialog)
 from electrum.util import write_json_file,read_json_file
 from electrum.gui.qt.my_treeview import MyTreeView
 from electrum.gui.qt.transaction_dialog import show_transaction
@@ -39,7 +40,12 @@ import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
 from ..heirs import push_transactions_to_willexecutors
-from ..util import str_to_locktime,locktime_to_str
+from ..util import str_to_locktime,locktime_to_str,print_var,encode_amount,decode_amount
+from electrum.transaction import tx_from_any
+from electrum.network import Network
+from functools import partial
+
+
 class PreviewList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         LOCKTIME = enum.auto()
@@ -67,15 +73,21 @@ class PreviewList(MyTreeView):
 
         )
         self.decimal_point=parent.bal_plugin.config.get_decimal_point
+        self.setModel(QStandardItemModel(self))
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+    
+
         #print("will",will)
         if not will is None:
             self.will = will
         else:
             self.will = parent.will
         self.bal_window = parent
+        self.wallet=parent.window.wallet
         self.setModel(QStandardItemModel(self))
         self.setSortingEnabled(True)
         self.std_model = self.model()
+        self.config = parent.bal_plugin.config
 
         #self.selected = self.parent.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
            
@@ -180,7 +192,7 @@ class PreviewList(MyTreeView):
             labels[self.Columns.LOCKTIME] = locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
             labels[self.Columns.DESCRIPTION] = bal_tx['description']
-            labels[self.Columns.VALUE] = float(float(bal_tx['heirsvalue'])/ pow(10,self.decimal_point()))
+            labels[self.Columns.VALUE] = decode_amount(bal_tx['heirsvalue'],self.config.get_decimal_point())
 
             if tx.is_complete():labels[self.Columns.STATUS] = 'C'
             else:labels[self.Columns.STATUS] = '-'
@@ -217,39 +229,79 @@ class PreviewList(MyTreeView):
 
     def create_toolbar(self, config): 
         toolbar, menu = self.create_toolbar_with_menu('') 
-        menu.addAction(_("&Sign All"), self.sign_transactions) 
+        menu.addAction(_("&Sign All"), self.ask_password_and_sign_transactions) 
         menu.addAction(_("Export"), self.export_file)
         menu.addAction(_("Broadcast"), self.broadcast)
         return toolbar
+     
+    def sign_transactions(self,password):
+        txs={}
+        print_var(self)
+        signed = None
+        tosign = None
+        def get_message():
+            msg = ""
+            if signed:
+                msg=_(f"signed: {signed}\n")
+            return msg + _(f"signing: {tosign}")
+        for txid,willitem in self.will.items():
+            tx = copy.deepcopy(willitem['tx'])
+            #if not tx.is_complete() and tx.is_missing_info_from_network():
+             #   await tx.add_info_from_network(self.wallet.network, timeout=10)
 
-    def sign_transactions(self):
+            #task = partial(self.wallet.sign_transaction, tx, password,ignore_warnings=True)
+            #msg = _(f"Signing transactions...{txid}")
+            #WaitingDialog(self, msg, task, on_success, on_failure)
+            tosign=txid
+            self.waiting_dialog.update(get_message())
+            self.wallet.sign_transaction(tx, password, ignore_warnings=True)
+            signed=tosign
+            #self.bal_window.window.sign_tx(tx,callback=sign_done,external_keypairs=None)
+            print("tx: {} is complete:{}".format(txid, tx.is_complete()))
+            txs[txid]=tx
+        return txs
+
+    def ask_password_and_sign_transactions(self):
+        def on_success(txs):
+            for txid,tx in txs.items():
+                self.bal_window.will[txid]['tx'] = self.will[txid]['tx']=copy.deepcopy(tx)
+            #self.bal_window.will[txid]['tx']=tx_from_any(str(tx))
+            self.update()
+            self.bal_window.will_list.update()
+        def on_failure(exc_info):
+            print("sign fail")
+
+
         password = None
         if self.wallet.has_keystore_encryption():
             password = self.bal_plugin.password_dialog(parent=self.bal.window)
-        for txid,tx in self.will.items():
-            self.wallet.sign_transaction(tx, password, ignore_warnings=True)
-
-        self.transactions_list.update()
+        #self.sign_transactions(password)
+        
+        task = partial(self.sign_transactions, password)
+        msg = _('Signing transactions...')
+        self. waiting_dialog = WaitingDialog(self, msg, task, on_success, on_failure)
+        
+                    
 
 
 
 
     def export_inheritance_handler(self,path):
         with open(path,"w") as f:
-            for tx in self.will:
-                f.write(str(tx))
+            for txid,tx in self.will.items():
+                f.write(str(tx['tx']))
                 f.write('\n')
 
     def export_file(self):
         try:
-            export_meta_gui(self.window, _('heirs_transactions'), self.export_inheritance_handler)
+            export_meta_gui(self.bal_window.window, _('heirs_transactions'), self.export_inheritance_handler)
         except Exception as e:
             self.bal_window.window.show_error(str(e))
             raise e
         return
 
     def broadcast(self):
-        push_transactions_to_willexecutors(self.will)
+        push_transactions_to_willexecutors(self.will, self.bal_window.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS))
 
 """
     def ping_servers(self):
@@ -299,7 +351,7 @@ class PreviewDialog(QDialog,MessageBoxMixin):
         buttonbox = QHBoxLayout()
 
         b = QPushButton(_('Sign'))
-        b.clicked.connect(self.transactions_list.sign_transactions)
+        b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
         buttonbox.addWidget(b)
 
         b = QPushButton(_('Export'))
@@ -313,7 +365,7 @@ class PreviewDialog(QDialog,MessageBoxMixin):
 
         vbox.addLayout(buttonbox)
 
-        self.transactions_list.update()
+        self.update()
 
 
     def update_will(self,will):
@@ -323,6 +375,7 @@ class PreviewDialog(QDialog,MessageBoxMixin):
     
     def update(self):
         self.transactions_list.update()
+
     def is_hidden(self):
         return self.isMinimized() or self.isHidden()
 
