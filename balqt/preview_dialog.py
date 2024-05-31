@@ -88,6 +88,7 @@ class PreviewList(MyTreeView):
         self.setSortingEnabled(True)
         self.std_model = self.model()
         self.config = parent.bal_plugin.config
+        self.bal_plugin=self.bal_window.bal_plugin
 
         #self.selected = self.parent.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
            
