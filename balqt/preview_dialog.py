@@ -274,7 +274,7 @@ class PreviewList(MyTreeView):
 
         password = None
         if self.wallet.has_keystore_encryption():
-            password = self.bal_plugin.password_dialog(parent=self.bal_plugin.window)
+            password = self.bal_plugin.password_dialog(parent=self.bal_window.window)
         #self.sign_transactions(password)
         
         task = partial(self.sign_transactions, password)

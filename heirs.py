@@ -271,13 +271,14 @@ def push_transactions_to_willexecutors(will,selected_willexecutors):
         if  willexecutor: 
             willexecutors[str(willexecutor)]=willexecutor
         strtxs += str(willitem['tx'])+"\n"
-        
+    print(willexecutors)
     if not willexecutors:
         return
     for url,willexecutor in willexecutors.items():
         push_transactions_to_willexecutor(strtxs,selected_willexecutors,willexecutor['url'])
 
 def push_transactions_to_willexecutor(strtxs,selected_willexecutors, url):
+    print(url,selected_willexecutors)
     if url in selected_willexecutors:
         try:
             print(strtxs.encode('ascii'))
