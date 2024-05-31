@@ -31,6 +31,7 @@ from electrum.transaction import TxOutput
 from electrum import bitcoin
 from electrum import dnssec
 from electrum.util import read_json_file, write_json_file, to_string,bfh
+import json
 from electrum.logging import Logger, get_logger
 from electrum.util import trigger_callback
 from electrum import descriptor
@@ -291,19 +292,21 @@ def push_transactions_to_willexecutor(strtxs,selected_willexecutors, url):
         except Exception as e:  
             print(f"error contacting {url} for pushing txs",e)
 def getinfo_willexecutor(url,willexecutor):
+    w=None
     try:
         print("GETINFO_WILLEXECUTOR")
         print(url)
         req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info", method='GET')
         with urllib.request.urlopen(req) as response:
             response_data=response.read().decode('utf-8')
-            print("response_data", response_data)
+
+            w = json.loads(response_data)
+            print("response_data", w['address'])
             if response.status != 200:
                 print(f"error{response.status} pushing txs to: {url}")
     except Exception as e:
         print(f"error {e} contacting {url}")
-    w={}
-    return {"address":w.get("address",willexecutor["address"]),"base_fee":w.get("base_fee",willexecutor["base_fee"])}
+    return w 
 def print_transaction(heirs,tx,locktimes,tx_fees):
     jtx=tx.to_json()
     print(f"TX: {tx.txid()}\t-\tLocktime: {jtx['locktime']}")
