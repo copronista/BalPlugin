@@ -247,6 +247,7 @@ class BalWindow():
 
     def delete_heirs(self,heir):
         del self.heirs[heir[0]]
+        self.heirs.save()
         self.heir_list.update()
         return True
     
