@@ -40,6 +40,7 @@ from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
+from .util import encode_amount
 from electrum.transaction import tx_from_any
 from time import time
 class Plugin(BalPlugin):
@@ -221,7 +222,7 @@ class BalWindow():
             heir = [
                     heir_name.text(),
                     heir_address.text(),
-                    heir_amount.text(),
+                    encode_amount(heir_amount.text(),self.bal_plugin.config.get_decimal_point()),
                     str(heir_locktime.get_locktime()),
                     ]
             try:
