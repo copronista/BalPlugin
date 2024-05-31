@@ -362,10 +362,8 @@ class BalWindow():
         w=PreviewDialog(self,txs)
         w.show()
     def add_info_from_will(self,tx):
-        print(dir(tx))
         for input in tx.inputs():
-            print(dir(input))
-
+            pass
 
 
 class bal_checkbox(QCheckBox):

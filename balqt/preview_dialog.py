@@ -40,7 +40,7 @@ import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
 from ..heirs import push_transactions_to_willexecutors
-from ..util import str_to_locktime,locktime_to_str,print_var,encode_amount,decode_amount
+from ..util import str_to_locktime,locktime_to_str,encode_amount,decode_amount
 from electrum.transaction import tx_from_any
 from electrum.network import Network
 from functools import partial
@@ -113,7 +113,7 @@ class PreviewList(MyTreeView):
                 menu.addAction(_("deselect").format(column_title), lambda: self.deselect(selected_keys))
             else:
             """    
-            menu.addAction(_("select").format(column_title), lambda: self.select(selected_keys))
+            #menu.addAction(_("select").format(column_title), lambda: self.select(selected_keys))
             menu.addAction(_("details").format(column_title), lambda: self.show_transaction(selected_keys))
             menu.addSeparator()
             menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
@@ -236,7 +236,6 @@ class PreviewList(MyTreeView):
      
     def sign_transactions(self,password):
         txs={}
-        print_var(self)
         signed = None
         tosign = None
         def get_message():

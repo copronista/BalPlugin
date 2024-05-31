@@ -480,8 +480,6 @@ class Heirs(dict, Logger):
     def is_perc(self,key):
         return is_perc(self[key][HEIR_AMOUNT])
     def buildTransactions(self,bal_plugin,wallet):
-        print(self)
-        print(dir(self))
         Heirs._validate(self)
         if len(self)<=0:
             return
