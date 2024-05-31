@@ -306,7 +306,7 @@ def getinfo_willexecutor(url,willexecutor):
                 print(f"error{response.status} pushing txs to: {url}")
     except Exception as e:
         print(f"error {e} contacting {url}")
-    return w 
+    return w or willexecutor 
 def print_transaction(heirs,tx,locktimes,tx_fees):
     jtx=tx.to_json()
     print(f"TX: {tx.txid()}\t-\tLocktime: {jtx['locktime']}")
@@ -520,7 +520,7 @@ class Heirs(dict, Logger):
                     continue
                 willexecutor["url"]=url
                 willexecutor_info=getinfo_willexecutor(url,willexecutor)
-                if not willexecutor_info["address"]:
+                if not willexecutor_info.get("address",None):
                     print(f"{willexecutor_info} no address")
                     continue
                 willexecutor["address"]=willexecutor_info["address"]
