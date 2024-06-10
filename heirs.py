@@ -42,7 +42,7 @@ import urllib.request
 import urllib.parse
 from electrum import constants
 from .bal import BalPlugin
-from .util import is_perc
+from .util import is_perc, print_var,print_utxo
 if TYPE_CHECKING:
     from .wallet_db import WalletDB
     from .simple_config import SimpleConfig
@@ -134,11 +134,12 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         used_utxos = []
         try:
             while utxo := available_utxos.pop():
-                    value = utxo.value_sats()
-                    in_amount += value
-                    used_utxos.append(utxo)
-                    if in_amount > out_amount:
-                        break
+                #print_utxo(utxo,"UTXO")
+                value = utxo.value_sats()
+                in_amount += value
+                used_utxos.append(utxo)
+                if in_amount > out_amount:
+                    break
 
         except IndexError:
             pass
@@ -183,17 +184,20 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         else: tx.description = ""
         tx.heirsvalue = heirsvalue
         tx.set_rbf(True) 
-#        tx.remove_signatures()
-#        wallet.sign_transaction(tx, password, ignore_warnings=True)
+        tx.remove_signatures()
+        #wallet.sign_transaction(tx, "a" )
+        #print_var(tx,"TX")
         txid = tx.txid()
         if txid is None:
             raise Exception("txid is none",tx)
         
         tx.my_locktime = locktime
         txsout[txid]=tx
-        
+         
         changes= tx.get_change_outputs()
         for change in changes:
+            #print_var(change,"CHANGE")
+        
             change_idx=tx.get_output_idxs_from_address(change.address)
             prevout = TxOutpoint(txid=bfh(tx.txid()), out_idx=change_idx.pop())
             txin = PartialTxInput(prevout=prevout)
@@ -201,8 +205,10 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
             txin.script_descriptor = change.script_descriptor
             txin.is_mine=True
             txin._TxInput__address=change.address
-            txin.script_sig = b''
-
+            txin._TxInput__scriptpubkey = change.scriptpubkey
+            txin._TxInput__value_sats = change.value
+            txin.utxo = tx
+            #print_utxo(txin,"TXIN")
             available_utxos.append(txin)
         
     return txsout
@@ -272,17 +278,16 @@ def push_transactions_to_willexecutors(will,selected_willexecutors):
         if  willexecutor: 
             willexecutors[str(willexecutor)]=willexecutor
         strtxs += str(willitem['tx'])+"\n"
-    print(willexecutors)
+    #print(willexecutors)
     if not willexecutors:
         return
     for url,willexecutor in willexecutors.items():
         push_transactions_to_willexecutor(strtxs,selected_willexecutors,willexecutor['url'])
 
 def push_transactions_to_willexecutor(strtxs,selected_willexecutors, url):
-    print(url,selected_willexecutors)
+    print(url,selected_willexecutors,strtxs)
     if url in selected_willexecutors:
         try:
-            print(strtxs.encode('ascii'))
             req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
             req.add_header('Content-Type', 'text/plain')
             with urllib.request.urlopen(req) as response:
@@ -310,10 +315,10 @@ def getinfo_willexecutor(url,willexecutor):
 def print_transaction(heirs,tx,locktimes,tx_fees):
     jtx=tx.to_json()
     print(f"TX: {tx.txid()}\t-\tLocktime: {jtx['locktime']}")
-    print(f"--------INPUTS: {len(jtx['inputs'])}\t{tx.input_value()}--------")
+    print(f"---")
     for inp in jtx["inputs"]:
         print(f"{inp['address']}: {inp['value_sats']}")
-    print(f"--------OUTPUTS: {len(jtx['outputs'])}\t{tx.output_value()}--------")
+    print(f"---")
     for out in jtx["outputs"]:
         heirname=""
         for key in heirs.keys():
@@ -694,10 +699,7 @@ class Heirs(dict, Logger):
         return (address,amount,locktime)
 
     def _validate(data):
-        print("validating data,self")
-        print(data)
         for k, v in list(data.items()):
-            print(f"validating{k},{v}")
             if k == 'heirs':
                 return Heirs._validate(v)
                        #data.pop(k)

@@ -34,13 +34,14 @@ from electrum.gui.qt.password_dialog import PasswordDialog
 
 from .bal import BalPlugin
 from .heirs import Heirs
+from .will import Will
 
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
-from .util import encode_amount
+from .util import encode_amount,print_var,get_current_height, search_willtx_per_io,chk_locktime
 from electrum.transaction import tx_from_any
 from time import time
 class Plugin(BalPlugin):
@@ -86,10 +87,17 @@ class Plugin(BalPlugin):
         w = self.get_window(window)
         w.init_menubar_tools(tools_menu)
 
+    @hook
+    def on_close_window(self,window):
+            w = self.get_window(window)
+            w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
+            
+
+
     def get_window(self,window):
         w = self.bal_windows.get(window.winId,None)
         if w is None:
-            w=BalWindow(self,window.top_level_window())
+            w=BalWindow(self,window)
             self.bal_windows[window.winId]=w
         return w
   
@@ -133,12 +141,13 @@ class BalWindow():
     def __init__(self,bal_plugin: 'BalPlugin',window: 'ElectrumWindow'):
         self.bal_plugin = bal_plugin
         self.window = window
+        self.wallet = self.window.wallet
 
 
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
-        self.heirs = Heirs._validate(Heirs(self.window.wallet.db))
-        self.will=self.window.wallet.db.get_dict('will')
+        self.heirs = Heirs._validate(Heirs(self.wallet.db))
+        self.will=self.wallet.db.get_dict("will")
         tools_menu.addSeparator()
         tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
         self.heirs_tab = self.create_heirs_tab()
@@ -232,10 +241,10 @@ class BalWindow():
                 self.window.show_error(str(e))
 
     def export_inheritance_handler(self,path):
-        txs = self.build_inheritance_transaction()
+        txs = self.build_inheritance_transaction(ignore_duplicate=True, keep_original=False)
         with open(path,"w") as f:
             for tx in txs:
-                f.write(str(tx))
+                f.write(str(tx['tx']))
                 f.write('\n')
  
     def set_heir(self,heir):
@@ -257,9 +266,8 @@ class BalWindow():
 
     def export_heirs(self):
         export_meta_gui(self.window, _('heirs'), self.heirs.export_file)
-
-                   
-    def build_inheritance_transaction(self):
+    
+    def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         will = {}
         try: 
             txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
@@ -267,16 +275,39 @@ class BalWindow():
                 willid = time()
                 for txid in txs:
                     tx = {}
-                    tx['tx'] = tx_from_any(str(txs[txid]))
+                    tx['tx'] = txs[txid]
                     tx['my_locktime'] = txs[txid].my_locktime
                     tx['heirsvalue'] = txs[txid].heirsvalue
                     tx['description'] = txs[txid].description
                     tx['willexecutor'] = txs[txid].willexecutor
+                    tx['status'] = 'New'
                     tx['willid'] =willid
                     print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
-                
-                    print(tx)
-                    will[txid] = self.will[txid] = tx
+                    if not txid in self.will:
+                        wid,w = search_tx_per_io(self.will,tx)
+                        locktime = int(w['tx'].locktime)
+                        print("LOCKTIME",locktime)
+                        locktime_time=self.get_config(BalPlugin.LOCKTIME_TIME)
+                        locktime_blocks=self.get_config(BalPlugin.LOCKTIME_BLOCKS)
+                        date_to_check = datetime.datetime.now()+datetime.timedelta(days=locktime_time)
+                        block_to_check = get_current_height(self.wallet.network) + locktime_blocks
+                        if ignore_duplicate and (not wid or chk_locktime(date_to_check,block_to_check,locktime)):
+                            continue
+                    else:
+                        if ignore_duplicate:
+                            continue
+                        if keep_original:
+                            tx = self.will[txid]
+                    try:
+                        self.will[txid] = tx
+                    except Exception as e:
+                        print("error saving will", e)
+                        print_var(self.will)
+
+                    will[txid] = self.will[txid]
+                    
+
+                    
 
             if len(will)>0:
                 if self.bal_plugin.config_get(BalPlugin.PREVIEW):
@@ -362,7 +393,8 @@ class BalWindow():
     #tx list display txid, willexecutor, qrcode, button to sign
     def preview_dialog(self, txs):
         w=PreviewDialog(self,txs)
-        w.show()
+        w.exec_()
+        return w
     def add_info_from_will(self,tx):
         for input in tx.inputs():
             pass

@@ -135,7 +135,7 @@ class WillExecutorList(MyTreeView):
             self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
             del self.parent.willexecutors_list[edit_key]
         if col == self.Columns.BASE_FEE:
-            self.parent.willexecutors_list[edit_key]["base_fee"] = encode_amount(text)
+            self.parent.willexecutors_list[edit_key]["base_fee"] = encode_amount(text,self.config.get_decimal_point())
         if col == self.Columns.ADDRESS:
             self.parent.willexecutors_list[edit_key]["info"] = text
         self.update()

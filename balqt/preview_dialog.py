@@ -31,7 +31,7 @@ from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView)
 
 from electrum.i18n import _
-from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin,BlockingWaitingDialog,WaitingDialog)
+from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin,BlockingWaitingDialog,WaitingDialog,WindowModalDialog)
 from electrum.util import write_json_file,read_json_file
 from electrum.gui.qt.my_treeview import MyTreeView
 from electrum.gui.qt.transaction_dialog import show_transaction
@@ -40,11 +40,11 @@ import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
 from ..heirs import push_transactions_to_willexecutors
-from ..util import str_to_locktime,locktime_to_str,encode_amount,decode_amount
+from ..util import str_to_locktime,locktime_to_str,encode_amount,decode_amount,print_utxo
 from electrum.transaction import tx_from_any
 from electrum.network import Network
 from functools import partial
-
+import json
 
 class PreviewList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
@@ -192,12 +192,10 @@ class PreviewList(MyTreeView):
             #print("willlocktime",tx.locktime)
             labels[self.Columns.LOCKTIME] = locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
-            labels[self.Columns.DESCRIPTION] = bal_tx['description']
-            labels[self.Columns.VALUE] = decode_amount(bal_tx['heirsvalue'],self.config.get_decimal_point())
-
-            if tx.is_complete():labels[self.Columns.STATUS] = 'C'
-            else:labels[self.Columns.STATUS] = '-'
-
+            labels[self.Columns.DESCRIPTION] = bal_tx.get('description','')
+            labels[self.Columns.VALUE] = decode_amount(bal_tx.get('heirsvalue',0),self.config.get_decimal_point())
+            labels[self.Columns.STATUS] = bal_tx.get('status','None')
+            
             
             
             items=[]
@@ -254,8 +252,28 @@ class PreviewList(MyTreeView):
             #WaitingDialog(self, msg, task, on_success, on_failure)
             tosign=txid
             self.waiting_dialog.update(get_message())
-            self.wallet.sign_transaction(tx, password, ignore_warnings=True)
+            for txin in tx.inputs():
+                print_utxo(txin,"UTXO")
+                prevout = txin.prevout.to_json()
+                if prevout[0] in self.will:
+                    print("TROVATO",self.will[prevout[0]])
+                    change = self.will[prevout[0]]['tx'].outputs()[prevout[1]]
+                    txin._trusted_value_sats = change.value
+                    txin.script_descriptor = change.script_descriptor
+                    txin.is_mine=True
+                    txin._TxInput__address=change.address
+                    txin._TxInput__scriptpubkey = change.scriptpubkey
+                    txin._TxInput__value_sats = change.value
+                    print_utxo(txin)
+                print(">>>>>>>>",txin.spent_txid)
+         
+
+            self.wallet.sign_transaction(tx, password,ignore_warnings=True)
             signed=tosign
+            is_complete=False
+            if tx.is_complete():
+                is_complete=True
+                willitem['status'] = "Complete"
             #self.bal_window.window.sign_tx(tx,callback=sign_done,external_keypairs=None)
             print("tx: {} is complete:{}".format(txid, tx.is_complete()))
             txs[txid]=tx
@@ -269,7 +287,7 @@ class PreviewList(MyTreeView):
             self.update()
             self.bal_window.will_list.update()
         def on_failure(exc_info):
-            print("sign fail")
+            print("sign fail",exc_info)
 
 
         password = None
@@ -287,10 +305,14 @@ class PreviewList(MyTreeView):
 
 
     def export_inheritance_handler(self,path):
+        w=copy.deepcopy(self.will)
+        for txid,willitem in self.will.items():
+            w[txid]['tx']=str(willitem['tx'])
         with open(path,"w") as f:
-            for txid,tx in self.will.items():
-                f.write(str(tx['tx']))
-                f.write('\n')
+            json.dump(w,f)
+            #for txid,tx in self.will.items():
+            #    f.write(js))
+            #    f.write('\n')
 
     def export_file(self):
         try:
@@ -299,6 +321,9 @@ class PreviewList(MyTreeView):
             self.bal_window.window.show_error(str(e))
             raise e
         return
+    def import_file(self):
+        pass
+
 
     def broadcast(self):
         push_transactions_to_willexecutors(self.will, self.bal_window.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS))
@@ -328,10 +353,10 @@ def get_willexecutors_list_from_json(config):
         return {}
 """
 
-class PreviewDialog(QDialog,MessageBoxMixin):
+class PreviewDialog(WindowModalDialog,MessageBoxMixin):
     def __init__(self, bal_window, will):
-        self.parent = bal_window.window
-        QDialog.__init__(self,parent=bal_window.window)
+        self.parent = bal_window.window.top_level_window()
+        QDialog.__init__(self,parent=self.parent)
         self.bal_plugin = bal_window.bal_plugin
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config
