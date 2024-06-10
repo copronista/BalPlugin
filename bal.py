@@ -52,7 +52,7 @@ class BalPlugin(BasePlugin):
         PREVIEW: True,
         SAVE_TXS: True,
         WILLEXECUTORS:  {
-            'https://bitcoinafter.life/': {
+            'https://bitcoin-after.life/': {
                 "base_fee": 100000,
                 "status": 0,
                 "info":"Bitcoin After Life Will Executor"

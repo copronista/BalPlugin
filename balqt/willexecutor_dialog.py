@@ -131,14 +131,17 @@ class WillExecutorList(MyTreeView):
 
         col = idx.column()
         print("col",col)
-        if col == self.Columns.URL:
-            self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
-            del self.parent.willexecutors_list[edit_key]
-        if col == self.Columns.BASE_FEE:
-            self.parent.willexecutors_list[edit_key]["base_fee"] = encode_amount(text,self.config.get_decimal_point())
-        if col == self.Columns.ADDRESS:
-            self.parent.willexecutors_list[edit_key]["info"] = text
-        self.update()
+        try:
+            if col == self.Columns.URL:
+                self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
+                del self.parent.willexecutors_list[edit_key]
+            if col == self.Columns.BASE_FEE:
+                self.parent.willexecutors_list[edit_key]["base_fee"] = encode_amount(text,self.config.get_decimal_point())
+            if col == self.Columns.ADDRESS:
+                self.parent.willexecutors_list[edit_key]["info"] = text
+            self.update()
+        except Exception as e:
+            print("error saving willexecutor:",e)
 
     def update(self):
         if self.parent.willexecutors_list is None:
@@ -228,13 +231,10 @@ class WillExecutorDialog(QDialog,MessageBoxMixin):
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config
         self.window = bal_window.window
-        self.willexecutors_list = self.bal_plugin.config_get(BalPlugin.WILLEXECUTORS) or {
-            'https://bitcoinafter.life/': {
-                "base_fee": 100000,
-                "status": 0,
-                "info":"Bitcoin After Life Will Executor"
-            }
-        }
+        self.willexecutors_list = self.bal_plugin.config_get(BalPlugin.WILLEXECUTORS)
+        bal=BalPlugin.DEFAULT_SETTINGS[BalPlugin.WILLEXECUTORS]
+        if not bal in self.willexecutors_list.items():
+            self.willexecutors_list.update(BalPlugin.DEFAULT_SETTINGS[BalPlugin.WILLEXECUTORS])
         
         self.setWindowTitle(_('WillExecutor Service List'))
         self.setMinimumSize(800, 200)
