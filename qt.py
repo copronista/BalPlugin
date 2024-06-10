@@ -34,7 +34,6 @@ from electrum.gui.qt.password_dialog import PasswordDialog
 
 from .bal import BalPlugin
 from .heirs import Heirs
-from .will import Will
 
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
