@@ -135,7 +135,8 @@ class PreviewList(MyTreeView):
         
     def show_transaction(self,selected_keys):
         for key in selected_keys:
-            show_transaction(self.will[key]['tx'], parent=self.bal_window.window)
+            self.bal_window.window.show_transaction(self.will[key]['tx'])
+            #self.show_transaction(self.will[key]['tx'], parent=self.bal_window.window.top_level_window())
 
         self.update()
 
@@ -153,8 +154,7 @@ class PreviewList(MyTreeView):
     def on_edited(self, idx, edit_key, *, text):
         prior_name = self.parent.willexecutors_list[edit_key]
         print("prior_name",prior_name)
-        print("idx",idx)
-        print("edit_key",edit_key)
+        aarint("edit_key",edit_key)
 
         col = idx.column()
         print("col",col)
@@ -259,7 +259,10 @@ class PreviewList(MyTreeView):
                     print("TROVATO",self.will[prevout[0]])
                     change = self.will[prevout[0]]['tx'].outputs()[prevout[1]]
                     txin._trusted_value_sats = change.value
-                    txin.script_descriptor = change.script_descriptor
+                    try:
+                        txin.script_descriptor = change.script_descriptor
+                    except:
+                        pass
                     txin.is_mine=True
                     txin._TxInput__address=change.address
                     txin._TxInput__scriptpubkey = change.scriptpubkey
@@ -355,13 +358,19 @@ def get_willexecutors_list_from_json(config):
 
 class PreviewDialog(WindowModalDialog,MessageBoxMixin):
     def __init__(self, bal_window, will):
-        self.parent = bal_window.window.top_level_window()
-        QDialog.__init__(self,parent=self.parent)
+        self.parent = bal_window.window
+        WindowModalDialog.__init__(self,parent=self.parent)
         self.bal_plugin = bal_window.bal_plugin
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config
         self.bal_window = bal_window
         self.wallet = bal_window.window.wallet
+        self.format_amount = bal_window.window.format_amount
+        self.base_unit = bal_window.window.base_unit
+        self.format_fiat_and_units = bal_window.window.format_fiat_and_units 
+        self.fx = bal_window.window.fx 
+        self.format_fee_rate = bal_window.window.format_fee_rate
+        self.show_address = bal_window.window.show_address
         if not will:
             self.will = bal_window.will
         else:

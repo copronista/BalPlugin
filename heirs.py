@@ -113,7 +113,7 @@ def parse_locktime_string(locktime,w):
 
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
-
+    available_utxos=sorted(available_utxos, key=lambda x:x.value_sats())
     total_used_utxos = []
     txsout={}
     for locktime,heirs in locktimes.items():
@@ -132,6 +132,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
 
         in_amount = 0.0
         used_utxos = []
+        print_var(available_utxos)
         try:
             while utxo := available_utxos.pop():
                 #print_utxo(utxo,"UTXO")

@@ -40,7 +40,7 @@ from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
-from .util import encode_amount,print_var,get_current_height, search_willtx_per_io,chk_locktime
+from .util import encode_amount,print_var,get_current_height, search_willtx_per_io,chk_locktime,search_willtx_per_io
 from electrum.transaction import tx_from_any
 from time import time
 class Plugin(BalPlugin):
@@ -283,15 +283,16 @@ class BalWindow():
                     tx['willid'] =willid
                     print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
                     if not txid in self.will:
-                        wid,w = search_tx_per_io(self.will,tx)
-                        locktime = int(w['tx'].locktime)
-                        print("LOCKTIME",locktime)
-                        locktime_time=self.get_config(BalPlugin.LOCKTIME_TIME)
-                        locktime_blocks=self.get_config(BalPlugin.LOCKTIME_BLOCKS)
-                        date_to_check = datetime.datetime.now()+datetime.timedelta(days=locktime_time)
-                        block_to_check = get_current_height(self.wallet.network) + locktime_blocks
-                        if ignore_duplicate and (not wid or chk_locktime(date_to_check,block_to_check,locktime)):
-                            continue
+                        wid,w = search_willtx_per_io(self.will,tx)
+                        if wid:
+                            locktime = int(w['tx'].locktime)
+                            print("LOCKTIME",locktime)
+                            locktime_time=self.get_config(BalPlugin.LOCKTIME_TIME)
+                            locktime_blocks=self.get_config(BalPlugin.LOCKTIME_BLOCKS)
+                            date_to_check = datetime.datetime.now()+datetime.timedelta(days=locktime_time)
+                            block_to_check = get_current_height(self.wallet.network) + locktime_blocks
+                            if ignore_duplicate and (not wid or chk_locktime(date_to_check,block_to_check,locktime)):
+                                continue
                     else:
                         if ignore_duplicate:
                             continue
@@ -315,8 +316,6 @@ class BalWindow():
                     if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
                         self.preview_dialog(will)
 
-            else:
-                self.window.show_message(_("no tx to be created"))
             self.window.history_list.update()
             self.window.utxo_list.update()
             self.window.labels_changed_signal.emit()

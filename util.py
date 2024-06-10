@@ -80,7 +80,9 @@ def get_lowest_locktimes_from_will(will):
 
 def search_willtx_per_io(will,tx):
     for wid, w in will.items():
-        if cmp_txs(w['tx'],tx):
+        print_var(tx,"tx")
+        print_var(w['tx'],"wtx")
+        if cmp_txs(w['tx'],tx['tx']):
             return wid,w
     return None, None
 
