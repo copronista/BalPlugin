@@ -9,4 +9,4 @@ def version():
             out = str(f.read()).strip()
     except:
         pass
-    return out
+    return f"v0.0.0.{out}"
