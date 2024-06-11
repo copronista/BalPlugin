@@ -308,6 +308,8 @@ class PreviewList(MyTreeView):
 
 
     def export_inheritance_handler(self,path):
+        write_json_file(path, self.will)
+        """
         w=copy.deepcopy(self.will)
         for txid,willitem in self.will.items():
             w[txid]['tx']=str(willitem['tx'])
@@ -316,7 +318,7 @@ class PreviewList(MyTreeView):
             #for txid,tx in self.will.items():
             #    f.write(js))
             #    f.write('\n')
-
+        """
     def export_file(self):
         try:
             export_meta_gui(self.bal_window.window, _('heirs_transactions'), self.export_inheritance_handler)
