@@ -37,7 +37,7 @@ import json
 import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
-from ..util import encode_amount,decode_amount
+from ..util import Util
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -136,7 +136,7 @@ class WillExecutorList(MyTreeView):
                 self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
                 del self.parent.willexecutors_list[edit_key]
             if col == self.Columns.BASE_FEE:
-                self.parent.willexecutors_list[edit_key]["base_fee"] = encode_amount(text,self.config.get_decimal_point())
+                self.parent.willexecutors_list[edit_key]["base_fee"] = Util.encode_amount(text,self.config.get_decimal_point())
             if col == self.Columns.ADDRESS:
                 self.parent.willexecutors_list[edit_key]["info"] = text
             self.update()
@@ -165,7 +165,7 @@ class WillExecutorList(MyTreeView):
                 labels[self.Columns.SELECTED] = [read_QIcon('confirmed.png'),'']
             else:
                 labels[self.Columns.SELECTED] = ''
-            labels[self.Columns.BASE_FEE] = decode_amount(value.get('base_fee',0),self.config.get_decimal_point())
+            labels[self.Columns.BASE_FEE] = Util.decode_amount(value.get('base_fee',0),self.config.get_decimal_point())
             if str(value.get('status',0)) == "200":
                 labels[self.Columns.STATUS] = [read_QIcon('status_connected.png'),'']
             else:

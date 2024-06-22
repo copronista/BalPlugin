@@ -8,7 +8,7 @@ from electrum.util import to_bytes, bfh
 from electrum import json_db
 from electrum.transaction import tx_from_any
 
-from .util import print_var
+from .util import Util
 json_db.register_dict('heirs', tuple, None)
 json_db.register_dict('will', lambda x: get_will(x), None)
 
@@ -16,7 +16,7 @@ def get_will(x):
     try:
         x['tx']=tx_from_any(x['tx'])
     except Exception as e:
-        print_var(x)
+        Util.print_var(x)
         raise e
 
     return x
@@ -61,6 +61,13 @@ class BalPlugin(BasePlugin):
         SELECTED_WILLEXECUTORS:[],
     }
 
+    STATUS_NEW = 'New'
+    STATUS_COMPLETE = 'Complete'
+    STATUS_BROADCASTED = 'Broadcasted'
+    STATUS_PUSHED = 'Pushed'
+    STATUS_EXPORTED = 'Exported'
+    STATUS_REPLACED = 'Replaced'
+    STATUS_INVALIDATED = 'Invalidated' 
 
     LATEST_VERSION = '1'
     KNOWN_VERSIONS = ('0', '1')
@@ -71,6 +78,7 @@ class BalPlugin(BasePlugin):
     def __init__(self, parent, config, name):
         BasePlugin.__init__(self, parent, config, name)
         self.base_dir = os.path.join(config.electrum_path(), 'bal')
+        print(self.base_dir)
         self.parent = parent
         self.config = config
         self.name = name

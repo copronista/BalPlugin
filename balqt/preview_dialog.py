@@ -40,7 +40,7 @@ import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
 from ..heirs import push_transactions_to_willexecutors
-from ..util import str_to_locktime,locktime_to_str,encode_amount,decode_amount,print_utxo
+from ..util import Util 
 from electrum.transaction import tx_from_any
 from electrum.network import Network
 from functools import partial
@@ -168,7 +168,7 @@ class PreviewList(MyTreeView):
         self.update()
     """
     def update_will(self,will):
-        self.will=will
+        self.will.update(will)
         self.update()
 
     def update(self):
@@ -190,10 +190,10 @@ class PreviewList(MyTreeView):
             tx=bal_tx['tx']
             labels = [""] * len(self.Columns)
             #print("willlocktime",tx.locktime)
-            labels[self.Columns.LOCKTIME] = locktime_to_str(tx.locktime)
+            labels[self.Columns.LOCKTIME] = Util.locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
             labels[self.Columns.DESCRIPTION] = bal_tx.get('description','')
-            labels[self.Columns.VALUE] = decode_amount(bal_tx.get('heirsvalue',0),self.config.get_decimal_point())
+            labels[self.Columns.VALUE] = Util.decode_amount(bal_tx.get('heirsvalue',0),self.config.get_decimal_point())
             labels[self.Columns.STATUS] = bal_tx.get('status','None')
             
             
@@ -244,6 +244,10 @@ class PreviewList(MyTreeView):
             return msg + _(f"signing: {tosign}")
         for txid,willitem in self.will.items():
             tx = copy.deepcopy(willitem['tx'])
+            if BalPlugin.STATUS_COMPLETE in willitem['status']:
+                print("altready signed",txid)
+                txs[txid]=tx
+                continue 
             #if not tx.is_complete() and tx.is_missing_info_from_network():
              #   await tx.add_info_from_network(self.wallet.network, timeout=10)
 
@@ -253,10 +257,10 @@ class PreviewList(MyTreeView):
             tosign=txid
             self.waiting_dialog.update(get_message())
             for txin in tx.inputs():
-                print_utxo(txin,"UTXO")
+                #print_utxo(txin,"UTXO")
                 prevout = txin.prevout.to_json()
                 if prevout[0] in self.will:
-                    print("TROVATO",self.will[prevout[0]])
+                    #print("TROVATO",self.will[prevout[0]])
                     change = self.will[prevout[0]]['tx'].outputs()[prevout[1]]
                     txin._trusted_value_sats = change.value
                     try:
@@ -267,7 +271,7 @@ class PreviewList(MyTreeView):
                     txin._TxInput__address=change.address
                     txin._TxInput__scriptpubkey = change.scriptpubkey
                     txin._TxInput__value_sats = change.value
-                    print_utxo(txin)
+                    #print_utxo(txin)
                 print(">>>>>>>>",txin.spent_txid)
          
 
@@ -276,7 +280,7 @@ class PreviewList(MyTreeView):
             is_complete=False
             if tx.is_complete():
                 is_complete=True
-                willitem['status'] = "Complete"
+                willitem['status'] += BalPlugin.STATUS_COMPLETE
             #self.bal_window.window.sign_tx(tx,callback=sign_done,external_keypairs=None)
             print("tx: {} is complete:{}".format(txid, tx.is_complete()))
             txs[txid]=tx
@@ -288,7 +292,11 @@ class PreviewList(MyTreeView):
                 self.bal_window.will[txid]['tx'] = self.will[txid]['tx']=copy.deepcopy(tx)
             #self.bal_window.will[txid]['tx']=tx_from_any(str(tx))
             self.update()
-            self.bal_window.will_list.update()
+            try:
+                self.bal_window.will_list.update()
+            except:
+                print("failed to update willlist")
+                pass
         def on_failure(exc_info):
             print("sign fail",exc_info)
 
@@ -405,7 +413,7 @@ class PreviewDialog(WindowModalDialog,MessageBoxMixin):
 
 
     def update_will(self,will):
-        self.will=will
+        self.will.update(will)
         self.transactions_list.update_will(will)
         self.update()
     

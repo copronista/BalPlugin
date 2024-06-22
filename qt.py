@@ -14,6 +14,7 @@ import random
 import traceback
 from functools import partial
 import sys
+import copy
 
 from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
@@ -34,15 +35,15 @@ from electrum.gui.qt.password_dialog import PasswordDialog
 
 from .bal import BalPlugin
 from .heirs import Heirs
-
+from .util import Util
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
-from .util import encode_amount,print_var,get_current_height, search_willtx_per_io,chk_locktime,search_willtx_per_io
 from electrum.transaction import tx_from_any
 from time import time
+import datetime
 class Plugin(BalPlugin):
 
     def __init__(self, parent, config, name):
@@ -52,27 +53,32 @@ class Plugin(BalPlugin):
 
     @hook
     def init_qt(self,gui_object):
-        self.gui_object=gui_object
-        for window in gui_object.windows:
-            wallet = window.wallet
+        
+        try:
+            self.gui_object=gui_object
+            for window in gui_object.windows:
+                wallet = window.wallet
 
-            self.bal_windows[window.winId]= BalWindow(self,window)
-            for child in window.children():
-                if isinstance(child,QMenuBar):
-                    for menu_child in child.children():
-                        if isinstance(menu_child,QMenu):
-                            try:
-                                print(menu_child.title())
-                                if menu_child.title()==_("&Tools"):
-                                    for menu_item in menu_child.children():
-                                        pass
-                                        
-                            except:
-                                print("except:",menu_child.text())
-                                
+                self.bal_windows[window.winId]= BalWindow(self,window)
+                for child in window.children():
+                    if isinstance(child,QMenuBar):
+                        for menu_child in child.children():
+                            if isinstance(menu_child,QMenu):
+                                try:
+                                    print(menu_child.title())
+                                    if menu_child.title()==_("&Tools"):
+                                        for menu_item in menu_child.children():
+                                            pass
+                                            
+                                except:
+                                    print("except:",menu_child.text())
+                                    
+        except Exception as e:
+            print("Error loading plugin",e)
+            Util.print_var(window)
+            Util.print_var(window.window())
 
-            tools_menu = window.getMenuBar()
-            self.init_menubar_tools(self,window,window.tools_menu)
+
 
     @hook
     def create_status_bar(self, sb):
@@ -88,6 +94,7 @@ class Plugin(BalPlugin):
 
     @hook
     def on_close_window(self,window):
+            #Util.print_var(window)
             w = self.get_window(window)
             w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
             
@@ -104,8 +111,8 @@ class Plugin(BalPlugin):
         return True
     
     def settings_widget(self, window):
-        print("questo mi darebbe la finestra quando attivo il plugin")
-        w=self.get_window(window)
+        w=self.get_window(window.window)
+        #w.window.show_message(_("please reastart electrum to activate BalPlugin"))
         return EnterButton(_('Settings'), partial(w.settings_dialog))
 
     def password_dialog(self, msg=None, parent=None):
@@ -129,10 +136,26 @@ class Plugin(BalPlugin):
     def on_close(self):
         print("close plugin")
         try:
-            for window in self.windows:
-                window.heirs_tab.close()
-                window.tabs.removeTab(self.heirs_tab)
-                window.tools_menu.removeAction(_("&Will Executors"))
+            for winid,bal_window in self.bal_windows.items():
+                print(1)
+                window=bal_window.window
+                print(2)
+                bal_window.heirs_tab.close()
+                print(3)
+                bal_window.will_tab.close()
+                print(4)
+                window.toggle_tab(bal_window.heirs_tab)
+                print(5)
+                window.toggle_tab(bal_window.will_tab)
+                print(6)
+
+                #Util.print_var(window.tabs)
+                window.tabs.update()
+                bal_window.will_tab.hide()
+                #window.tabs.removeTab(bal_window.will_tab.tab_pos-1)
+                print(7)
+                #Util.print_var(bal_window.tools_menu.willexecutors_action)
+                bal_window.tools_menu.removeAction(bal_window.tools_menu.willexecutors_action)
         except Exception as e:
             print("error closing plugin",e)
             
@@ -141,18 +164,23 @@ class BalWindow():
         self.bal_plugin = bal_plugin
         self.window = window
         self.wallet = self.window.wallet
-
+        self.heirs = Heirs._validate(Heirs(self.wallet.db))
+        self.will=self.wallet.db.get_dict("will")
+        print(self.window.windowTitle())
 
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
-        self.heirs = Heirs._validate(Heirs(self.wallet.db))
-        self.will=self.wallet.db.get_dict("will")
-        tools_menu.addSeparator()
-        tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
+        for txid,willtx in self.will.items():
+            if isinstance(willtx['tx'],str):
+                tx=tx_from_any(willtx['tx'])
+                willtx['tx']=tx
+            self.add_info_from_will(willtx['tx'])
+        
+
+
         self.heirs_tab = self.create_heirs_tab()
         self.will_tab = self.create_will_tab()
-        for txid,willtx in self.will.items():
-            self.add_info_from_will(willtx['tx'])
+
         def add_optional_tab(tabs, tab, icon, description):
             tab.tab_icon = icon
             tab.tab_description = description
@@ -162,6 +190,8 @@ class BalWindow():
 
         add_optional_tab(self.window.tabs, self.heirs_tab, read_QIcon("will.png"), _("&Heirs"))
         add_optional_tab(self.window.tabs, self.will_tab, read_QIcon("will.png"), _("&Will"))
+        tools_menu.addSeparator()
+        self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
 
     def get_window_title(self,title):
         return _('BAL - ') + _(title) 
@@ -230,7 +260,7 @@ class BalWindow():
             heir = [
                     heir_name.text(),
                     heir_address.text(),
-                    encode_amount(heir_amount.text(),self.bal_plugin.config.get_decimal_point()),
+                    Util.encode_amount(heir_amount.text(),self.bal_plugin.config.get_decimal_point()),
                     str(heir_locktime.get_locktime()),
                     ]
             try:
@@ -265,67 +295,138 @@ class BalWindow():
 
     def export_heirs(self):
         export_meta_gui(self.window, _('heirs'), self.heirs.export_file)
-    
+     
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
-        will = {}
-        try: 
-            txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
-            if txs: 
-                willid = time()
-                for txid in txs:
-                    tx = {}
-                    tx['tx'] = txs[txid]
-                    tx['my_locktime'] = txs[txid].my_locktime
-                    tx['heirsvalue'] = txs[txid].heirsvalue
-                    tx['description'] = txs[txid].description
-                    tx['willexecutor'] = txs[txid].willexecutor
-                    tx['status'] = 'New'
-                    tx['willid'] =willid
-                    print("set_label: {} {}:{} ".format(self.window.wallet.set_label(txid,tx['description']),txid,tx['description']))
-                    if not txid in self.will:
-                        wid,w = search_willtx_per_io(self.will,tx)
-                        if wid:
-                            locktime = int(w['tx'].locktime)
-                            print("LOCKTIME",locktime)
-                            locktime_time=self.get_config(BalPlugin.LOCKTIME_TIME)
-                            locktime_blocks=self.get_config(BalPlugin.LOCKTIME_BLOCKS)
-                            date_to_check = datetime.datetime.now()+datetime.timedelta(days=locktime_time)
-                            block_to_check = get_current_height(self.wallet.network) + locktime_blocks
-                            if ignore_duplicate and (not wid or chk_locktime(date_to_check,block_to_check,locktime)):
+        try:
+            locktime_time=self.bal_plugin.config_get(BalPlugin.LOCKTIME_TIME)
+            locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
+            date_to_check = (datetime.datetime.now()+datetime.timedelta(days=locktime_time)).timestamp()
+            current_block = Util.get_current_height(self.wallet.network)
+            block_to_check = current_block + locktime_blocks
+            current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos())
+            will = {}
+            willtodelete=[]
+            willtoappend={}
+            print("current_will is valid",current_will_is_valid,self.will)
+            try: 
+                txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
+                if txs: 
+                    willid = time()
+                    for txid in txs:
+                        print("____________________________________________________________________")
+                        txtodelete=[]
+                        _break = False
+                        print(txid,txs[txid].description)
+                        tx = {}
+                        tx['tx'] = txs[txid]
+                        tx['my_locktime'] = txs[txid].my_locktime
+                        tx['heirsvalue'] = txs[txid].heirsvalue
+                        tx['description'] = txs[txid].description
+                        tx['willexecutor'] = txs[txid].willexecutor
+                        tx['status'] = BalPlugin.STATUS_NEW
+                        tx['willid'] =willid
+                        tx['heirs'] =txs[txid].heirs
+
+                        #se la txid non è presente allora tutte le tx andranno anticipate
+                        #per anticipare le tx cerco tra tutti gli input quello che appartiene alla tx che scade prima.
+                        #per anticipare una tx anticipare il locktime controllare gli input ricorsivamente nel caso sia successivo metterlo uguale alla tx corrente
+
+                        #controllare se la nuova scadenza e' inferiore al limite nel caso costruire la tx per invalidare tutto il testsamento e rifarlo da capo 
+                    
+
+                        if not txid in self.will:
+                            selfwill=self.will.items()
+                            txinputs = tx['tx'].inputs()
+                            for _txid,willitem in selfwill:
+                                Util.print_var(tx['heirs'],'TX')
+                                Util.print_var(willitem['heirs'],'WILLITEM')
+                                print(Util.cmp_heirs(tx['heirs'],willitem['heirs']))
+                                heirs= {}
+
+                                if tx['heirsvalue'] == willitem['heirsvalue'] and Util.cmp_heirs(tx['heirs'],willitem['heirs']):
+                                    print("they have the same heirsvalue")
+                                    value_amount = Util.get_value_amount(tx['tx'],willitem['tx'])
+                                    if value_amount:
+                                        print("they are the same tx")
+                                    print(f"value amount: {value_amount} == {willitem['heirsvalue']}")
+                                    if willitem['status'] == 'New' and value_amount:
+                                        print("txtodelete")
+                                        txtodelete.append(_txid)
+                                    else:
+                                        print("willtodelete")
+                                        willtodelete.append(txid)
+                                        willtoappend[_txid]=willitem
+                                        
+                                else:
+                                    print("they are not the same tx",tx,willitem)
+                                    willinputs = willitem['tx'].inputs()
+                                    for _input in txinputs:
+                                        if Util.in_utxo(_input,willinputs):
+                                            will[_txid]=self.will[_txid]
+                                            if self.will[_txid]['status'] == BalPlugin.STATUS_NEW:
+                                                #print("replaced",_txid,_input.to_json())
+                                                #self.will[_txid]['status']='Replaced'
+                                                txtodelete.append(_txid)
+                                                #min_locktime=min(min_locktime, willitem['tx'].locktime)
+                                            else:
+                                                if  BalPlugin.STATUS_COMPLETE in self.will[_txid]['status']:
+                                                    self.will[_txid]['status']+=BalPlugin.STATUS_REPLACED
+                                                if willitem['status'] in (BalPlugin.STATUS_EXPORTED,BalPlugin.STATUS_BROADCASTED):
+                                                    self.will[_txid]['status']+=BalPlugin.STATUS_ANTICIPATED
+                                                    if tx['tx'].locktime >=willitem['tx'].locktime:
+                                                        tx['tx'].locktime = willitem['tx'].locktime-int_locktime(hours=24)
+
+                                        else:
+                                            pass
+                                            #print("not_replaced",_txid,_input.to_json())
+                        else:
+                            if ignore_duplicate:
+                                print("ignore duplicate")
                                 continue
-                    else:
-                        if ignore_duplicate:
-                            continue
-                        if keep_original:
-                            tx = self.will[txid]
+                            if keep_original:
+                                tx = self.will[txid]
+                        #tx['tx']=str(tx['tx'])
+                        try:
+                            print("salvo il testamento")
+                            will[txid]=tx
+                            
+                        except Exception as e:
+                            print("error saving will", e)
+                            Util.print_var(self.will)
+                        for _txid in txtodelete:
+                            try:
+                                del self.will[_txid]
+                            except:
+                                #print(f"no tx to delete{_txid}")
+                                pass
+                for t in willtodelete:
                     try:
-                        self.will[txid] = tx
-                    except Exception as e:
-                        print("error saving will", e)
-                        print_var(self.will)
-
-                    will[txid] = self.will[txid]
-                    
-
-                    
-
-            if len(will)>0:
-                if self.bal_plugin.config_get(BalPlugin.PREVIEW):
-                    self.preview_dialog(will)
-                elif self.bal_plugin.config_get(BalPlugin.BROADCAST):
-                    if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
+                        del will[t]
+                    except:
+                        print(will.keys())
+                will.update(willtoappend)
+                for k in will:
+                    self.will[k]=will[k]
+                if len(will)>0:
+                    if self.bal_plugin.config_get(BalPlugin.PREVIEW):
                         self.preview_dialog(will)
+                    elif self.bal_plugin.config_get(BalPlugin.BROADCAST):
+                        if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
+                            self.preview_dialog(will)
 
-            self.window.history_list.update()
-            self.window.utxo_list.update()
-            self.window.labels_changed_signal.emit()
-            self.will_list.update_will(will)
+                self.window.history_list.update()
+                self.window.utxo_list.update()
+                try:
+                    self.will_list.update_will(self.will)
+                except: pass
+            except Exception as e:
+                print(e)
+                self.window.show_message(e)
+                raise e
+            return will 
         except Exception as e:
-            print(e)
-            self.window.show_message(e)
+            print("ERROR: exception building transactions",e)
             raise e
-        return will 
-
 
     def export_inheritance_transactions(self):
         try:

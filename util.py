@@ -1,157 +1,301 @@
 from datetime import datetime
 import bisect
-LOCKTIME_THRESHOLD = 500000000
-def locktime_to_str(locktime):
-    try:
-        locktime=int(locktime)
-        if locktime > LOCKTIME_THRESHOLD:
-            dt = datetime.fromtimestamp(locktime).isoformat()[:-3]
-            return dt
-
-    except Exception as e:
-        print(e)
-        pass
-    return str(locktime)
-
-def str_to_locktime(locktime):
-    try:
-        if locktime[-1] in ('y','d','b'):
-          return locktime
-        else: return int(locktime)
-    except Exception as e:
-        print(e)
-    dt_object = datetime.fromisoformat(locktime)
-    timestamp = dt_object.timestamp()
-    return int(timestamp)
-
-def encode_amount(amount, decimal_point):
-    if is_perc(amount):
-        return amount
-    else:
-        return int(float(amount)*pow(10,decimal_point))
-
-def decode_amount(amount,decimal_point):
-    if is_perc(amount):
-        return amount
-    else:
-        return str(float(amount)/pow(10,decimal_point))
-
-def is_perc(value): 
+class Util:
+    LOCKTIME_THRESHOLD = 500000000
+    def locktime_to_str(locktime):
         try:
-            return value[-1] == '%'
+            locktime=int(locktime)
+            if locktime > Util.LOCKTIME_THRESHOLD:
+                dt = datetime.fromtimestamp(locktime).isoformat()[:-3]
+                return dt
+
+        except Exception as e:
+            print(e)
+            pass
+        return str(locktime)
+
+    def str_to_locktime(locktime):
+        try:
+            if locktime[-1] in ('y','d','b'):
+              return locktime
+            else: return int(locktime)
+        except Exception as e:
+            print(e)
+        dt_object = datetime.fromisoformat(locktime)
+        timestamp = dt_object.timestamp()
+        return int(timestamp)
+
+    def int_locktime(seconds=0,minutes=0,hours=0, days=0, blocks = 0):
+        return int(seconds + minutes*60 + hours*60*60 + days*60*60*24 + blocks * 600)
+
+    def encode_amount(amount, decimal_point):
+        if Util.is_perc(amount):
+            return amount
+        else:
+            return int(float(amount)*pow(10,decimal_point))
+
+    def decode_amount(amount,decimal_point):
+        if Util.is_perc(amount):
+            return amount
+        else:
+            return str(float(amount)/pow(10,decimal_point))
+
+    def is_perc(value): 
+            try:
+                return value[-1] == '%'
+            except:
+                return False
+
+    def cmp_heir(heira,heirb):
+        try:
+            if not len(heira) == len(heirb):
+                return False
+            for h in range(0,len(heira)):
+                if not heira[h] == heirb[h]:
+                    return False
+            return True
         except:
             return False
 
-def cmp_txs(txa,txb):
-    return txa.inputs() == txb.inputs() and txa.outputs == txb.outputs()
+    def cmp_heirs(heirsa,heirsb):
+        try:
+            if not len(heirsa)== len(heirsb):
+                return False
 
-def chk_locktime(timestamp_to_check,block_height_to_check,locktime):
-    #TODO BUG:  WHAT HAPPEN AT THRESHOLD?
-    if locktime > LOCKTIME_THRESHOLD and locktime < timestamp_to_check:
-        return True
-    elif locktime <LOCKTIME_THRESHOLD and locktime < block_height_to_check:
-        return True
-    else:
+            for heir in heirsa:
+                if not Util.cmp_heir(heirsa[heir],heirsb[heir]):
+                    return False
+            return True
+        except:
+            return False
+    def cmp_txs(txa,txb):
+        for inputa in txa.inputs():
+            if not Util.in_utxo(inputa,txb.inputs()):
+                print("inutxoa notin txb")
+                return False
+        for inputb in txb.inputs():
+            if not Util.in_utxo(inputb,txa.inputs()):
+                print("inutxob notin txa")
+                return False
+        value_amount = Util.get_value_amount(txa,txb)
+        if not value_amount:
+            return False
+        return value_amount
+
+    def get_value_amount(txa,txb):
+        outputsa=txa.outputs()
+        outputsb=txb.outputs()
+        value_amount = 0
+        #if len(outputsa) != len(outputsb):
+        #    print("outputlen is different")
+        #    return False
+
+        for outa in outputsa:
+            print("nuovo output")
+            same_amount,same_address = Util.in_output(outa,txb.outputs())
+            if not (same_amount or same_address):
+                print("outa notin txb", same_amount,same_address)
+                return False
+            if same_amount and same_address:
+                value_amount+=outa.value
+            if same_amount:
+                print("same amount")
+            if same_address:
+                print("same address")
+
+        return value_amount
+        #not needed
+        #for outb in outputsb:
+        #    if not in_output(outb,txa.outputs()):
+        #        print("outb notin txb")
+        #        return False
+
+
+
+    def chk_locktime(timestamp_to_check,block_height_to_check,locktime):
+        #TODO BUG:  WHAT HAPPEN AT THRESHOLD?
+        if int(locktime) > int(Util.LOCKTIME_THRESHOLD) and int(locktime) > int(timestamp_to_check):
+            return True
+        elif int(locktime) < int(Util.LOCKTIME_THRESHOLD) and int(locktime) > int(block_height_to_check):
+            return True
+        else:
+            return False
+
+    def get_lowest_valid_tx(available_utxos,will):
+        will = sorted(will.items(),key = lambda x: x[1]['tx'].locktime)
+        for txid,willitem in will.items():
+            pass
+
+    def get_locktimes(will):
+        locktimes = {}
+        for txid,willitem in will.items():
+            locktimes[willitem['tx'].locktime]=True
+        return locktimes.keys()
+
+    def get_lowest_locktimes(locktimes):
+        sorted_timestamp=[]
+        sorted_block=[]
+        for l in locktimes:
+            if l < Util.LOCKTIME_THRESHOLD:
+                bisect.insort(sorted_block,l)
+            else:
+                bisect.insort(sorted_timestamp,l)
+
+        return sorted(sorted_timestamp), sorted(sorted_block)
+
+    def get_lowest_locktimes_from_will(will):
+        return Util.get_lowest_locktimes(Util.get_locktimes(will))
+
+    def search_willtx_per_io(will,tx):
+        for wid, w in will.items():
+            if Util.cmp_txs(w['tx'],tx['tx']):
+                return wid,w
+        return None, None
+
+    def invalidate_will(will):
+        pass
+    def get_will_spent_utxos(will):
+        utxos=[]
+        for txid,willitem in will.items():
+            utxos+=willitem['tx'].inputs()
+            
+        return utxos
+
+    def cmp_utxo(utxoa,utxob):
+        if utxoa.prevout.txid==utxob.prevout.txid and utxoa.prevout.out_idx == utxob.prevout.out_idx:
+            return True
+        else:
+            return False
+
+    def in_utxo(utxo, utxos):
+        for s_u in utxos:
+            if Util.cmp_utxo(s_u,utxo):
+                return True
+                
+        
         return False
 
-def get_lowest_valid_tx(available_utxos,will):
-    will = sorted(will.items(),key = lambda x: x[1]['tx'].locktime)
-    for txid,willitem in will.items():
-        pass
-
-def get_locktimes(will):
-    locktimes = {}
-    for txid,willitem in will.items():
-        locktimes[willitem['tx'].locktime]=True
-
-def get_lowest_locktimes(locktimes):
-    sorted_timestamp=[]
-    sorted_block=[]
-    for l in locktimes:
-        if l < LOCKTIME_THRESHOLD:
-            bisect.insort(sorted_block,l)
-        else:
-            bisect.insort(sorted_timestamp,l)
-
-    return sorted(sorted_blocks),sorted(sorted_timestamp)
-
-def get_lowest_locktimes_from_will(will):
-    return get_lowest_locktimes(get_locktimes(will))
-
-def search_willtx_per_io(will,tx):
-    for wid, w in will.items():
-        if cmp_txs(w['tx'],tx['tx']):
-            return wid,w
-    return None, None
-
-def invalidate_will(will):
-    pass
-
-def get_current_height(network:'Network'):
-    #if no network or not up to date, just set locktime to zero
-    if not network:
-        return 0
-    chain = network.blockchain()
-    if chain.is_tip_stale():
-        return 0
-    # figure out current block height
-    chain_height = chain.height()  # learnt from all connected servers, SPV-checked
-    server_height = network.get_server_height()  # height claimed by main server, unverified
-    # note: main server might be lagging (either is slow, is malicious, or there is an SPV-invisible-hard-fork)
-    #       - if it's lagging too much, it is the network's job to switch away
-    if server_height < chain_height - 10:
-        # the diff is suspiciously large... give up and use something non-fingerprintable
-        return 0
-    # discourage "fee sniping"
-    height = min(chain_height, server_height)
-    return height
+    #check all output with the same amount if none have the same address it can be a change
+    #return true true same address same amount 
+    #return true false same amount different address
+    #return false false different amount, different address not found
 
 
-def print_var(var,name = "",veryverbose=False):
-    print(f"---{name}---")
-    if not var is None:
-        try:
-            print("doc:",doc(var))
-        except: pass
-        try:
-            print("str:",str(var))
-        except: pass
-        try:
-            print("repr",repr(var))
-        except:pass
-        try:
-            print("dict",dict(var))
-        except:pass
-        try:
-            print("dir",dir(var))
-        except:pass
-        try:
-            print("type",type(var))
-        except:pass
-        try:
-            print("to_json",var.to_json())
-        except: pass
-        try:
-            print("__slotnames__",var.__slotnames__)
-        except:pass
+    def in_output(out,outputs):
+        same_amount=[]
+        for s_o in outputs:
+            print("quando sono uguali?",out.value == s_o.value,out.value,s_o.value)
+            if int(out.value) == int(s_o.value):
+                same_amount.append(s_o)
+                if out.address==s_o.address:
+                    print("SAME_:",out.address,s_o.address)
+                    return True, True
+                else:
+                    print("NOT  SAME_:",out.address,s_o.address)
 
-    print(f"---end {name}---")
+        if len(same_amount)>0:
+            return True, False
+        else:return False, False
 
-def print_utxo(utxo, name = ""):
-    print(f"---utxo-{name}---")
-    print_var(utxo,name)
-    print_prevout(utxo.prevout,name)
-    print_var(utxo.script_sig,f"{name}-script-sig")
-    print_var(utxo.witness,f"{name}-witness")
-    #print("madonnamaiala_TXInput__scriptpubkey:",utxo._TXInput__scriptpubkey)
-    print("_TxInput__address:",utxo._TxInput__address)
-    print("_TxInput__scriptpubkey:",utxo._TxInput__scriptpubkey)
-    print("_TxInput__value_sats:",utxo._TxInput__value_sats)
-    print(f"---utxo-end {name}---")
 
-def print_prevout(prevout, name = ""):
-    print(f"---prevout-{name}---")
-    print_var(prevout,f"{name}-prevout")
-    print_var(prevout._asdict())
-    print(f"---prevout-end {name}---")
+    def is_will_valid(will, block_to_check, timestamp_to_check, all_utxos):
+        spent_utxos=[]
+        locktimes_time,locktimes_blocks  = Util.get_lowest_locktimes_from_will(will)
+        for txid,willitem in will.items():
+            spent_utxos +=willitem['tx'].inputs()
+            chk_block=True
+            chk_time=True
+            if len(locktimes_blocks)>0:
+                chk_block =  Util.chk_locktime(block_to_check,timestamp_to_check,locktimes_blocks[0])
+
+            if len(locktimes_time)>0:
+                chk_time =  Util.chk_locktime(block_to_check,timestamp_to_check,locktimes_time[0])
+
+            if not (chk_block or chk_time):
+                print("locktime",locktimes_time[0],timestamp_to_check,Util.chk_locktime(timestamp_to_check,block_to_check,locktimes_time[0]))
+                print("locktime",locktimes_blocks[0],block_to_check,Util.chk_locktime(timestamp_to_check,block_to_check,locktimes_blocks[0]))
+                print("locktime outdated",locktimes_time,locktimes_blocks,block_to_check,timestamp_to_check)
+                print("will need to be invalidated")
+                return False
+        #check that all utxo in wallet are spent
+        for utxo in all_utxos:
+            if not Util.in_utxo(utxo,spent_utxos):
+                    print("utxo is not spent",utxo.to_json())
+                    return False
+        #check that all spent uxtos are in wallet
+        for s_utxo in spent_utxos:
+            if not Util.in_utxo(s_utxo,spent_utxos):
+                if not s_utxo.prevout.txid in will.keys():
+                    print("utxo is not in wallet",s_utxo.to_json())
+                    return False
+        return True
+
+
+    def get_current_height(network:'Network'):
+        #if no network or not up to date, just set locktime to zero
+        if not network:
+            return 0
+        chain = network.blockchain()
+        if chain.is_tip_stale():
+            return 0
+        # figure out current block height
+        chain_height = chain.height()  # learnt from all connected servers, SPV-checked
+        server_height = network.get_server_height()  # height claimed by main server, unverified
+        # note: main server might be lagging (either is slow, is malicious, or there is an SPV-invisible-hard-fork)
+        #       - if it's lagging too much, it is the network's job to switch away
+        if server_height < chain_height - 10:
+            # the diff is suspiciously large... give up and use something non-fingerprintable
+            return 0
+        # discourage "fee sniping"
+        height = min(chain_height, server_height)
+        return height
+
+
+    def print_var(var,name = "",veryverbose=False):
+        print(f"---{name}---")
+        if not var is None:
+            try:
+                print("doc:",doc(var))
+            except: pass
+            try:
+                print("str:",str(var))
+            except: pass
+            try:
+                print("repr",repr(var))
+            except:pass
+            try:
+                print("dict",dict(var))
+            except:pass
+            try:
+                print("dir",dir(var))
+            except:pass
+            try:
+                print("type",type(var))
+            except:pass
+            try:
+                print("to_json",var.to_json())
+            except: pass
+            try:
+                print("__slotnames__",var.__slotnames__)
+            except:pass
+
+        print(f"---end {name}---")
+
+    def print_utxo(utxo, name = ""):
+        print(f"---utxo-{name}---")
+        Util.print_var(utxo,name)
+        Util.print_prevout(utxo.prevout,name)
+        Util.print_var(utxo.script_sig,f"{name}-script-sig")
+        Util.print_var(utxo.witness,f"{name}-witness")
+        #print("madonnamaiala_TXInput__scriptpubkey:",utxo._TXInput__scriptpubkey)
+        print("_TxInput__address:",utxo._TxInput__address)
+        print("_TxInput__scriptpubkey:",utxo._TxInput__scriptpubkey)
+        print("_TxInput__value_sats:",utxo._TxInput__value_sats)
+        print(f"---utxo-end {name}---")
+
+    def print_prevout(prevout, name = ""):
+        print(f"---prevout-{name}---")
+        Util.print_var(prevout,f"{name}-prevout")
+        Util.print_var(prevout._asdict())
+        print(f"---prevout-end {name}---")
 

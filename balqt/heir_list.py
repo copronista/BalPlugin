@@ -38,7 +38,7 @@ from electrum.plugin import run_hook
 from electrum.gui.qt.util import webopen, MessageBoxMixin
 from electrum.gui.qt.my_treeview import MyTreeView
 from datetime import datetime
-from ..util import str_to_locktime,locktime_to_str,encode_amount,decode_amount
+from ..util import Util
 if TYPE_CHECKING:
     from electrum.gui.qt.main_window import ElectrumWindow
 
@@ -92,12 +92,12 @@ class HeirList(MyTreeView,MessageBoxMixin):
         try:
             if col == 3:
                 try:
-                    text = str_to_locktime(text)
+                    text = Util.str_to_locktime(text)
                 except:
                     print("not a valid locktime")
                     pass
             if col == 2:
-                text = encode_amount(text,self.decimal_point)
+                text = Util.encode_amount(text,self.decimal_point)
             else:
                 print("porco dio di colonna",col)
             prior_name[col-1] = text
@@ -162,8 +162,8 @@ class HeirList(MyTreeView,MessageBoxMixin):
             labels = [""] * len(self.Columns)
             labels[self.Columns.NAME] = key
             labels[self.Columns.ADDRESS] = heir[0]
-            labels[self.Columns.AMOUNT] = decode_amount(heir[1],self.decimal_point)
-            labels[self.Columns.LOCKTIME] =  str(locktime_to_str(heir[2]))
+            labels[self.Columns.AMOUNT] = Util.decode_amount(heir[1],self.decimal_point)
+            labels[self.Columns.LOCKTIME] =  str(Util.locktime_to_str(heir[2]))
 
             items = [QStandardItem(x) for x in labels]
             items[self.Columns.NAME].setEditable(False)
@@ -206,6 +206,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
         return toolbar
     def build_transactions(self):
         will = self.bal_window.build_inheritance_transaction(ignore_duplicate=False,keep_original = False)
-        if len(will) ==0:
-            self.window.show_message(_("no tx to be created"))
+        if will:
+            if len(will) ==0:
+                self.bal_window.window.show_message(_("no tx to be created"))
 

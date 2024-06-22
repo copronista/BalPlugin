@@ -21,28 +21,22 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import re
-from typing import Optional, Tuple, Dict, Any, TYPE_CHECKING
+import json
+from typing import Optional, Tuple, Dict, Any, TYPE_CHECKING,Sequence,List
 
 import dns
 import threading
 from dns.exception import DNSException
 
-from electrum.transaction import TxOutput
-from electrum import bitcoin
-from electrum import dnssec
-from electrum.util import read_json_file, write_json_file, to_string,bfh
-import json
+from electrum import bitcoin,dnssec,descriptor
+from electrum.util import read_json_file, write_json_file, to_string,bfh,trigger_callback
 from electrum.logging import Logger, get_logger
-from electrum.util import trigger_callback
-from electrum import descriptor
-from typing import Sequence,List
-from electrum.transaction import PartialTxInput, PartialTxOutput,TxOutpoint,PartialTransaction
+from electrum.transaction import PartialTxInput, PartialTxOutput,TxOutpoint,PartialTransaction,TxOutput
 import datetime
 import urllib.request
 import urllib.parse
-from electrum import constants
 from .bal import BalPlugin
-from .util import is_perc, print_var,print_utxo
+from .util import Util
 if TYPE_CHECKING:
     from .wallet_db import WalletDB
     from .simple_config import SimpleConfig
@@ -113,7 +107,7 @@ def parse_locktime_string(locktime,w):
 
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
-    available_utxos=sorted(available_utxos, key=lambda x:x.value_sats())
+    available_utxos=sorted(available_utxos, key=lambda x:"{}:{}:{}".format(x.value_sats(),x.prevout.txid,x.prevout.out_idx))
     total_used_utxos = []
     txsout={}
     for locktime,heirs in locktimes.items():
@@ -132,7 +126,6 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
 
         in_amount = 0.0
         used_utxos = []
-        print_var(available_utxos)
         try:
             while utxo := available_utxos.pop():
                 #print_utxo(utxo,"UTXO")
@@ -192,6 +185,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         if txid is None:
             raise Exception("txid is none",tx)
         
+        tx.heirs = heirs
         tx.my_locktime = locktime
         txsout[txid]=tx
          
@@ -297,6 +291,7 @@ def push_transactions_to_willexecutor(strtxs,selected_willexecutors, url):
                     print(f"error{response.status} pushing txs to: {url}")
         except Exception as e:  
             print(f"error contacting {url} for pushing txs",e)
+
 def getinfo_willexecutor(url,willexecutor):
     w=None
     try:
@@ -313,6 +308,7 @@ def getinfo_willexecutor(url,willexecutor):
     except Exception as e:
         print(f"error {e} contacting {url}")
     return w or willexecutor 
+
 def print_transaction(heirs,tx,locktimes,tx_fees):
     jtx=tx.to_json()
     print(f"TX: {tx.txid()}\t-\tLocktime: {jtx['locktime']}")
@@ -372,7 +368,7 @@ class Heirs(dict, Logger):
 
     def import_file(self, path):
         data = read_json_file(path)
-        data = self._validate(data)
+        data = Heirs._validate(data)
         self.update(data)
         self.save()
 
@@ -428,7 +424,7 @@ class Heirs(dict, Logger):
         for key in self.keys():
             print("mario",key)
             try:
-                if is_perc(self[key][HEIR_AMOUNT]):
+                if Util.is_perc(self[key][HEIR_AMOUNT]):
                     percent_amount += float(self[key][HEIR_AMOUNT][:-1])
                     percent_heirs[key] =list(self[key])
                 else:
@@ -488,7 +484,7 @@ class Heirs(dict, Logger):
 
         return locktimes, onlyfixed
     def is_perc(self,key):
-        return is_perc(self[key][HEIR_AMOUNT])
+        return Util.is_perc(self[key][HEIR_AMOUNT])
     def buildTransactions(self,bal_plugin,wallet):
         Heirs._validate(self)
         if len(self)<=0:
@@ -674,7 +670,7 @@ class Heirs(dict, Logger):
 
     def validate_amount(amount):
         try:
-            if is_perc(amount):
+            if Util.is_perc(amount):
                 famount = float(amount[:-1])
             else:
                 famount = float(amount)
