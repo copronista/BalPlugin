@@ -1,6 +1,7 @@
 try:
     import __version__
 except:
+    print("oh oh")
     import electrum.plugins.BalPlugin.__version__ as __version__
 def version():
     out = "0"

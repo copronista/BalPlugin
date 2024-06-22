@@ -1,6 +1,10 @@
 from electrum.i18n import _
 import subprocess
-from electrum.plugins.BalPlugin._version import version
+try:
+    from electrum.plugins.BalPlugin._version import version
+except:
+    print("oh oh init")
+    from ._version import version
 
 fullname = _('B.A.L.')
 description = ''.join([
