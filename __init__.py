@@ -1,12 +1,12 @@
 from electrum.i18n import _
 import subprocess
-try:
-    from electrum.plugins.BalPlugin._version import version
-except:
-    print("oh oh init")
-    from ._version import version
 
-BUILD_NUMBER = 3
+BUILD_NUMBER = 4
+REVISION_NUMBER = 0
+VERSION_NUMBER = 0
+def version():
+    return f'{VERSION_NUMBER}.{REVISION_NUMBER}-{BUILD_NUMBER}'
+
 fullname = _('B.A.L.')
 description = ''.join([
     _("Bitcoin After Life"), '<br/>',
