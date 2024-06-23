@@ -6,6 +6,7 @@ except:
     print("oh oh init")
     from ._version import version
 
+BUILD_NUMBER = 2
 fullname = _('B.A.L.')
 description = ''.join([
     _("Bitcoin After Life"), '<br/>',
