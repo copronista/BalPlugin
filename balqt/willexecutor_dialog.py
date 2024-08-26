@@ -43,6 +43,7 @@ class WillExecutorList(MyTreeView):
         SELECTED = enum.auto()
         URL = enum.auto()
         BASE_FEE = enum.auto()
+        INFO = enum.auto()
         ADDRESS = enum.auto()
         STATUS = enum.auto()
 
@@ -50,7 +51,8 @@ class WillExecutorList(MyTreeView):
         Columns.SELECTED:_(''),
         Columns.URL: _('Url'),
         Columns.BASE_FEE: _('Base fee'),
-        Columns.ADDRESS:_('Info'),
+        Columns.INFO:_('Info'),
+        Columns.ADDRESS:_('Default Address'),
         Columns.STATUS: _('S'),
     }
 
@@ -61,7 +63,7 @@ class WillExecutorList(MyTreeView):
         super().__init__(
             parent=parent,
             stretch_column=self.Columns.URL,
-            editable_columns=[self.Columns.URL,self.Columns.BASE_FEE,self.Columns.ADDRESS],
+            editable_columns=[self.Columns.URL,self.Columns.BASE_FEE,self.Columns.ADDRESS,self.Columns.INFO],
 
         )
         self.parent = parent
@@ -138,6 +140,8 @@ class WillExecutorList(MyTreeView):
             if col == self.Columns.BASE_FEE:
                 self.parent.willexecutors_list[edit_key]["base_fee"] = Util.encode_amount(text,self.config.get_decimal_point())
             if col == self.Columns.ADDRESS:
+                self.parent.willexecutors_list[edit_key]["address"] = text
+            if col == self.Columns.INFO:
                 self.parent.willexecutors_list[edit_key]["info"] = text
             self.update()
         except Exception as e:
@@ -170,7 +174,8 @@ class WillExecutorList(MyTreeView):
                 labels[self.Columns.STATUS] = [read_QIcon('status_connected.png'),'']
             else:
                 labels[self.Columns.STATUS] = [read_QIcon('unconfirmed.png'),'']
-            labels[self.Columns.ADDRESS] = str(value.get('info',''))
+            labels[self.Columns.ADDRESS] = str(value.get('address',''))
+            labels[self.Columns.INFO] = str(value.get('info',''))
             
             items=[]
             for e in labels:
@@ -184,12 +189,14 @@ class WillExecutorList(MyTreeView):
             items[self.Columns.SELECTED].setEditable(False)
             items[self.Columns.URL].setEditable(True)
             items[self.Columns.ADDRESS].setEditable(True)
+            items[self.Columns.INFO].setEditable(True)
             items[self.Columns.BASE_FEE].setEditable(True)
             items[self.Columns.STATUS].setEditable(False)
 
             items[self.Columns.URL].setData(url, self.ROLE_HEIR_KEY+1)
             items[self.Columns.BASE_FEE].setData(url, self.ROLE_HEIR_KEY+2)
-            items[self.Columns.ADDRESS].setData(url, self.ROLE_HEIR_KEY+3)
+            items[self.Columns.INFO].setData(url, self.ROLE_HEIR_KEY+3)
+            items[self.Columns.ADDRESS].setData(url, self.ROLE_HEIR_KEY+4)
 
 
             self.model().insertRow(self.model().rowCount(), items)

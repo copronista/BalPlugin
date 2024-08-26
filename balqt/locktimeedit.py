@@ -35,7 +35,8 @@ class HeirsLockTimeEdit(QWidget):
         self.editors = [self.locktime_raw_e, self.locktime_height_e, self.locktime_date_e]
 
         self.combo = QComboBox()
-        options = [_("Raw"), _("Block height"), _("Date")]
+        #options = [_("Raw"), _("Block height"), _("Date")]
+        options = [_("Raw"),_("Date")]
         option_index_to_editor_map = {
             0: self.locktime_raw_e,
             1: self.locktime_height_e,
@@ -124,7 +125,8 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
 
     def numbify(self):
         text = self.text().strip()
-        chars = '0123456789bdy'
+        #chars = '0123456789bdy' removed the option to choose locktime by block
+        chars = '0123456789dy'
         pos = posx = self.cursorPosition()
         pos = len(''.join([i for i in text[:pos] if i in chars]))
         s = ''.join([i for i in text if i in chars])

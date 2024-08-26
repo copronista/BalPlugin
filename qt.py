@@ -1,11 +1,9 @@
 '''
 
 Bal
-Do you have something to hide?
-Secret backup plug-in for the electrum wallet.
 
-Distributed under the MIT software license, see the accompanying
-file LICENCE or http://www.opensource.org/licenses/mit-license.php
+Bitcoin after life
+
 
 '''
 
@@ -36,6 +34,7 @@ from electrum.gui.qt.password_dialog import PasswordDialog
 from .bal import BalPlugin
 from .heirs import Heirs
 from .util import Util
+from .will import Will, WillExpiredException,NotCompleteWillException
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
@@ -166,6 +165,7 @@ class BalWindow():
         self.wallet = self.window.wallet
         self.heirs = Heirs._validate(Heirs(self.wallet.db))
         self.will=self.wallet.db.get_dict("will")
+        Will.normalize_will(self.will,self.wallet)
         print(self.window.windowTitle())
 
     def init_menubar_tools(self,tools_menu):
@@ -273,6 +273,8 @@ class BalWindow():
         txs = self.build_inheritance_transaction(ignore_duplicate=True, keep_original=False)
         with open(path,"w") as f:
             for tx in txs:
+                Util.print_var(tx)
+                tx['status']+=BalPlugin.STATUS_EXPORTED
                 f.write(str(tx['tx']))
                 f.write('\n')
  
@@ -295,7 +297,42 @@ class BalWindow():
 
     def export_heirs(self):
         export_meta_gui(self.window, _('heirs'), self.heirs.export_file)
-     
+
+    def prepare_will(self, ignore_duplicate = False, keep_original = False):
+        will = self.build_inheritance_transaction(ignore_duplicate = ignore_duplicate, keep_original=keep_original)
+        if not will or  len(will) == 0:
+            self.window.show_message(_('no tx to be created'))
+        return will
+    def will_not_replaced_nor_invalidated(self):
+        for k,v in self.will.items():
+            if not BalPlugin.STATUS_REPLACED in v['status']:
+                if not BalPlugin.STATUS_INVALIDATED in v['status']:
+                        yield k
+
+    def del_old_will(self,oldwilltodelete):
+        print("del old will")
+        new_old_will_to_delete=[]
+        for did in oldwilltodelete:
+            print(f"del: {did}")
+            try:
+                del self.will[did]
+            except:
+                print(f"trying to delete {did}: but failed")
+            for oid in self.will:
+                if Util.txid_in_utxo(did,self.will[oid]['tx'].inputs()):
+                    print(f"append {oid} to be deleted")
+                    new_old_will_to_delete.append(oid)
+        if len(new_old_will_to_delete)>0:
+            self.del_old_will(new_old_will_to_delete)
+    
+    def delete_not_valid(self,txid,s_utxo):
+        try:
+            self.will[txid]['status']+=BalPlugin.STATUS_INVALIDATED
+            self.will[txid]['valid']=False
+        except Exception as e:
+            print(f"cannot invalidate {txid}")
+            raise e
+
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
             locktime_time=self.bal_plugin.config_get(BalPlugin.LOCKTIME_TIME)
@@ -303,138 +340,111 @@ class BalWindow():
             date_to_check = (datetime.datetime.now()+datetime.timedelta(days=locktime_time)).timestamp()
             current_block = Util.get_current_height(self.wallet.network)
             block_to_check = current_block + locktime_blocks
-            current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos())
             will = {}
             willtodelete=[]
             willtoappend={}
-            print("current_will is valid",current_will_is_valid,self.will)
+            show_preview=False
+            #for txid in self.will_not_replaced_nor_invalidated():
+            #    if not self.will[txid]['status']==BalPlugin.STATUS_NEW:
+            #        self.will[txid]['status']+=BalPlugin.STATUS_REPLACED
+            #    else:
+            #        willtodelete.append((None,txid))
+            utxos=self.window.wallet.get_utxos()
+            #current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, utxos)
+            #print("current_will is valid",current_will_is_valid,self.will)
+            try:
+                Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
+            except WillExpiredException as e:
+                tx = Will.invalidate_will(self.will)
+                self.window.show_transaction(self.will[key]['tx'])
+
+                self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
+                self.bal_window.window.show_transaction(tx)
+            except NotCompleteWillException as e:
+                self.window.show_message(_("Will is not complete some utxo was not included I will rebuild it"))
             try: 
-                txs = self.heirs.buildTransactions(self.bal_plugin,self.window.wallet)
-                if txs: 
-                    willid = time()
-                    for txid in txs:
-                        print("____________________________________________________________________")
-                        txtodelete=[]
-                        _break = False
-                        print(txid,txs[txid].description)
-                        tx = {}
-                        tx['tx'] = txs[txid]
-                        tx['my_locktime'] = txs[txid].my_locktime
-                        tx['heirsvalue'] = txs[txid].heirsvalue
-                        tx['description'] = txs[txid].description
-                        tx['willexecutor'] = txs[txid].willexecutor
-                        tx['status'] = BalPlugin.STATUS_NEW
-                        tx['willid'] =willid
-                        tx['heirs'] =txs[txid].heirs
+                txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,date_to_check)
+                creation_time = time()
+                for txid in txs:
+                    txtodelete=[]
+                    _break = False
+                    print(txid,txs[txid].description)
+                    tx = {}
+                    tx['tx'] = txs[txid]
+                    tx['my_locktime'] = txs[txid].my_locktime
+                    tx['heirsvalue'] = txs[txid].heirsvalue
+                    tx['description'] = txs[txid].description
+                    tx['willexecutor'] = txs[txid].willexecutor
+                    tx['status'] = BalPlugin.STATUS_NEW
+                    tx['exported'] = False
+                    tx['broadcasted'] = False
+                    tx['valid'] = True
+                    tx['time'] = creation_time
+                    tx['heirs'] = txs[txid].heirs
+                    tx['txchildren'] = []
+                    will[txid]=tx
+                        
 
-                        #se la txid non è presente allora tutte le tx andranno anticipate
-                        #per anticipare le tx cerco tra tutti gli input quello che appartiene alla tx che scade prima.
-                        #per anticipare una tx anticipare il locktime controllare gli input ricorsivamente nel caso sia successivo metterlo uguale alla tx corrente
-
-                        #controllare se la nuova scadenza e' inferiore al limite nel caso costruire la tx per invalidare tutto il testsamento e rifarlo da capo 
-                    
-
-                        if not txid in self.will:
-                            selfwill=self.will.items()
-                            txinputs = tx['tx'].inputs()
-                            for _txid,willitem in selfwill:
-                                Util.print_var(tx['heirs'],'TX')
-                                Util.print_var(willitem['heirs'],'WILLITEM')
-                                print(Util.cmp_heirs(tx['heirs'],willitem['heirs']))
-                                heirs= {}
-
-                                if tx['heirsvalue'] == willitem['heirsvalue'] and Util.cmp_heirs(tx['heirs'],willitem['heirs']):
-                                    print("they have the same heirsvalue")
-                                    value_amount = Util.get_value_amount(tx['tx'],willitem['tx'])
-                                    if value_amount:
-                                        print("they are the same tx")
-                                    print(f"value amount: {value_amount} == {willitem['heirsvalue']}")
-                                    if willitem['status'] == 'New' and value_amount:
-                                        print("txtodelete")
-                                        txtodelete.append(_txid)
-                                    else:
-                                        print("willtodelete")
-                                        willtodelete.append(txid)
-                                        willtoappend[_txid]=willitem
-                                        
-                                else:
-                                    print("they are not the same tx",tx,willitem)
-                                    willinputs = willitem['tx'].inputs()
-                                    for _input in txinputs:
-                                        if Util.in_utxo(_input,willinputs):
-                                            will[_txid]=self.will[_txid]
-                                            if self.will[_txid]['status'] == BalPlugin.STATUS_NEW:
-                                                #print("replaced",_txid,_input.to_json())
-                                                #self.will[_txid]['status']='Replaced'
-                                                txtodelete.append(_txid)
-                                                #min_locktime=min(min_locktime, willitem['tx'].locktime)
-                                            else:
-                                                if  BalPlugin.STATUS_COMPLETE in self.will[_txid]['status']:
-                                                    self.will[_txid]['status']+=BalPlugin.STATUS_REPLACED
-                                                if willitem['status'] in (BalPlugin.STATUS_EXPORTED,BalPlugin.STATUS_BROADCASTED):
-                                                    self.will[_txid]['status']+=BalPlugin.STATUS_ANTICIPATED
-                                                    if tx['tx'].locktime >=willitem['tx'].locktime:
-                                                        tx['tx'].locktime = willitem['tx'].locktime-int_locktime(hours=24)
-
-                                        else:
-                                            pass
-                                            #print("not_replaced",_txid,_input.to_json())
-                        else:
-                            if ignore_duplicate:
-                                print("ignore duplicate")
-                                continue
-                            if keep_original:
-                                tx = self.will[txid]
-                        #tx['tx']=str(tx['tx'])
-                        try:
-                            print("salvo il testamento")
-                            will[txid]=tx
-                            
-                        except Exception as e:
-                            print("error saving will", e)
-                            Util.print_var(self.will)
-                        for _txid in txtodelete:
-                            try:
-                                del self.will[_txid]
-                            except:
-                                #print(f"no tx to delete{_txid}")
-                                pass
-                for t in willtodelete:
+                        
+                Will.update_will(self.will,will)
+                Will.normalize_will(will)
+                Will.normalize_will(will)
+                print(will)
+                for nid in will:
+                    txid=will[nid]['tx'].txid()
+                    if not txid in self.will:
+                        print("new txid:",txid,nid)
+                        self.will[txid]=will[nid]
+                todelete=[]
+                for wid in self.will:
+                    if wid != self.will[wid]['tx'].txid():
+                        print("todelete",wid,self.will[wid]['tx'].txid())
+                        todelete.append(wid)
+                for wid in todelete:
+                    self.will[wid]=None
                     try:
-                        del will[t]
+                        del self.will[wid]
                     except:
-                        print(will.keys())
-                will.update(willtoappend)
-                for k in will:
-                    self.will[k]=will[k]
-                if len(will)>0:
+                        print("was not present",wid)
+                for wid in self.will:
+                    self.will[wid]=self.will[wid]
+                try:
+                    Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
+                except WillExpiredException as e:
+                    tx = Will.invalidate_will(self.will)
+                    self.window.show_transaction(self.will[key]['tx'])
+
+                    self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
+                    self.bal_window.window.show_transaction(tx)
+                except NotCompleteWillException as e:
+                    self.window.show_message(_("Will is not complete some utxo was not included for unknown reasons"))
+
+
+                
+
+
+
+                if show_preview:
                     if self.bal_plugin.config_get(BalPlugin.PREVIEW):
-                        self.preview_dialog(will)
+                        self.preview_dialog(self.will)
                     elif self.bal_plugin.config_get(BalPlugin.BROADCAST):
                         if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
-                            self.preview_dialog(will)
+                            self.preview_dialog(self.will)
 
                 self.window.history_list.update()
                 self.window.utxo_list.update()
                 try:
                     self.will_list.update_will(self.will)
-                except: pass
+                except: raise e
             except Exception as e:
                 print(e)
                 self.window.show_message(e)
                 raise e
-            return will 
+            return self.will 
         except Exception as e:
             print("ERROR: exception building transactions",e)
             raise e
 
-    def export_inheritance_transactions(self):
-        try:
-            export_meta_gui(self.window, _('heirs_transactions'), self.export_inheritance_handler)
-        except Exception as e:
-            self.window.show_error(str(e))
-            raise e
-            return
 
     def settings_dialog(self):
         d = WindowModalDialog(self.window, self.get_window_title("Settings"))
@@ -445,26 +455,46 @@ class BalWindow():
         heir_locktime_time.setMinimum(0)
         heir_locktime_time.setMaximum(3650)
         heir_locktime_time.setValue(int(self.bal_plugin.config_get(BalPlugin.LOCKTIME_TIME)))
+        def on_heir_locktime_time():
+            value = heir_locktime_time.value()
+            self.bal_plugin.config.set_key(BalPlugin.LOCKTIME_TIME,value,save=True)
+        heir_locktime_time.valueChanged.connect(on_heir_locktime_time)
 
         heir_locktimedelta_time = QSpinBox()
         heir_locktimedelta_time.setMinimum(0)
         heir_locktimedelta_time.setMaximum(3650)
         heir_locktimedelta_time.setValue(int(self.bal_plugin.config_get(BalPlugin.LOCKTIMEDELTA_TIME)))
+        def on_heir_locktime_time():
+            value = heir_locktime_time.value
+            self.bal_plugin.config.set_key(BalPlugin.LOCKTIME_TIME,value,save=True)
+        heir_locktime_time.valueChanged.connect(on_heir_locktime_time)
 
         heir_locktime_blocks = QSpinBox()
         heir_locktime_blocks.setMinimum(0)
         heir_locktime_blocks.setMaximum(144*3650)
         heir_locktime_blocks.setValue(int(self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)))
+        def on_heir_locktime_blocks():
+            value = heir_locktime_blocks.value()
+            self.bal_plugin.config.set_key(BalPlugin.LOCKTIME_BLOCKS,value,save=True)
+        heir_locktime_blocks.valueChanged.connect(on_heir_locktime_blocks)
 
         heir_locktimedelta_blocks = QSpinBox()
         heir_locktimedelta_blocks.setMinimum(0)
         heir_locktimedelta_blocks.setMaximum(144*3650)
         heir_locktimedelta_blocks.setValue(int(self.bal_plugin.config_get(BalPlugin.LOCKTIMEDELTA_BLOCKS)))
+        def on_heir_locktimedelta_blocks():
+            value = heir_locktimedelta_blocks.value()
+            self.bal_plugin.config.set_key(BalPlugin.LOCKTIMEDELTA_TIME,value,save=True)
+        heir_locktimedelta_blocks.valueChanged.connect(on_heir_locktimedelta_blocks)
 
         heir_tx_fees = QSpinBox()
         heir_tx_fees.setMinimum(1)
         heir_tx_fees.setMaximum(10000)
         heir_tx_fees.setValue(int(self.bal_plugin.config_get(BalPlugin.TX_FEES)))
+        def on_heir_tx_fees():
+            value = heir_tx_fees.value()
+            self.bal_plugin.config.set_key(BalPlugin.TX_FEES,value,save=True)
+        heir_tx_fees.valueChanged.connect(on_heir_tx_fees)
 
         heir_broadcast = bal_checkbox(self.bal_plugin, BalPlugin.BROADCAST)
         heir_ask_broadcast = bal_checkbox(self.bal_plugin, BalPlugin.ASK_BROADCAST)
@@ -490,6 +520,7 @@ class BalWindow():
             return
     #TODO IMPLEMENT PREVIEW DIALOG
     #tx list display txid, willexecutor, qrcode, button to sign
+    #   :def preview_dialog(self, txs):
     def preview_dialog(self, txs):
         w=PreviewDialog(self,txs)
         w.exec_()
@@ -506,8 +537,8 @@ class bal_checkbox(QCheckBox):
         def on_check(v):
             plugin.config.set_key(variable, v == Qt.Checked, save=True)
         self.stateChanged.connect(on_check)
-    
-        
+
+
 def add_widget(grid,label,widget,row,help_):
     grid.addWidget(QLabel(_(label)),row,0)
     grid.addWidget(widget,row,1)

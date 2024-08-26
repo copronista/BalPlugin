@@ -202,11 +202,8 @@ class HeirList(MyTreeView,MessageBoxMixin):
         menu.addAction(_("&New Heir"), self.bal_window.new_heir_dialog)
         menu.addAction(_("Import"), self.bal_window.import_heirs)
         menu.addAction(_("Export"), lambda: self.bal_window.export_heirs())
-        menu.addAction(_("Build Transactions"), self.build_transactions)
+        #menu.addAction(_("Build Transactions"), self.build_transactions)
         return toolbar
     def build_transactions(self):
-        will = self.bal_window.build_inheritance_transaction(ignore_duplicate=False,keep_original = False)
-        if will:
-            if len(will) ==0:
-                self.bal_window.window.show_message(_("no tx to be created"))
+        will = self.bal_window.prepare_will()
 

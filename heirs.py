@@ -1,34 +1,13 @@
-# Electrum - Lightweight Bitcoin Client
-# Copyright (c) 2015 Thomas Voegtlin
-#
-# Permission is hereby granted, free of charge, to any person
-# obtaining a copy of this software and associated documentation files
-# (the "Software"), to deal in the Software without restriction,
-# including without limitation the rights to use, copy, modify, merge,
-# publish, distribute, sublicense, and/or sell copies of the Software,
-# and to permit persons to whom the Software is furnished to do so,
-# subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-# ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
 import re
 import json
 from typing import Optional, Tuple, Dict, Any, TYPE_CHECKING,Sequence,List
 
 import dns
 import threading
+import math
 from dns.exception import DNSException
 
-from electrum import bitcoin,dnssec,descriptor
+from electrum import bitcoin,dnssec,descriptor,constants
 from electrum.util import read_json_file, write_json_file, to_string,bfh,trigger_callback
 from electrum.logging import Logger, get_logger
 from electrum.transaction import PartialTxInput, PartialTxOutput,TxOutpoint,PartialTransaction,TxOutput
@@ -57,7 +36,7 @@ def reduce_outputs(in_amount, out_amount, fee, outputs):
     if in_amount < out_amount:
         for output in outputs:
             print("reduce_amount",output.value)
-            output.value = int((in_amount-fee)/out_amount * output.value)
+            output.value = math.floor((in_amount-fee)/out_amount * output.value)
 
 #TODO: put this method inside wallet.db to replace or complete get_locktime_for_new_transaction
 def get_current_height(network:'Network'):
@@ -81,7 +60,7 @@ def get_current_height(network:'Network'):
 
 
 
-def parse_locktime_string(locktime,w):
+def parse_locktime_string(locktime,w=None):
     try:
         return int(locktime)
 
@@ -110,18 +89,30 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
     available_utxos=sorted(available_utxos, key=lambda x:"{}:{}:{}".format(x.value_sats(),x.prevout.txid,x.prevout.out_idx))
     total_used_utxos = []
     txsout={}
-    for locktime,heirs in locktimes.items():
+    locktime,_=Util.get_lowest_locktimes(locktimes)
+    if not locktime:
+        print("not locktime diocane",locktimes)
+        return
+    print(locktime)
+    locktime=locktime[0]
 
+    heirs = locktimes[locktime]
+    #for locktime,heirs in locktimes.items():
+    vero=True
+    while vero:
+        print("PREPARE TRANSACTIONS:",heirs,locktimes)
+        vero=False
         fee=fees.get(locktime,0) 
         out_amount = 0.0
         description = ""
         for name,heir in heirs.items():
 
             try:
-                out_amount += int(heir[HEIR_REAL_AMOUNT])
+                out_amount += math.floor(heir[HEIR_REAL_AMOUNT])
 
                 description += f"{name}\n"
-            except:
+            except Exception as e:
+                print("ERROR, PREPARE TRANSACTIONS",e)
                 pass
 
         in_amount = 0.0
@@ -148,7 +139,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         for name,heir in heirs.items():
 
             try:
-                outputs.append(PartialTxOutput.from_address_and_value(heir[HEIR_ADDRESS], int(heir[HEIR_REAL_AMOUNT])))
+                outputs.append(PartialTxOutput.from_address_and_value(heir[HEIR_ADDRESS], math.floor(heir[HEIR_REAL_AMOUNT])))
 
             except Exception as e:
                 e.heir=heir
@@ -167,12 +158,11 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
 
 
         change = get_change_output(wallet, in_amount, out_amount, fee)
-        have_change=False
         if change:
-            have_change=True
             outputs.append(change)
 
         #reduce_outputs(in_amount,out_amount,fees[locktime],outputs)
+
         tx = PartialTransaction.from_io(used_utxos, outputs, locktime=parse_locktime_string(locktime,wallet), version=2)
         if len(description)>0: tx.description = description[:-1]
         else: tx.description = ""
@@ -180,7 +170,6 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         tx.set_rbf(True) 
         tx.remove_signatures()
         #wallet.sign_transaction(tx, "a" )
-        #print_var(tx,"TX")
         txid = tx.txid()
         if txid is None:
             raise Exception("txid is none",tx)
@@ -205,7 +194,8 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
             txin.utxo = tx
             #print_utxo(txin,"TXIN")
             available_utxos.append(txin)
-        
+            #to_be_exploded.append(txin)
+        txsout[txid].change = available_utxos[:]
     return txsout
 
 
@@ -385,16 +375,18 @@ class Heirs(dict, Logger):
             self.save()
             return res
 
-    def get_locktimes(self):
+    def get_locktimes(self,from_locktime):
         locktimes = {}
         for key in self.keys():
-            locktimes[self[key][HEIR_LOCKTIME]]=0
+            locktime = parse_locktime_string(self[key][HEIR_LOCKTIME])
+            if locktime > from_locktime:
+                locktimes[locktime]=None
         return locktimes.keys()
 
     def check_locktime(self):
         return False
 
-    def prepare_lists(self, balance, total_fees, wallet, willexecutor = False):
+    def prepare_lists(self, balance, total_fees, wallet, willexecutor = False, from_locktime = 0):
         fixed_amount = 0
         percent_amount = 0.0
         willexecutors_amount = 0 
@@ -404,26 +396,29 @@ class Heirs(dict, Logger):
         heir_list = {}
         onlyfixed = False
         newbalance = balance - total_fees
-        locktimes = self.get_locktimes();
+        locktimes = self.get_locktimes(from_locktime);
         if willexecutor:
             for locktime in locktimes:
-                try:
-                    base_fee = int(willexecutor['base_fee'])
-                    willexecutors_amount += base_fee
-                    h = [None] * 4
-                    h[HEIR_AMOUNT] = base_fee
-                    h[HEIR_REAL_AMOUNT] = base_fee
-                    h[HEIR_LOCKTIME] = locktime
-                    h[HEIR_ADDRESS] = willexecutor['address']
-                    willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
-                except Exception as e:
-                    print("error willexecutor:",e)
+                if Util.int_locktime(locktime) > from_locktime:
+                    try:
+                        base_fee = int(willexecutor['base_fee'])
+                        willexecutors_amount += base_fee
+                        h = [None] * 4
+                        h[HEIR_AMOUNT] = base_fee
+                        h[HEIR_REAL_AMOUNT] = base_fee
+                        h[HEIR_LOCKTIME] = locktime
+                        h[HEIR_ADDRESS] = willexecutor['address']
+                        willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
+                    except Exception as e:
+                        print("error willexecutor:",e)
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
 
         for key in self.keys():
             print("mario",key)
             try:
+                if not parse_locktime_string(self[key][HEIR_LOCKTIME]) > from_locktime:
+                    continue
                 if Util.is_perc(self[key][HEIR_AMOUNT]):
                     percent_amount += float(self[key][HEIR_AMOUNT][:-1])
                     percent_heirs[key] =list(self[key])
@@ -443,7 +438,7 @@ class Heirs(dict, Logger):
             amount = 0
             for key in fixed_heirs:
                 try:
-                    value = int(newbalance/fixed_amount*float(fixed_heirs[key][HEIR_AMOUNT]))
+                    value = math.floor(newbalance/fixed_amount*float(fixed_heirs[key][HEIR_AMOUNT]))
                     if value < wallet.dust_threshold():
                         value=0
                     fixed_heirs[key].insert(HEIR_REAL_AMOUNT, value)
@@ -462,7 +457,7 @@ class Heirs(dict, Logger):
             perc_amount=0 
             for key,value in percent_heirs.items():
                 try:
-                    value = int(newbalance/percent_amount*float(value[HEIR_AMOUNT][:-1]))
+                    value = math.floor(newbalance/percent_amount*float(value[HEIR_AMOUNT][:-1]))
                     if value > wallet.dust_threshold(): 
                         percent_heirs[key].insert(HEIR_REAL_AMOUNT, value)
                         perc_amount += value
@@ -478,21 +473,25 @@ class Heirs(dict, Logger):
 
         locktimes = {}
         for key, value in heir_list:
-            strlocktime=str(value[HEIR_LOCKTIME])
-            if not strlocktime in  locktimes: locktimes[strlocktime]={key:value}
-            else: locktimes[strlocktime][key]=value
+            print("heir keyvalue:",key,value)
+            locktime=Util.parse_locktime_string(value[HEIR_LOCKTIME])
+            if not locktime in  locktimes: locktimes[locktime]={key:value}
+            else: locktimes[locktime][key]=value
 
         return locktimes, onlyfixed
     def is_perc(self,key):
         return Util.is_perc(self[key][HEIR_AMOUNT])
-    def buildTransactions(self,bal_plugin,wallet):
+
+    def buildTransactions(self,bal_plugin,wallet,utxos=None,from_locktime=0):
+        print("------FROM LOCKTIME",from_locktime)
         Heirs._validate(self)
         if len(self)<=0:
             return
         balance = 0.0
         len_utxo_set = 0
         available_utxos = []
-        utxos = wallet.get_utxos()
+        if not utxos:
+            utxos = wallet.get_utxos()
         willexecutors = bal_plugin.config_get(BalPlugin.WILLEXECUTORS) or {}
         selected_willexecutors = bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
         tx_fees = bal_plugin.config_get(BalPlugin.TX_FEES)
@@ -534,7 +533,7 @@ class Heirs(dict, Logger):
             fees = {}
             i=0
             while True:
-                txs = []
+                txs = {}
                 redo = False
                 i+=1
                 total_fees=0
@@ -542,15 +541,22 @@ class Heirs(dict, Logger):
                     total_fees += int(fees[fee])
                 print("total_fees",total_fees)
                 newbalance = balance 
-                locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor)
+                locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor, from_locktime)
                 print("locktimes",locktimes)
                 try:
                     txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)
+                    if not txs:
+                        return {}
+                    #for tx in txsfirs:
+                    #    if reusable_input
                 except Exception as e:
-                    print(e,e.heirname,url,selected_willexecutors)
-                    if "w!ll3x3c" in e.heirname:
-                        selected_willexecutors.remove(url)
-                        break 
+                    try:
+                        print(e,e.heirname,url,selected_willexecutors)
+                        if "w!ll3x3c" in e.heirname:
+                            selected_willexecutors.remove(url)
+                            break
+                    except:
+                        raise e
                 total_fees = 0
                 total_fees_real = 0
                 total_in = 0
@@ -558,7 +564,7 @@ class Heirs(dict, Logger):
                     tx.willexecutor = willexecutor
                     fee = tx.estimated_size() * tx_fees    
                     total_fees += fee
-                    total_fees_real +=tx.get_fee()
+                    total_fees_real += tx.get_fee()
                     total_in += tx.input_value()
                     rfee= tx.input_value()-tx.output_value()
                     if rfee < fee or rfee > fee+ wallet.dust_threshold():
@@ -577,6 +583,16 @@ class Heirs(dict, Logger):
             alltxs.update(txs)
             
         return alltxs
+    def get_transactions(self,bal_plugin,wallet,utxos=None,from_locktime=0):
+        txs=self.buildTransactions(bal_plugin,wallet,utxos,from_locktime)
+        if txs:
+            temp_txs = {}
+            for txid in txs:
+                if txs[txid].change:
+                    temp_txs.update(self.get_transactions(bal_plugin,wallet,txs[txid].change,txs[txid].locktime))
+            txs.update(temp_txs)
+        return txs
+
         
 
     def resolve(self, k):

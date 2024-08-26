@@ -32,7 +32,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLa
 
 from electrum.i18n import _
 from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin,BlockingWaitingDialog,WaitingDialog,WindowModalDialog)
-from electrum.util import write_json_file,read_json_file
+from electrum.util import write_json_file,read_json_file,FileImportFailed
 from electrum.gui.qt.my_treeview import MyTreeView
 from electrum.gui.qt.transaction_dialog import show_transaction
 import json
@@ -228,11 +228,36 @@ class PreviewList(MyTreeView):
 
     def create_toolbar(self, config): 
         toolbar, menu = self.create_toolbar_with_menu('') 
-        menu.addAction(_("&Sign All"), self.ask_password_and_sign_transactions) 
-        menu.addAction(_("Export"), self.export_file)
+        menu.addAction(_("Prepare Will"), self.build_transactions) 
+        menu.addAction(_("Sign Will"), self.ask_password_and_sign_transactions)
+        menu.addAction(_("Export Will"), self.export_will)
+        menu.addAction(_("Import Will"), self.import_will)
+        menu.addAction(_("Export Transactions"), self.export_file)
         menu.addAction(_("Broadcast"), self.broadcast)
         return toolbar
-     
+
+    def build_transactions(self):
+        will = self.bal_window.prepare_will()
+        if will:
+            self.update_will(will)
+    def export_json_file(self,path):
+        write_json_file(path, self.will)
+
+    def export_will(self):
+        export_meta_gui(self.bal_window.window, _('will'), self.export_json_file)
+
+    def import_json_file(self,path):
+        try:
+            data = read_json_file(path)
+            for k,v in data.items():
+                data[k]['tx']=tx_from_any(v['tx'])
+            self.will.update(data)
+        except:
+            raise FileImportFailed(_("Invalid will file"))
+
+    def import_will(self):
+        import_meta_gui(self.bal_window.window, _('will'), self.import_json_file,self.update)
+
     def sign_transactions(self,password):
         txs={}
         signed = None
@@ -316,7 +341,12 @@ class PreviewList(MyTreeView):
 
 
     def export_inheritance_handler(self,path):
-        write_json_file(path, self.will)
+        with open(path,"w") as f:
+            for txid,willitem in self.will.items():
+                self.will[txid]['status']+=BalPlugin.STATUS_EXPORTED
+                f.write(str(willitem['tx'])+"\n")
+        self.update()
+
         """
         w=copy.deepcopy(self.will)
         for txid,willitem in self.will.items():
@@ -329,7 +359,7 @@ class PreviewList(MyTreeView):
         """
     def export_file(self):
         try:
-            export_meta_gui(self.bal_window.window, _('heirs_transactions'), self.export_inheritance_handler)
+            Util.export_meta_gui(self.bal_window.window, _('heirs_transactions'), self.export_inheritance_handler)
         except Exception as e:
             self.bal_window.window.show_error(str(e))
             raise e
@@ -394,11 +424,25 @@ class PreviewDialog(WindowModalDialog,MessageBoxMixin):
         vbox.addWidget(self.transactions_list)
         buttonbox = QHBoxLayout()
 
+        b = QPushButton(_('Write Will'))
+        b.clicked.connect(self.transactions_list.export_file)
+        buttonbox.addWidget(b)
+
         b = QPushButton(_('Sign'))
         b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
         buttonbox.addWidget(b)
 
-        b = QPushButton(_('Export'))
+
+        b = QPushButton(_('Export Will'))
+        b.clicked.connect(self.transactions_list.export_file)
+        buttonbox.addWidget(b)
+
+        b = QPushButton(_('Importt Will'))
+        b.clicked.connect(self.transactions_list.export_file)
+        buttonbox.addWidget(b)
+
+
+        b = QPushButton(_('Export Transactions'))
         b.clicked.connect(self.transactions_list.export_file)
         buttonbox.addWidget(b)
 

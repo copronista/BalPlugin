@@ -34,4 +34,20 @@
 analizzare una soluzione per lightning network(chiusura cooperativa credo che sia infattibile, si potrebbe chiedere una chiusura forzata, ma andrebbe aggiornata di continuo, e pure invalidata senza causare la chiusura prematura del canale
 
 
+
 considerare gli hardware wallet
+
+
+creazione transazioni
+calcolo gli importi come faccio ora, 
+per ogni locktime/willexecutor costruisco la transazione.
+se c'e' un resto
+ricalcolo gli importi per le transazioni successive includendo quel resto. 
+ricostruisco le transazioni per ogni willexecutor
+servirebbe una funzione ricorsiva
+
+replace ed invalidazione delle transazioni
+quando una transazione non e' stata firmata viene semplicemente elimninata.
+quando una transazione e' firmata, allora viene invalidata.
+	per invalidare una transazione controllare nelle transazioni nuove se ce ne e' qualcuna che spende gli stessi input, ed anticiparla rispetto alla transazione da invalidare
+

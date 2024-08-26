@@ -1,5 +1,9 @@
-from datetime import datetime
+from datetime import datetime,timedelta
 import bisect
+from electrum.gui.qt.util import getSaveFileName
+from electrum.i18n import _
+from electrum.transaction import PartialTxOutput
+
 class Util:
     LOCKTIME_THRESHOLD = 500000000
     def locktime_to_str(locktime):
@@ -25,6 +29,30 @@ class Util:
         timestamp = dt_object.timestamp()
         return int(timestamp)
 
+    def parse_locktime_string(locktime,w=None): 
+        try: 
+            return int(locktime) 
+     
+        except Exception as e: 
+            print("parse_locktime_string",e) 
+        try: 
+            now = datetime.now() 
+            if locktime[-1] == 'y': 
+                locktime = str(int(locktime[:-1])*365) + "d" 
+            if locktime[-1] == 'd': 
+                return int((now + timedelta(days = int(locktime[:-1]))).replace(hour=0,minute=0,second=0,microsecond=0).timestamp()) 
+            if locktime[-1] == 'b': 
+                locktime = int(locktime[:-1]) 
+                height = 0 
+                if w: 
+                    height = get_current_height(w.network) 
+                locktime+=int(height) 
+            return int(locktime) 
+        except Exception as e: 
+            print("parse_locktime_string",e) 
+            raise e
+
+
     def int_locktime(seconds=0,minutes=0,hours=0, days=0, blocks = 0):
         return int(seconds + minutes*60 + hours*60*60 + days*60*60*24 + blocks * 600)
 
@@ -46,7 +74,7 @@ class Util:
             except:
                 return False
 
-    def cmp_heir(heira,heirb):
+    def cmp_array(heira,heirb):
         try:
             if not len(heira) == len(heirb):
                 return False
@@ -57,9 +85,14 @@ class Util:
         except:
             return False
 
+    def cmp_heir(heira,heirb):
+        if heira[0] == heirb[0] and heira[3] == heirb[3]:
+            return True
+        return False
+
     def cmp_heirs(heirsa,heirsb):
         try:
-            if not len(heirsa)== len(heirsb):
+            if not len(heirsa) == len(heirsb):
                 return False
 
             for heir in heirsa:
@@ -68,19 +101,30 @@ class Util:
             return True
         except:
             return False
+
     def cmp_txs(txa,txb):
+        if not len(txa.inputs()) == len(txb.inputs()):
+            return False
+        if not len(txa.outputs()) == len(txb.outputs()):
+            return False
         for inputa in txa.inputs():
             if not Util.in_utxo(inputa,txb.inputs()):
-                print("inutxoa notin txb")
                 return False
-        for inputb in txb.inputs():
-            if not Util.in_utxo(inputb,txa.inputs()):
-                print("inutxob notin txa")
+
+        #for inputb in txb.inputs():
+        #    if not Util.in_utxo(inputb,txa.inputs()):
+        #        print("inutxob notin txa")
+        #        return False
+
+        for outputa in txa.outputs():
+            if not Util.in_output(outputa,txb.outputs()):
                 return False
-        value_amount = Util.get_value_amount(txa,txb)
-        if not value_amount:
-            return False
-        return value_amount
+        #value_amount = Util.get_value_amount(txa,txb)
+
+        #if not value_amount:
+        #    return False
+        #return value_amount
+        return True
 
     def get_value_amount(txa,txb):
         outputsa=txa.outputs()
@@ -114,13 +158,29 @@ class Util:
 
     def chk_locktime(timestamp_to_check,block_height_to_check,locktime):
         #TODO BUG:  WHAT HAPPEN AT THRESHOLD?
-        if int(locktime) > int(Util.LOCKTIME_THRESHOLD) and int(locktime) > int(timestamp_to_check):
+        locktime=int(locktime)
+        if locktime > Util.LOCKTIME_THRESHOLD and locktime > timestamp_to_check:
             return True
-        elif int(locktime) < int(Util.LOCKTIME_THRESHOLD) and int(locktime) > int(block_height_to_check):
+        elif locktime < Util.LOCKTIME_THRESHOLD and locktime > block_height_to_check:
             return True
         else:
             return False
 
+    def anticipate_locktime(locktime,blocks=0,hours=0,days=0):
+        locktime = int(locktime)
+        out=0
+        if locktime> Util.LOCKTIME_THRESHOLD:
+            seconds = blocks*600 + hours*3600 + days*86400
+            dt = datetime.fromtimestamp(locktime)
+            dt -= timedelta(seconds=seconds)
+            out = dt.timestamp()
+        else:
+            blocks -= hours*6 + days*144
+            out = locktime + blocks
+
+        if out < 1:
+            out = 1 
+        return out
     def get_lowest_valid_tx(available_utxos,will):
         will = sorted(will.items(),key = lambda x: x[1]['tx'].locktime)
         for txid,willitem in will.items():
@@ -136,6 +196,8 @@ class Util:
         sorted_timestamp=[]
         sorted_block=[]
         for l in locktimes:
+            print("locktime:",Util.parse_locktime_string(l))
+            l=Util.parse_locktime_string(l)
             if l < Util.LOCKTIME_THRESHOLD:
                 bisect.insort(sorted_block,l)
             else:
@@ -153,7 +215,8 @@ class Util:
         return None, None
 
     def invalidate_will(will):
-        pass
+        raise Exception("not implemented")
+
     def get_will_spent_utxos(will):
         utxos=[]
         for txid,willitem in will.items():
@@ -171,20 +234,27 @@ class Util:
         for s_u in utxos:
             if Util.cmp_utxo(s_u,utxo):
                 return True
-                
-        
         return False
 
+    def txid_in_utxo(txid,utxos):
+        for s_u in utxos:
+            if s_u.prevout.txid == txid:
+                return True
+        return False
+    def in_output(output,outputs):
+        for s_o in outputs:
+            if s_o.address == output.address and s_o.value == output.value:
+                return True
+        return False
     #check all output with the same amount if none have the same address it can be a change
     #return true true same address same amount 
     #return true false same amount different address
     #return false false different amount, different address not found
 
 
-    def in_output(out,outputs):
+    def din_output(out,outputs):
         same_amount=[]
         for s_o in outputs:
-            print("quando sono uguali?",out.value == s_o.value,out.value,s_o.value)
             if int(out.value) == int(s_o.value):
                 same_amount.append(s_o)
                 if out.address==s_o.address:
@@ -198,37 +268,13 @@ class Util:
         else:return False, False
 
 
-    def is_will_valid(will, block_to_check, timestamp_to_check, all_utxos):
-        spent_utxos=[]
-        locktimes_time,locktimes_blocks  = Util.get_lowest_locktimes_from_will(will)
-        for txid,willitem in will.items():
-            spent_utxos +=willitem['tx'].inputs()
-            chk_block=True
-            chk_time=True
-            if len(locktimes_blocks)>0:
-                chk_block =  Util.chk_locktime(block_to_check,timestamp_to_check,locktimes_blocks[0])
-
-            if len(locktimes_time)>0:
-                chk_time =  Util.chk_locktime(block_to_check,timestamp_to_check,locktimes_time[0])
-
-            if not (chk_block or chk_time):
-                print("locktime",locktimes_time[0],timestamp_to_check,Util.chk_locktime(timestamp_to_check,block_to_check,locktimes_time[0]))
-                print("locktime",locktimes_blocks[0],block_to_check,Util.chk_locktime(timestamp_to_check,block_to_check,locktimes_blocks[0]))
-                print("locktime outdated",locktimes_time,locktimes_blocks,block_to_check,timestamp_to_check)
-                print("will need to be invalidated")
-                return False
-        #check that all utxo in wallet are spent
-        for utxo in all_utxos:
-            if not Util.in_utxo(utxo,spent_utxos):
-                    print("utxo is not spent",utxo.to_json())
-                    return False
-        #check that all spent uxtos are in wallet
-        for s_utxo in spent_utxos:
-            if not Util.in_utxo(s_utxo,spent_utxos):
-                if not s_utxo.prevout.txid in will.keys():
-                    print("utxo is not in wallet",s_utxo.to_json())
-                    return False
-        return True
+    def get_change_output(wallet,in_amount,out_amount,fee): 
+        change_amount = int(in_amount - out_amount - fee) 
+        if change_amount > wallet.dust_threshold(): 
+            change_addresses = wallet.get_change_addresses_for_new_transaction() 
+            out = PartialTxOutput.from_address_and_value(change_addresses[0], change_amount) 
+            out.is_change = True 
+            return out
 
 
     def get_current_height(network:'Network'):
@@ -298,4 +344,23 @@ class Util:
         Util.print_var(prevout,f"{name}-prevout")
         Util.print_var(prevout._asdict())
         print(f"---prevout-end {name}---")
+
+    def export_meta_gui(electrum_window: 'ElectrumWindow', title, exporter):
+        filter_ = "All files (*)"
+        filename = getSaveFileName(
+            parent=electrum_window,
+            title=_("Select file to save your {}").format(title),
+            filename='electrum_{}'.format(title),
+            filter=filter_,
+            config=electrum_window.config,
+        )
+        if not filename:
+            return
+        try:
+            exporter(filename)
+        except FileExportFailed as e:
+            electrum_window.show_critical(str(e))
+        else:
+            electrum_window.show_message(_("Your {0} were exported to '{1}'")
+                                     .format(title, str(filename)))
 
