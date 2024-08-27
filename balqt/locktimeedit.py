@@ -30,17 +30,19 @@ class HeirsLockTimeEdit(QWidget):
         hbox.setSpacing(0)
 
         self.locktime_raw_e = LockTimeRawEdit(self)
-        self.locktime_height_e = LockTimeHeightEdit(self)
+        #self.locktime_height_e = LockTimeHeightEdit(self)
         self.locktime_date_e = LockTimeDateEdit(self)
-        self.editors = [self.locktime_raw_e, self.locktime_height_e, self.locktime_date_e]
+        #self.editors = [self.locktime_raw_e, self.locktime_height_e, self.locktime_date_e]
+        self.editors = [self.locktime_raw_e, self.locktime_date_e]
 
         self.combo = QComboBox()
         #options = [_("Raw"), _("Block height"), _("Date")]
         options = [_("Raw"),_("Date")]
         option_index_to_editor_map = {
             0: self.locktime_raw_e,
-            1: self.locktime_height_e,
-            2: self.locktime_date_e,
+            #1: self.locktime_height_e,
+            1: self.locktime_date_e,
+            #2: self.locktime_date_e,
         }
         self.combo.addItems(options)
 
@@ -65,7 +67,7 @@ class HeirsLockTimeEdit(QWidget):
             hbox.addWidget(w)
         hbox.addStretch(1)
 
-        self.locktime_height_e.textEdited.connect(self.valueEdited.emit)
+        #self.locktime_height_e.textEdited.connect(self.valueEdited.emit)
         self.locktime_raw_e.textEdited.connect(self.valueEdited.emit)
         self.locktime_date_e.dateTimeChanged.connect(self.valueEdited.emit)
         self.combo.currentIndexChanged.connect(self.valueEdited.emit)

@@ -1,6 +1,6 @@
 from .util import Util
 from .bal import BalPlugin
-from electrum.transaction import TxOutpoint,PartialTxInput
+from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any
 from electrum.util import bfh
 class Will:
     MIN_LOCKTIME = 1
@@ -44,7 +44,16 @@ class Will:
                     return will[w]['tx']
         return False
 
-        
+    def get_will(x):
+        try:
+            x['tx']=tx_from_any(x['tx'])
+        except Exception as e:
+            Util.print_var(x)
+            raise e
+
+        return x
+
+  
     #this method will substitute childrent transaction input with real father transaction id
     def normalize_will(will,wallet=None):
         print("normalize will")
@@ -52,6 +61,9 @@ class Will:
         to_be_addedd = []
         for willid in will:
             if wallet:
+                if isinstance(will[willid]['tx'],str):
+                    will[willid]['tx']=Will.get_will(will[willid]['tx'])
+                print("type",type(will[willid]['tx']),)
                 will[willid]['tx'].add_info_from_wallet(wallet)
             parent_txid = will[willid]['tx'].txid()
             

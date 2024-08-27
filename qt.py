@@ -57,8 +57,8 @@ class Plugin(BalPlugin):
             self.gui_object=gui_object
             for window in gui_object.windows:
                 wallet = window.wallet
-
-                self.bal_windows[window.winId]= BalWindow(self,window)
+                w = BalWindow(self,window)
+                self.bal_windows[window.winId]= w
                 for child in window.children():
                     if isinstance(child,QMenuBar):
                         for menu_child in child.children():
@@ -66,8 +66,7 @@ class Plugin(BalPlugin):
                                 try:
                                     print(menu_child.title())
                                     if menu_child.title()==_("&Tools"):
-                                        for menu_item in menu_child.children():
-                                            pass
+                                        w.init_menubar_tools(menu_child)
                                             
                                 except:
                                     print("except:",menu_child.text())
@@ -166,10 +165,6 @@ class BalWindow():
         self.heirs = Heirs._validate(Heirs(self.wallet.db))
         self.will=self.wallet.db.get_dict("will")
         Will.normalize_will(self.will,self.wallet)
-        print(self.window.windowTitle())
-
-    def init_menubar_tools(self,tools_menu):
-        self.tools_menu=tools_menu
         for txid,willtx in self.will.items():
             if isinstance(willtx['tx'],str):
                 tx=tx_from_any(willtx['tx'])
@@ -180,6 +175,10 @@ class BalWindow():
 
         self.heirs_tab = self.create_heirs_tab()
         self.will_tab = self.create_will_tab()
+        print(self.window.windowTitle())
+
+    def init_menubar_tools(self,tools_menu):
+        self.tools_menu=tools_menu
 
         def add_optional_tab(tabs, tab, icon, description):
             tab.tab_icon = icon
@@ -365,62 +364,63 @@ class BalWindow():
             try: 
                 txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,date_to_check)
                 creation_time = time()
-                for txid in txs:
-                    txtodelete=[]
-                    _break = False
-                    print(txid,txs[txid].description)
-                    tx = {}
-                    tx['tx'] = txs[txid]
-                    tx['my_locktime'] = txs[txid].my_locktime
-                    tx['heirsvalue'] = txs[txid].heirsvalue
-                    tx['description'] = txs[txid].description
-                    tx['willexecutor'] = txs[txid].willexecutor
-                    tx['status'] = BalPlugin.STATUS_NEW
-                    tx['exported'] = False
-                    tx['broadcasted'] = False
-                    tx['valid'] = True
-                    tx['time'] = creation_time
-                    tx['heirs'] = txs[txid].heirs
-                    tx['txchildren'] = []
-                    will[txid]=tx
+                if txs:
+                    for txid in txs:
+                        txtodelete=[]
+                        _break = False
+                        print(txid,txs[txid].description)
+                        tx = {}
+                        tx['tx'] = txs[txid]
+                        tx['my_locktime'] = txs[txid].my_locktime
+                        tx['heirsvalue'] = txs[txid].heirsvalue
+                        tx['description'] = txs[txid].description
+                        tx['willexecutor'] = txs[txid].willexecutor
+                        tx['status'] = BalPlugin.STATUS_NEW
+                        tx['exported'] = False
+                        tx['broadcasted'] = False
+                        tx['valid'] = True
+                        tx['time'] = creation_time
+                        tx['heirs'] = txs[txid].heirs
+                        tx['txchildren'] = []
+                        will[txid]=tx
                         
 
                         
-                Will.update_will(self.will,will)
-                Will.normalize_will(will)
-                Will.normalize_will(will)
-                print(will)
-                for nid in will:
-                    txid=will[nid]['tx'].txid()
-                    if not txid in self.will:
-                        print("new txid:",txid,nid)
-                        self.will[txid]=will[nid]
-                todelete=[]
-                for wid in self.will:
-                    if wid != self.will[wid]['tx'].txid():
-                        print("todelete",wid,self.will[wid]['tx'].txid())
-                        todelete.append(wid)
-                for wid in todelete:
-                    self.will[wid]=None
+                    Will.update_will(self.will,will)
+                    Will.normalize_will(will)
+                    Will.normalize_will(will)
+                    print(will)
+                    for nid in will:
+                        txid=will[nid]['tx'].txid()
+                        if not txid in self.will:
+                            print("new txid:",txid,nid)
+                            self.will[txid]=will[nid]
+                    todelete=[]
+                    for wid in self.will:
+                        if wid != self.will[wid]['tx'].txid():
+                            print("todelete",wid,self.will[wid]['tx'].txid())
+                            todelete.append(wid)
+                    for wid in todelete:
+                        self.will[wid]=None
+                        try:
+                            del self.will[wid]
+                        except:
+                            print("was not present",wid)
+                    for wid in self.will:
+                        self.will[wid]=self.will[wid]
                     try:
-                        del self.will[wid]
-                    except:
-                        print("was not present",wid)
-                for wid in self.will:
-                    self.will[wid]=self.will[wid]
-                try:
-                    Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
-                except WillExpiredException as e:
-                    tx = Will.invalidate_will(self.will)
-                    self.window.show_transaction(self.will[key]['tx'])
+                        Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
+                    except WillExpiredException as e:
+                        tx = Will.invalidate_will(self.will)
+                        self.window.show_transaction(self.will[key]['tx'])
 
-                    self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
-                    self.bal_window.window.show_transaction(tx)
-                except NotCompleteWillException as e:
-                    self.window.show_message(_("Will is not complete some utxo was not included for unknown reasons"))
+                        self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
+                        self.bal_window.window.show_transaction(tx)
+                    except NotCompleteWillException as e:
+                        self.window.show_message(_("Will is not complete some utxo was not included for unknown reasons"))
 
 
-                
+                    
 
 
 
@@ -435,15 +435,19 @@ class BalWindow():
                 self.window.utxo_list.update()
                 try:
                     self.will_list.update_will(self.will)
-                except: raise e
+                except: 
+                    pass
+                    #raise e
             except Exception as e:
-                print(e)
-                self.window.show_message(e)
-                raise e
+                pass
+                #print(e)
+                #self.window.show_message(e)
+                #raise e
             return self.will 
         except Exception as e:
-            print("ERROR: exception building transactions",e)
-            raise e
+            #print("ERROR: exception building transactions",e)
+            #raise e
+            pass
 
 
     def settings_dialog(self):
