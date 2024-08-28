@@ -39,7 +39,7 @@ import json
 import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
-from ..heirs import push_transactions_to_willexecutors
+from ..willexecutors import Willexecutors
 from ..util import Util 
 from electrum.transaction import tx_from_any
 from electrum.network import Network

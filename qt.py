@@ -40,6 +40,7 @@ from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
+from .willexecutors import Willexecutors
 from electrum.transaction import tx_from_any
 from time import time
 import datetime
@@ -92,9 +93,10 @@ class Plugin(BalPlugin):
 
     @hook
     def on_close_window(self,window):
+        pass
             #Util.print_var(window)
-            w = self.get_window(window)
-            w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
+            #w = self.get_window(window)
+            #w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
             
 
 
@@ -334,6 +336,7 @@ class BalWindow():
 
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
+            print("start building transactions")
             locktime_time=self.bal_plugin.config_get(BalPlugin.LOCKTIME_TIME)
             locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
             date_to_check = (datetime.datetime.now()+datetime.timedelta(days=locktime_time)).timestamp()
@@ -361,7 +364,10 @@ class BalWindow():
                 self.bal_window.window.show_transaction(tx)
             except NotCompleteWillException as e:
                 self.window.show_message(_("Will is not complete some utxo was not included I will rebuild it"))
-            try: 
+            try:
+                willexecutors = Willexecutors.get_willexecutors(self.bal_plugin) 
+                Willexecutors.ping_servers(willexecutors)
+                print(willexecutors)
                 txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,date_to_check)
                 creation_time = time()
                 if txs:
@@ -385,29 +391,14 @@ class BalWindow():
                         will[txid]=tx
                         
 
-                        
+                    print("WILL",will)    
                     Will.update_will(self.will,will)
+                    print("WILL2",will)    
                     Will.normalize_will(will)
-                    Will.normalize_will(will)
-                    print(will)
-                    for nid in will:
-                        txid=will[nid]['tx'].txid()
-                        if not txid in self.will:
-                            print("new txid:",txid,nid)
-                            self.will[txid]=will[nid]
-                    todelete=[]
-                    for wid in self.will:
-                        if wid != self.will[wid]['tx'].txid():
-                            print("todelete",wid,self.will[wid]['tx'].txid())
-                            todelete.append(wid)
-                    for wid in todelete:
-                        self.will[wid]=None
-                        try:
-                            del self.will[wid]
-                        except:
-                            print("was not present",wid)
-                    for wid in self.will:
-                        self.will[wid]=self.will[wid]
+                    print("WILL3",will)    
+
+                    for wid in will:
+                        self.will[wid]=will[wid]
                     try:
                         Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
                     except WillExpiredException as e:
@@ -435,10 +426,12 @@ class BalWindow():
                 self.window.utxo_list.update()
                 try:
                     self.will_list.update_will(self.will)
-                except: 
+                except Exception as e:
+                    raise e
                     pass
                     #raise e
             except Exception as e:
+                raise e
                 pass
                 #print(e)
                 #self.window.show_message(e)
@@ -446,7 +439,7 @@ class BalWindow():
             return self.will 
         except Exception as e:
             #print("ERROR: exception building transactions",e)
-            #raise e
+            raise e
             pass
 
 

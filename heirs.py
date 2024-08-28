@@ -16,6 +16,7 @@ import urllib.request
 import urllib.parse
 from .bal import BalPlugin
 from .util import Util
+from .willexecutors import Willexecutors
 if TYPE_CHECKING:
     from .wallet_db import WalletDB
     from .simple_config import SimpleConfig
@@ -254,51 +255,6 @@ def completed_willitem(will):
         else:
             print(f"tx:{txid} is not complete")
 
-#TODO push transactions to willexecutors servers
-def push_transactions_to_willexecutors(will,selected_willexecutors):
-    willexecutors ={}
-    strtxs=""
-    for willitem in completed_willitem(will):
-        willexecutor=willitem['willexecutor']
-        if  willexecutor: 
-            willexecutors[str(willexecutor)]=willexecutor
-        strtxs += str(willitem['tx'])+"\n"
-    #print(willexecutors)
-    if not willexecutors:
-        return
-    for url,willexecutor in willexecutors.items():
-        push_transactions_to_willexecutor(strtxs,selected_willexecutors,willexecutor['url'])
-
-def push_transactions_to_willexecutor(strtxs,selected_willexecutors, url):
-    print(url,selected_willexecutors,strtxs)
-    if url in selected_willexecutors:
-        try:
-            req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
-            req.add_header('Content-Type', 'text/plain')
-            with urllib.request.urlopen(req) as response:
-                response_data = response.read().decode('utf-8')
-                if response.status != 200:
-                    print(f"error{response.status} pushing txs to: {url}")
-        except Exception as e:  
-            print(f"error contacting {url} for pushing txs",e)
-
-def getinfo_willexecutor(url,willexecutor):
-    w=None
-    try:
-        print("GETINFO_WILLEXECUTOR")
-        print(url)
-        req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info", method='GET')
-        with urllib.request.urlopen(req) as response:
-            response_data=response.read().decode('utf-8')
-
-            w = json.loads(response_data)
-            print("response_data", w['address'])
-            if response.status != 200:
-                print(f"error{response.status} pushing txs to: {url}")
-    except Exception as e:
-        print(f"error {e} contacting {url}")
-    return w or willexecutor 
-
 def print_transaction(heirs,tx,locktimes,tx_fees):
     jtx=tx.to_json()
     print(f"TX: {tx.txid()}\t-\tLocktime: {jtx['locktime']}")
@@ -386,6 +342,30 @@ class Heirs(dict, Logger):
     def check_locktime(self):
         return False
 
+    def normalize_perc(self, heir_list, total_balance, relative_balance,wallet):
+        amount = 0
+        for key,value in heir_list.items():
+            try:
+                value = math.floor(total_balance/relative_balance*self.amount_to_float(value[HEIR_AMOUNT]))
+                if value > wallet.dust_threshold():
+                    heir_list[key].insert(HEIR_REAL_AMOUNT, value)
+                    amount += value
+
+            except Exception as e:
+                print("error getting heirs",e,key,heir_list[key],total_balance,relative_balance)
+        return amount
+
+    def amount_to_float(self,amount):
+        try:
+            return float(amount)
+        except:
+            try:
+                return float(amount[:-1])
+            except:
+                print("error parsing amount",amount)
+                return 0.0
+
+
     def prepare_lists(self, balance, total_fees, wallet, willexecutor = False, from_locktime = 0):
         fixed_amount = 0
         percent_amount = 0.0
@@ -413,7 +393,6 @@ class Heirs(dict, Logger):
                         print("error willexecutor:",e)
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
-
         for key in self.keys():
             print("mario",key)
             try:
@@ -435,18 +414,8 @@ class Heirs(dict, Logger):
                 print("Error getting heir info",e)
         if fixed_amount > newbalance:
             print(f"warning fixed_amount({fixed_amount}) > balance-fee({newbalance})")
-            amount = 0
-            for key in fixed_heirs:
-                try:
-                    value = math.floor(newbalance/fixed_amount*float(fixed_heirs[key][HEIR_AMOUNT]))
-                    if value < wallet.dust_threshold():
-                        value=0
-                    fixed_heirs[key].insert(HEIR_REAL_AMOUNT, value)
-                    amount += value
-                except Exception as e:
-                    print("error getting fixed heirs",e,key,fixed_heirs[key],newbalance,fixed_amount)
+            fixed_amount = self.normalize_perc(fixed_heirs,newbalance,fixed_amount,wallet)
 
-            fixed_amount=amount
             onlyfixed = True
 
         heir_list.update(fixed_heirs)
@@ -454,17 +423,18 @@ class Heirs(dict, Logger):
         newbalance -= fixed_amount
         print("newbalance",newbalance)   
         if newbalance > 0:
-            perc_amount=0 
-            for key,value in percent_heirs.items():
-                try:
-                    value = math.floor(newbalance/percent_amount*float(value[HEIR_AMOUNT][:-1]))
-                    if value > wallet.dust_threshold(): 
-                        percent_heirs[key].insert(HEIR_REAL_AMOUNT, value)
-                        perc_amount += value
-                except Exception as e: 
-                    print("error getting perc heirs",e,key,percent_heirs[key],newbalance,perc_amount,value)
+            print("calculate_percentage_amount")
+            perc_amount = self.normalize_perc(percent_heirs,newbalance,percent_amount,wallet)
             newbalance -= perc_amount
             heir_list.update(percent_heirs)
+
+        if newbalance > 0:
+            print("percentage amount not enought to fill all utxos, retrying with fixed heirs")
+            newbalance += fixed_amount
+            fixed_amount = self.normalize_perc(fixed_heirs,newbalance,fixed_amount,wallet)
+            newbalance -= fixed_amount
+            print(fixed_heirs)
+            heir_list.update(fixed_heirs)
 
         heir_list = sorted(heir_list.items(), key = lambda item: parse_locktime_string(item[1][HEIR_LOCKTIME],wallet))
         print("heir_list",heir_list)
@@ -492,8 +462,7 @@ class Heirs(dict, Logger):
         available_utxos = []
         if not utxos:
             utxos = wallet.get_utxos()
-        willexecutors = bal_plugin.config_get(BalPlugin.WILLEXECUTORS) or {}
-        selected_willexecutors = bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
+        willexecutors = Willexecutors.get_willexecutors(bal_plugin) or {}
         tx_fees = bal_plugin.config_get(BalPlugin.TX_FEES)
         self.decimal_point=bal_plugin.config.get_decimal_point()
 
@@ -516,16 +485,8 @@ class Heirs(dict, Logger):
             elif 0 <= j:
                 print("hello",j,willexecutorslen,willexecutorsitems[j])
                 url, willexecutor = willexecutorsitems[j]
-                if not url in selected_willexecutors:
-                    print(f"{url}is not in {selected_willexecutors}")
+                if not Willexecutors.is_selected(willexecutor):
                     continue
-                willexecutor["url"]=url
-                willexecutor_info=getinfo_willexecutor(url,willexecutor)
-                if not willexecutor_info.get("address",None):
-                    print(f"{willexecutor_info} no address")
-                    continue
-                willexecutor["address"]=willexecutor_info["address"]
-                willexecutor["base_fee"]=willexecutor_info["base_fee"]
             elif j == -1:
                 url = willexecutor = False
             else:
@@ -551,9 +512,9 @@ class Heirs(dict, Logger):
                     #    if reusable_input
                 except Exception as e:
                     try:
-                        print(e,e.heirname,url,selected_willexecutors)
+                        print(e,e.heirname,url)
                         if "w!ll3x3c" in e.heirname:
-                            selected_willexecutors.remove(url)
+                            Willexecutors.is_selected(willexecutors[w],False)
                             break
                     except:
                         raise e

@@ -38,6 +38,7 @@ import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
 from ..util import Util
+from ..willexecutors import Willexecutors
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -71,7 +72,6 @@ class WillExecutorList(MyTreeView):
         self.setSortingEnabled(True)
         self.std_model = self.model()
         self.config =parent.bal_plugin.config
-        self.selected = self.parent.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
            
 
         self.update()
@@ -90,7 +90,7 @@ class WillExecutorList(MyTreeView):
             column_title = self.model().horizontalHeaderItem(column).text()
             column_data = '\n'.join(self.model().itemFromIndex(s_idx).text()
                                     for s_idx in self.selected_in_column(column))
-            if sel_key in self.selected:
+            if Willexecutors.is_selected(self.parent.willexecutors_list[sel_key]):
                 menu.addAction(_("deselect").format(column_title), lambda: self.deselect(selected_keys))
             else:
                 menu.addAction(_("select").format(column_title), lambda: self.select(selected_keys))
@@ -114,15 +114,17 @@ class WillExecutorList(MyTreeView):
         for key in selected_keys:
             del self.parent.willexecutors_list[key]
         self.update()
+
     def select(self,selected_keys):
-        self.selected += selected_keys
-        self.parent.bal_plugin.config.set_key(BalPlugin.SELECTED_WILLEXECUTORS,self.selected,save=True)
+        for wid,w in self.parent.willexecutors_list.items():
+            if wid in selected_keys:
+                w['selected']=True
         self.update()
 
     def deselect(self,selected_keys):
-        for key in selected_keys:
-            self.selected.remove(key)
-        self.parent.bal_plugin.config.set_key(BalPlugin.SELECTED_WILLEXECUTORS,self.selected,save=True)
+        for wid,w in self.parent.willexecutors_list.items():
+            if wid in selected_keys:
+                w['selected']=False
         self.update()
 
     def on_edited(self, idx, edit_key, *, text):
@@ -165,7 +167,7 @@ class WillExecutorList(MyTreeView):
             print("new value",url,value)
             labels = [""] * len(self.Columns)
             labels[self.Columns.URL] = url 
-            if url in self.selected:
+            if Willexecutors.is_selected(value):
                 labels[self.Columns.SELECTED] = [read_QIcon('confirmed.png'),'']
             else:
                 labels[self.Columns.SELECTED] = ''
@@ -204,32 +206,9 @@ class WillExecutorList(MyTreeView):
                 idx = self.model().index(row_count, self.Columns.NAME)
                 set_current = QPersistentModelIndex(idx)
             self.set_current_idx(set_current)
+        self.parent.save_willexecutors()
 
 
-
-    def ping_servers(self):
-        for url in self.parent.willexecutors_list:
-            self.ping_server(url)
-
-    def ping_server(self,url):
-            try:
-                print("ping ",url)
-                res=urllib.request.urlopen(url)
-                self.parent.willexecutors_list[url]['status']=res.status 
-            except Exception as e: print(f"error {e} \n url:{url}")
-
-           
-
-
-def get_willexecutors_list_from_json(config):
-    try:
-        with open("willexecutors.json") as f:
-            h = json.load(f)
-            config.set_key(BalPlugin.WILLEXECUTORS,h,save=True)
-            return h
-    except Exception as e:
-        print("errore aprendo willexecutors.json:",e)
-        return {}
 
 class WillExecutorDialog(QDialog,MessageBoxMixin):
     def __init__(self, bal_window):
@@ -238,10 +217,7 @@ class WillExecutorDialog(QDialog,MessageBoxMixin):
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config
         self.window = bal_window.window
-        self.willexecutors_list = self.bal_plugin.config_get(BalPlugin.WILLEXECUTORS)
-        bal=BalPlugin.DEFAULT_SETTINGS[BalPlugin.WILLEXECUTORS]
-        if not bal in self.willexecutors_list.items():
-            self.willexecutors_list.update(BalPlugin.DEFAULT_SETTINGS[BalPlugin.WILLEXECUTORS])
+        self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin)
         
         self.setWindowTitle(_('WillExecutor Service List'))
         self.setMinimumSize(800, 200)
@@ -312,4 +288,7 @@ class WillExecutorDialog(QDialog,MessageBoxMixin):
 
     def closeEvent(self, event):
         event.accept()
+    def save_willexecutors(self):
+        print(self.willexecutors_list)
+        self.bal_plugin.config.set_key(self.bal_plugin.WILLEXECUTORS,self.willexecutors_list,save=True)
     

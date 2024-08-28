@@ -3,7 +3,8 @@ import bisect
 from electrum.gui.qt.util import getSaveFileName
 from electrum.i18n import _
 from electrum.transaction import PartialTxOutput
-
+import urllib.request
+import urllib.parse
 class Util:
     LOCKTIME_THRESHOLD = 500000000
     def locktime_to_str(locktime):
@@ -86,7 +87,13 @@ class Util:
             return False
 
     def cmp_heir(heira,heirb):
-        if heira[0] == heirb[0] and heira[3] == heirb[3]:
+        if heira[0] == heirb[0] and heira[3] == heirb[3] and heira[1]==heirb[1]:
+            return True
+        return False
+
+    def cmp_willexecutor(willexecutora,willexecutorb):
+        
+        if willexecutora == willexecutorb:
             return True
         return False
 
@@ -102,28 +109,25 @@ class Util:
         except:
             return False
 
+    def cmp_inputs(inputsa,inputsb):
+        if len(inputsa) != len(inputsb): 
+            return False 
+        for inputa in inputsa:
+            if not Util.in_utxo(inputa,inputsb):
+                return False
+
+    def cmp_outputs(outputsa,outputsb):
+        if len(outputsa) != len(outputsb): 
+            return False 
+        for outputa in outputsa: 
+            if not Util.in_utxo(outputa,outputsb): 
+                return False
+
     def cmp_txs(txa,txb):
-        if not len(txa.inputs()) == len(txb.inputs()):
+        if not Util.cmp_inputs(txa.inputs(),txb.inputs()):
             return False
-        if not len(txa.outputs()) == len(txb.outputs()):
+        if not Util.cmp_outputs(txa.outputs(),txb.outputs()):
             return False
-        for inputa in txa.inputs():
-            if not Util.in_utxo(inputa,txb.inputs()):
-                return False
-
-        #for inputb in txb.inputs():
-        #    if not Util.in_utxo(inputb,txa.inputs()):
-        #        print("inutxob notin txa")
-        #        return False
-
-        for outputa in txa.outputs():
-            if not Util.in_output(outputa,txb.outputs()):
-                return False
-        #value_amount = Util.get_value_amount(txa,txb)
-
-        #if not value_amount:
-        #    return False
-        #return value_amount
         return True
 
     def get_value_amount(txa,txb):
@@ -181,6 +185,7 @@ class Util:
         if out < 1:
             out = 1 
         return out
+
     def get_lowest_valid_tx(available_utxos,will):
         will = sorted(will.items(),key = lambda x: x[1]['tx'].locktime)
         for txid,willitem in will.items():
@@ -250,7 +255,7 @@ class Util:
     #return true true same address same amount 
     #return true false same amount different address
     #return false false different amount, different address not found
-
+    
 
     def din_output(out,outputs):
         same_amount=[]
@@ -363,4 +368,5 @@ class Util:
         else:
             electrum_window.show_message(_("Your {0} were exported to '{1}'")
                                      .format(title, str(filename)))
+
 
