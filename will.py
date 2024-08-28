@@ -123,7 +123,7 @@ class Will:
                 found = False
                 old_txid = wtx.txid()
                 for i in range(0,len(inputs)):
-                    if inputs[i].prevout.txid.hex() == otxid:
+                    if inputs[i].prevout.txid.hex() == otxid and inputs[i].prevout.out_idx == idx:
                         will[wid]['tx']._inputs[i]=Will.new_input(ntxid,idx,change)
                         found = True
                 if found:
@@ -234,40 +234,65 @@ class Will:
         all_inputs_min_locktime = {}
         
         for i,values in all_inputs.items():
-            all_inputs_min_locktime[i]=min(values,key = lambda x:x[1]['tx'].locktime)
+            min_locktime = min(values,key = lambda x:x[1]['tx'].locktime)[1]['tx'].locktime
+            for w in values:
+                if w[1]['tx'].locktime == min_locktime:
+                    if not i in all_inputs_min_locktime:
+                        all_inputs_min_locktime[i]=[w]
+                    else:
+                         all_inputs_min_locktime[i].append(w)
 
         return all_inputs_min_locktime
 
     def cmp_will(ow,nw):
+        print("old heirs:",ow['heirs'])
+        print("new heirs:",nw['heirs'])
         if Util.cmp_heirs(ow['heirs'],nw['heirs']):
+            print("same heirs")
             if Util.cmp_willexecutor(ow['willexecutor'],nw['willexecutor']):
-                if Util.cmp_inputs(ow['tx'].inputs(),nw['tx'].inputs()):
-                    return True
+                print("same willexecutor")
+                return True
         return False
 
 
     def update_will(old_will,new_will):
         #write_json_file("/home/steal/Documents/old_will",old_will)
         #write_json_file("/home/steal/Documents/new_will",new_will)
-        all_inputs_min_locktime = Will.get_all_inputs_min_locktime(Will.get_all_inputs(old_will))
+        all_old_inputs = Will.get_all_inputs(old_will)
+        all_inputs_min_locktime = Will.get_all_inputs_min_locktime(all_old_inputs)
         all_new_inputs = Will.get_all_inputs(new_will)
-        
+        print("_______________UPDATE WILL______________") 
         for nid in new_will:
+            print("nid",nid)
             if nid in old_will:
+                print("already present")
                 new_will[nid]=old_will[nid]
                 continue
             nw=new_will[nid]
+            print("heirs",nw['heirs'])
+            print("locktime",nw['tx'].locktime)
             ntx=nw['tx']
             for inp in ntx.inputs():
                 prevout_str = inp.prevout.to_str()
                 if prevout_str in all_inputs_min_locktime:
-                    ow = all_inputs_min_locktime[prevout_str][1]
-                    otx = ow['tx']
-                    anticipate = Util.anticipate_locktime(otx.locktime,days=1)
-                    if ntx.locktime >= anticipate:
-                        if Will.cmp_will(ow,nw):
-                            new_will[nid]=ow
+                    ows = all_inputs_min_locktime[prevout_str]
+                    for ow in ows:
+                        otx = ow[1]['tx']
+                        anticipate = Util.anticipate_locktime(otx.locktime,days=1)
+                        found = False
+                        print(nw['tx'].locktime,otx.locktime)
+                        if ntx.locktime >= anticipate:
+                            nw['tx'].locktime = otx.locktime
+                            print("ntx locktime >=anticipate")
+                            if Util.cmp_heirs(ow[1]['heirs'],nw['heirs']):
+                                if Util.cmp_willexecutor(ow[1]['willexecutor'],nw['willexecutor']):
+                                    print("equals!!!")
+                                    if Util.cmp_txs(otx,ntx):
+                                        print("keeping old tx") 
+                                        new_will[nid]=ow[1]
+                                        found = True
                         else:
+                            print("actually anticipate")
                             new_will[nid]['tx'].locktime = int(anticipate)
         try:
             Will.normalize_will(new_will)
@@ -276,7 +301,10 @@ class Will:
                             
 
         for oid in Will.only_valid(old_will):
-            if not oid in new_will:
+            if oid in new_will:
+                new_will[oid]=old_will[oid]
+                continue
+            else:
                 ow = old_will[oid]
                 otx = ow['tx']
                 new_will_found = False
@@ -284,7 +312,8 @@ class Will:
                     nw = new_will[nid]
                     ntx = nw['tx']
                     if Will.cmp_will(ow,nw):
-                        new_will_found = True
+                        if Util.cmp_txs(otx,ntx):
+                            new_will_found = True
 
                 if not new_will_found:
                     old_will[oid]['status'] += BalPlugin.STATUS_REPLACED

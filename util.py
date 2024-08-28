@@ -87,46 +87,61 @@ class Util:
             return False
 
     def cmp_heir(heira,heirb):
-        if heira[0] == heirb[0] and heira[3] == heirb[3] and heira[1]==heirb[1]:
+        if heira[0] == heirb[0] and heira[3] == heirb[3]: 
             return True
         return False
 
     def cmp_willexecutor(willexecutora,willexecutorb):
-        
+        print("willexecutora",willexecutora)
+        print("willexecutorb",willexecutorb)
         if willexecutora == willexecutorb:
             return True
+        try:
+            if willexecutora['url']==willexecutorb['url'] and willexecutora['address'] == willexecutorb['address'] and willexecutora['base_fee']==willexecutorb['base_fee']:
+                return True
+        except:
+            return False
         return False
 
     def cmp_heirs(heirsa,heirsb):
         try:
-            if not len(heirsa) == len(heirsb):
-                return False
-
             for heir in heirsa:
-                if not Util.cmp_heir(heirsa[heir],heirsb[heir]):
-                    return False
+                if not "w!ll3x3c\"" in heir:
+                    if not Util.cmp_heir(heirsa[heir],heirsb[heir]):
+                        return False
+            for heir in heirsb:
+                if not "w!ll3x3c\"" in heir:
+                    if not Util.cmp_heir(heirsa[heir],heirsb[heir]):
+                        return False
             return True
         except:
             return False
 
     def cmp_inputs(inputsa,inputsb):
         if len(inputsa) != len(inputsb): 
+            print("not same len",len(inputsa),len(inputsb))
             return False 
         for inputa in inputsa:
             if not Util.in_utxo(inputa,inputsb):
+                print("inputa",inputa.prevout.to_str(),"not present in inputsb")
                 return False
+        return True
 
     def cmp_outputs(outputsa,outputsb):
         if len(outputsa) != len(outputsb): 
             return False 
         for outputa in outputsa: 
-            if not Util.in_utxo(outputa,outputsb): 
+            if not Util.in_output(outputa,outputsb): 
                 return False
+        return True
 
     def cmp_txs(txa,txb):
+        print(Util.cmp_inputs(txa.inputs(),txb.inputs()))
         if not Util.cmp_inputs(txa.inputs(),txb.inputs()):
+            print("not same inputs")
             return False
         if not Util.cmp_outputs(txa.outputs(),txb.outputs()):
+            print("not same outputs")
             return False
         return True
 
