@@ -26,7 +26,7 @@ from electrum.plugin import hook
 from electrum.i18n import _
 from electrum.util import make_dir, InvalidPassword, UserCancelled
 from electrum.gui.qt.util import (read_QIcon, EnterButton, WWLabel, icon_path,
-                                  WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton,HelpButton,WaitingDialog)
+                                  WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton,HelpButton)
 from electrum.gui.qt.qrtextedit import ScanQRTextEdit
 from electrum.gui.qt.main_window import StatusBarButton
 from electrum.gui.qt.password_dialog import PasswordDialog
@@ -441,31 +441,6 @@ class BalWindow():
             #print("ERROR: exception building transactions",e)
             raise e
             pass
-
-    def show_transaction(self,tx=None,txid=None):
-            
-            if txid !=None and txid in self.will:
-                tx=self.will[txid]['tx']
-            if not tx:
-                raise Exception(_("no tx"))
-            return self.window.show_transaction(tx)
-            #self.show_transaction(self.will[key]['tx'], parent=self.bal_window.window.top_level_window())
-
-
-    def invalidate_will(self):
-        def on_success(result):
-            self.window.show_message(_("Please sign and broadcast this transaction to invalidate current will"))
-            a=self.show_transaction(result)
-            Util.print_var(a)
-            
-        def on_failure(exec_info):
-            self.window.show_error(f"ERROR:{exec_info}")
-            Util.print_var(exec_info)
-        #txs = Will.invalidate_will(self.will)
-        fee_per_byte=self.bal_plugin.config_get(BalPlugin.TX_FEES)
-        task = partial(Will.invalidate_will,self.will,self.wallet,fee_per_byte)
-        msg = _("Calculating Transactions")
-        self.waiting_dialog = WaitingDialog(self.window, msg, task, on_success, on_failure)
 
 
     def settings_dialog(self):

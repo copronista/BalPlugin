@@ -1,6 +1,6 @@
 from .util import Util
 from .bal import BalPlugin
-from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTransaction,PartialTxOutput
+from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTransaction
 from electrum.util import bfh
 from electrum.util import write_json_file,read_json_file,FileImportFailed
 
@@ -261,12 +261,11 @@ class Will:
                 out[inp.prevout.to_str()] = inp
         return out
 
-    def invalidate_will(will,wallet,fees_per_byte):
+    def invalidate_will(will,wallet):
         inputs = Will.get_higher_input_for_tx(will)
         filtered_inputs = []
         balance = 0
-        utxos = wallet.get_utxos()
-        for utxo in utxos:
+        for utxo in wallet.utxos:
             utxo_str=utxo.prevout.to_str()
             if utxo_str in inputs:
                 filtered_inputs.append(inputs[utxo_str])
@@ -275,12 +274,8 @@ class Will:
         change_addresses = wallet.get_change_addresses_for_new_transaction()
         out = PartialTxOutput.from_address_and_value(change_addresses[0], balance)
         out.is_change = True
-        locktime = Util.get_current_height(wallet.network)
-        tx = PartialTransaction.from_io(utxos, [out], locktime=locktime, version=2)
-        fee=tx.estimated_size()*fees_per_byte
-        out = PartialTxOutput.from_address_and_value(change_addresses[0],balance - fee)
-        tx = PartialTransaction.from_io(utxos,[out], locktime=locktime, version=2)
-        tx.set_rbf(True)
+
+        tx = PartialTransaction.from_io(utxos, out, locktime=Util.get_current_height(wallet.network), version=2)
         Util.print_var(tx)
         return tx
 
