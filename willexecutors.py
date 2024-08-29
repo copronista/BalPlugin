@@ -4,6 +4,10 @@ import json
 from datetime import datetime
 
 from electrum import constants
+from electrum.gui.qt.util import WaitingDialog
+from functools import partial
+
+
 
 class Willexecutors():
     def get_willexecutors(bal_plugin):
@@ -65,16 +69,18 @@ class Willexecutors():
             print(f"error contacting {url} for pushing txs",e)
 
     def ping_servers(willexecutors):
-        for url in willexecutors:
-            willexecutors[url]=Willexecutors.getinfo_willexecutor(url,willexecutors[url])
+        for url,we in willexecutors.items():
+            willexecutors[url]=Willexecutors.get_info_task(url,we)
 
-    def getinfo_willexecutor(url,willexecutor):
+
+
+    def get_info_task(url,willexecutor):
         w=None
         try:
             print("GETINFO_WILLEXECUTOR")
             print(url)
-            req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info", method='GET')
-            with urllib.request.urlopen(req) as response:
+            req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info",  method='GET')
+            with urllib.request.urlopen(req,timeout=10) as response:
                 response_data=response.read().decode('utf-8')
 
                 w = json.loads(response_data)

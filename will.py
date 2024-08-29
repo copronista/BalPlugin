@@ -96,8 +96,8 @@ class Will:
                 for i in range(0,len(outputs)):
                     Will.change_input(will,wid,txid,i,outputs[i])
         for warr in to_add:
-            print("warr0:",warr[0])
-            print("war1:",warr[1])
+            #print("warr0:",warr[0])
+            #print("war1:",warr[1])
             will[warr[0]] = warr[1]
         for wid in to_delete:
             if wid in will:
@@ -139,82 +139,6 @@ class Will:
 
 
 
-
-    #this method will substitute childrent transaction input with real father transaction id
-    def normalize_will_old(will,wallet=None):
-        print("normalize will")
-        to_be_deleted = []
-        to_be_addedd = []
-        for willid in will:
-            if isinstance(will[willid]['tx'],str):
-                will[willid]['tx']=Will.get_will(will[willid])
-            if wallet:
-                print("type",type(will[willid]['tx']),)
-                will[willid]['tx'].add_info_from_wallet(wallet)
-            parent_txid = will[willid]['tx'].txid()
-             
-            print("willid:",willid)
-            print("parent_txid:",parent_txid)
-           
-            print()
-            print(will[willid])
-            print()
-            print(will[willid]['tx'].to_json())
-            print()
-            if parent_txid and willid != parent_txid:
-                outputs = will[willid]['tx'].outputs()
-                children = Will.get_children(will, willid)
-                for child in children:
-                    print("CHILD:",child)
-                    print("OUTPUTS:",outputs)
-                    for out in outputs:
-                        print(out.to_json())
-                    try:
-                        change=outputs[child[2]]
-                    except:
-                        print("ERROR NO CHANGE OUTPUTS")
-                        will[child[0]]['status']+="ERROR"
-                        continue
-                        
-                    tx = will[child[0]]['tx']
-                    inputs = tx.inputs()
-                    print("previous_input:",inputs[child[1]].to_json())
-                    try:
-                        prevout = TxOutpoint(txid=bfh(parent_txid), out_idx=child[2])
-                    except Exception as e:
-                        print("prevout is none:",e)
-                        continue
-                    inp = PartialTxInput(prevout=prevout)
-                    inp._trusted_value_sats = change.value
-                    #inp.script_descriptor = change.script_descriptor
-                    inp.is_mine=True
-                    inp._TxInput__address=change.address
-                    inp._TxInput__scriptpubkey = change.scriptpubkey
-                    inp._TxInput__value_sats = change.value
-                    tx._inputs[child[1]]=inp
-                    tx.remove_signatures()
-                    equal_tx=Will.search_equal_tx(will,tx,willid)
-                    restored = ""
-                    if equal_tx and equal_tx.locktime >= tx.locktime:
-                        print("normalize equals",child[0],equal_tx.txid())
-                        to_be_deleted.append(child[0])
-                        print("to_be_deleted",will[child[0]])
-                        tx = equal_tx
-                        restored = "restored"
-                    will[child[0]]['tx'] = tx
-                    will[child[0]]['status'] += restored
-                to_be_addedd.append([will[willid],parent_txid])
-                to_be_deleted.append(willid)
-
-        for w in to_be_addedd:
-            will[w[1]]=w[0]
-        for w in to_be_deleted:
-            try:
-                txid=will[w]['tx'].txid()
-                print(f"will {w} will be substituted with {txid}")
-                will[txid]=will[child[0]]
-                del will[w]
-            except: pass
 
             
     def get_all_inputs(will):
@@ -324,54 +248,29 @@ class Will:
                             old_will[oid]['invalidated']=True
                             old_will[oid]['status'] += BalPlugin.STATUS_INVALIDATED
 
-    #situations:
-    #change will settings by user, id heir
-    #if same id take the old
-    def update_will_old(old_will,new_will):
-        ow_todelete=[]
-        nw_todelete=[]
-        for oid in Will.only_valid(old_will):
-            print("-----------oid",oid)
-            if oid in new_will:
-                print("equals, continue")
-                new_will[oid]=old_will[oid]
-                continue
-
-            ow = old_will[oid]
-            print("oldheirs",ow['heirs'])
-            print("oldstatus",ow['status'])
-            o_inputs = ow['tx'].inputs()
-            willitemfound = False
-            for nid in new_will:
-                print(">>>nid",nid)
-                nw = new_will[nid]
-                print("newheirs",nw['heirs'])
-                n_inputs = nw['tx'].inputs()
-                if nw['tx'].locktime >= ow['tx'].locktime:
-                    if Util.cmp_txs(nw['tx'],ow['tx']):
-                        new_will[nid]=ow
-                        print("replaced with the old")
-                    else:
-                        for n_i in n_inputs:
-                            if Util.in_utxo(n_i,o_inputs):
-                                anticipate = Util.anticipate_locktime(ow['tx'].locktime,days=1)
-                                if anticipate > Will.MIN_LOCKTIME and anticipate < nw['tx'].locktime:
-                                    temp = nw['tx'].locktime 
-                                    new_will[nid]['tx'].locktime = int(anticipate)
-                                    new_will[nid]['tx'].remove_signatures()
-                                    new_will[nid]['status']+=BalPlugin.STATUS_ANTICIPATED
-                                    print("anticipated", nid,temp,new_will[nid]['tx'].locktime,new_will[nid])
-                                    break
+    def get_higher_input_for_tx(will):
+        out = {}
+        for wid in will:
+            wtx = will[wid]['tx']
+            found = False
+            for inp in wtx.inputs():
+                if inp.prevout.txid.hex() in will:
+                    found = True
+                    break
+            if not found:
+                out[inp.prevout.to_str()] = inp
+        return out
 
     def invalidate_will(will,wallet):
-        utxos = []
-        for wid in Will.only_valid(will):
-            children = Will.get_children(will,wid)
-            if not children:
-                inputs = sort(will(wid)['tx'].inputs(), key = lambda i:i._TxInput__value_sats,reverse=True)
-                utxos.append(inputs[0])
+        inputs = Will.get_higher_input_for_tx(will)
+        filtered_inputs = []
         balance = 0
-            
+        for utxo in wallet.utxos:
+            utxo_str=utxo.prevout.to_str()
+            if utxo_str in inputs:
+                filtered_inputs.append(inputs[utxo_str])
+                balance += inputs[utxo_str]._TxInput__value_sats 
+        
         change_addresses = wallet.get_change_addresses_for_new_transaction()
         out = PartialTxOutput.from_address_and_value(change_addresses[0], balance)
         out.is_change = True

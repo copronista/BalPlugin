@@ -92,8 +92,6 @@ class Util:
         return False
 
     def cmp_willexecutor(willexecutora,willexecutorb):
-        print("willexecutora",willexecutora)
-        print("willexecutorb",willexecutorb)
         if willexecutora == willexecutorb:
             return True
         try:
@@ -119,11 +117,9 @@ class Util:
 
     def cmp_inputs(inputsa,inputsb):
         if len(inputsa) != len(inputsb): 
-            print("not same len",len(inputsa),len(inputsb))
             return False 
         for inputa in inputsa:
             if not Util.in_utxo(inputa,inputsb):
-                print("inputa",inputa.prevout.to_str(),"not present in inputsb")
                 return False
         return True
 
@@ -136,12 +132,9 @@ class Util:
         return True
 
     def cmp_txs(txa,txb):
-        print(Util.cmp_inputs(txa.inputs(),txb.inputs()))
         if not Util.cmp_inputs(txa.inputs(),txb.inputs()):
-            print("not same inputs")
             return False
         if not Util.cmp_outputs(txa.outputs(),txb.outputs()):
-            print("not same outputs")
             return False
         return True
 
@@ -154,10 +147,9 @@ class Util:
         #    return False
 
         for outa in outputsa:
-            print("nuovo output")
             same_amount,same_address = Util.in_output(outa,txb.outputs())
             if not (same_amount or same_address):
-                print("outa notin txb", same_amount,same_address)
+                #print("outa notin txb", same_amount,same_address)
                 return False
             if same_amount and same_address:
                 value_amount+=outa.value

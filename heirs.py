@@ -94,7 +94,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
     if not locktime:
         print("not locktime diocane",locktimes)
         return
-    print(locktime)
+    #print(locktime)
     locktime=locktime[0]
 
     heirs = locktimes[locktime]
@@ -336,7 +336,7 @@ class Heirs(dict, Logger):
         for key in self.keys():
             locktime = parse_locktime_string(self[key][HEIR_LOCKTIME])
             if locktime > from_locktime:
-                locktimes[locktime]=None
+                locktimes[int(locktime)]=None
         return locktimes.keys()
 
     def check_locktime(self):
@@ -394,7 +394,6 @@ class Heirs(dict, Logger):
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
         for key in self.keys():
-            print("mario",key)
             try:
                 if not parse_locktime_string(self[key][HEIR_LOCKTIME]) > from_locktime:
                     continue
@@ -409,7 +408,7 @@ class Heirs(dict, Logger):
                         fixed_heirs[key].insert(HEIR_REAL_AMOUNT,heir_amount)
                         #find_regex += self[key]
                     else:
-                        print("heir amount<dust threshold",) 
+                        print(f"heir({key}) amount({heir_amount})<dust threshold({wallet.dust_threshold()})",) 
             except Exception as e: 
                 print("Error getting heir info",e)
         if fixed_amount > newbalance:
@@ -421,7 +420,7 @@ class Heirs(dict, Logger):
         heir_list.update(fixed_heirs)
         
         newbalance -= fixed_amount
-        print("newbalance",newbalance)   
+        #print("newbalance",newbalance)   
         if newbalance > 0:
             print("calculate_percentage_amount")
             perc_amount = self.normalize_perc(percent_heirs,newbalance,percent_amount,wallet)
@@ -437,9 +436,7 @@ class Heirs(dict, Logger):
             heir_list.update(fixed_heirs)
 
         heir_list = sorted(heir_list.items(), key = lambda item: parse_locktime_string(item[1][HEIR_LOCKTIME],wallet))
-        print("heir_list",heir_list)
     
-        #TODO: ADD A WAY TO REMOVE DUST HEIRS
 
         locktimes = {}
         for key, value in heir_list:
@@ -476,14 +473,14 @@ class Heirs(dict, Logger):
         willexecutorsitems = list(willexecutors.items())
         willexecutorslen = len(willexecutorsitems)
         alltxs = {}
-        print(willexecutorsitems)
+        #print(willexecutorsitems)
         while True:
             j+=1
             if j >= willexecutorslen:
-                print("j> willexecutorslen")
+                #print("j> willexecutorslen")
                 break
             elif 0 <= j:
-                print("hello",j,willexecutorslen,willexecutorsitems[j])
+                #print("hello",j,willexecutorslen,willexecutorsitems[j])
                 url, willexecutor = willexecutorsitems[j]
                 if not Willexecutors.is_selected(willexecutor):
                     continue
@@ -500,10 +497,10 @@ class Heirs(dict, Logger):
                 total_fees=0
                 for fee in fees:
                     total_fees += int(fees[fee])
-                print("total_fees",total_fees)
+                #print("total_fees",total_fees)
                 newbalance = balance 
                 locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor, from_locktime)
-                print("locktimes",locktimes)
+                #print("locktimes",locktimes)
                 try:
                     txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)
                     if not txs:

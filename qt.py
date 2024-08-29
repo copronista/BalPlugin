@@ -367,14 +367,14 @@ class BalWindow():
             try:
                 willexecutors = Willexecutors.get_willexecutors(self.bal_plugin) 
                 Willexecutors.ping_servers(willexecutors)
-                print(willexecutors)
+                #print(willexecutors)
                 txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,date_to_check)
                 creation_time = time()
                 if txs:
                     for txid in txs:
                         txtodelete=[]
                         _break = False
-                        print(txid,txs[txid].description)
+                        #print(txid,txs[txid].description)
                         tx = {}
                         tx['tx'] = txs[txid]
                         tx['my_locktime'] = txs[txid].my_locktime
@@ -391,11 +391,11 @@ class BalWindow():
                         will[txid]=tx
                         
 
-                    print("WILL",will)    
+                    #print("WILL",will)    
                     Will.update_will(self.will,will)
-                    print("WILL2",will)    
+                    #print("WILL2",will)    
                     Will.normalize_will(will)
-                    print("WILL3",will)    
+                    #print("WILL3",will)    
 
                     for wid in will:
                         self.will[wid]=will[wid]
