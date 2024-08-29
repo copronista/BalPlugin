@@ -234,6 +234,7 @@ class PreviewList(MyTreeView):
         menu.addAction(_("Import Will"), self.import_will)
         menu.addAction(_("Export Transactions"), self.export_file)
         menu.addAction(_("Broadcast"), self.broadcast)
+        menu.addAction(_("Invalidate Will"), self.invalidate_will)
         return toolbar
 
     def build_transactions(self):
@@ -333,7 +334,7 @@ class PreviewList(MyTreeView):
         
         task = partial(self.sign_transactions, password)
         msg = _('Signing transactions...')
-        self. waiting_dialog = WaitingDialog(self, msg, task, on_success, on_failure)
+        self.waiting_dialog = WaitingDialog(self, msg, task, on_success, on_failure)
         
                     
 
@@ -341,22 +342,13 @@ class PreviewList(MyTreeView):
 
 
     def export_inheritance_handler(self,path):
+        print(path)
         with open(path,"w") as f:
             for txid,willitem in self.will.items():
                 self.will[txid]['status']+=BalPlugin.STATUS_EXPORTED
                 f.write(str(willitem['tx'])+"\n")
         self.update()
 
-        """
-        w=copy.deepcopy(self.will)
-        for txid,willitem in self.will.items():
-            w[txid]['tx']=str(willitem['tx'])
-        with open(path,"w") as f:
-            json.dump(w,f)
-            #for txid,tx in self.will.items():
-            #    f.write(js))
-            #    f.write('\n')
-        """
     def export_file(self):
         try:
             Util.export_meta_gui(self.bal_window.window, _('heirs_transactions'), self.export_inheritance_handler)
@@ -371,30 +363,9 @@ class PreviewList(MyTreeView):
     def broadcast(self):
         push_transactions_to_willexecutors(self.will, self.bal_window.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS))
 
-"""
-    def ping_servers(self):
-        for url in self.parent.willexecutors_list:
-            self.ping_server(url)
 
-    def ping_server(self,url):
-            try:
-                print("ping ",url)
-                res=urllib.request.urlopen(url)
-                self.parent.willexecutors_list[url]['status']=res.status 
-            except Exception as e: print(f"error {e} \n url:{url}")
-           
-
-
-def get_willexecutors_list_from_json(config):
-    try:
-        with open("willexecutors.json") as f:
-            h = json.load(f)
-            config.set_key(BalPlugin.WILLEXECUTORS,h,save=True)
-            return h
-    except Exception as e:
-        print("errore aprendo willexecutors.json:",e)
-        return {}
-"""
+    def invalidate_will(self):
+        self.bal_window.invalidate_will()
 
 class PreviewDialog(WindowModalDialog,MessageBoxMixin):
     def __init__(self, bal_window, will):
@@ -449,7 +420,11 @@ class PreviewDialog(WindowModalDialog,MessageBoxMixin):
         b = QPushButton(_('Broadcast'))
         b.clicked.connect(self.transactions_list.broadcast)
         buttonbox.addWidget(b)
-        
+
+        b = QPushButton(_('Invalidate will'))
+        b.clicked.connect(self.transactions_list.invalidate_will)
+        buttonbox.addWidget(b)
+ 
 
         vbox.addLayout(buttonbox)
 
