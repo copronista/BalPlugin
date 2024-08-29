@@ -11,7 +11,7 @@ class Util:
         try:
             locktime=int(locktime)
             if locktime > Util.LOCKTIME_THRESHOLD:
-                dt = datetime.fromtimestamp(locktime).isoformat()[:-3]
+                dt = datetime.fromtimestamp(locktime).isoformat()
                 return dt
 
         except Exception as e:
@@ -61,7 +61,10 @@ class Util:
         if Util.is_perc(amount):
             return amount
         else:
-            return int(float(amount)*pow(10,decimal_point))
+            try:
+                return int(float(amount)*pow(10,decimal_point))
+            except:
+                return 0
 
     def decode_amount(amount,decimal_point):
         if Util.is_perc(amount):
