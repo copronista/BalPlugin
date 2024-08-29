@@ -23,8 +23,7 @@ class Will:
         for willid in will:
             will[willid]['children'] = Will.get_children(will,willid)
             for child in will[willid]['children']:
-                if not 'father' in will[child[0]]: will[child[0]]['fathers'] = [willid]
-                else: will[child[0]]['fathers'].append(willid)
+                if not 'father' in will[child[0]]: will[child[0]]['father'] = willid
 
 
     #this method return a list of will sorted by locktime
@@ -208,13 +207,17 @@ class Will:
                         if ntx.locktime >= anticipate:
                             nw['tx'].locktime = otx.locktime
                             print("ntx locktime >=anticipate")
-                            if Util.cmp_heirs(ow[1]['heirs'],nw['heirs']):
-                                if Util.cmp_willexecutor(ow[1]['willexecutor'],nw['willexecutor']):
-                                    print("equals!!!")
-                                    if Util.cmp_txs(otx,ntx):
-                                        print("keeping old tx") 
-                                        new_will[nid]=ow[1]
-                                        found = True
+                            if util.cmp_outputs(ow[1]['tx'].outputs(),nw['tx'].outputs()):
+                                found = True
+                                print("keeping old tx")
+                                new_will[nid]=ow[1]
+                            #if Util.cmp_heirs(ow[1]['heirs'],nw['heirs']):
+                            #    if Util.cmp_willexecutor(ow[1]['willexecutor'],nw['willexecutor']):
+                            #        print("equals!!!")
+                            #        if Util.cmp_txs(otx,ntx):
+                            #            print("keeping old tx") 
+                            #            new_will[nid]=ow[1]
+                            #            found = True
                         else:
                             print("actually anticipate")
                             new_will[nid]['tx'].locktime = int(anticipate)

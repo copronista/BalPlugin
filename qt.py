@@ -17,10 +17,10 @@ import copy
 from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
 from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
-                         QColor, QDesktopServices, qRgba, QPainterPath)
+                         QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
 
 from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
-                             QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit)
+                             QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit,QScrollArea,QWidget,QSpacerItem,QSizePolicy)
 
 from electrum.plugin import hook
 from electrum.i18n import _
@@ -345,7 +345,7 @@ class BalWindow():
             will = {}
             willtodelete=[]
             willtoappend={}
-            show_preview=False
+            show_preview=self.bal_plugin.config_get(BalPlugin.PREVIEW)
             #for txid in self.will_not_replaced_nor_invalidated():
             #    if not self.will[txid]['status']==BalPlugin.STATUS_NEW:
             #        self.will[txid]['status']+=BalPlugin.STATUS_REPLACED
@@ -386,6 +386,8 @@ class BalWindow():
                         tx['exported'] = False
                         tx['broadcasted'] = False
                         tx['valid'] = True
+                        tx['replaced']=False
+                        tx['invalidated']=False
                         tx['time'] = creation_time
                         tx['heirs'] = txs[txid].heirs
                         tx['txchildren'] = []
@@ -416,6 +418,7 @@ class BalWindow():
 
 
 
+                self.preview_modal_dialog()
                 if show_preview:
                     if self.bal_plugin.config_get(BalPlugin.PREVIEW):
                         self.preview_dialog(self.will)
@@ -468,7 +471,73 @@ class BalWindow():
         msg = _("Calculating Transactions")
         self.waiting_dialog = WaitingDialog(self.window, msg, task, on_success, on_failure)
 
+    def get_will_widget(self,father=None):
+        box = QWidget()
+        vlayout = QVBoxLayout()
+        box.setLayout(vlayout)
+        for w in self.will:
+            f = self.will[w].get("father",None)
+            print("father:",father,f)
+            if father == f:
+                print(self.will[w]['heirs'])
+                qwidget = QWidget()
+                childWidget = QWidget()
+                hlayout=QHBoxLayout(qwidget)
+                qwidget.setLayout(hlayout)
+                vlayout.addWidget(qwidget)
+                detailw=QWidget()
+                detaillayout=QVBoxLayout()
+                detailw.setLayout(detaillayout)
+                detaillayout.addWidget(QLabel(w))
+                detaillayout.addWidget(QLabel(_("Heirs:")))
+                for heir in self.will[w]['heirs']:
+                    if "w!ll3x3c\"" not in heir:
+                        detaillayout.addWidget(QLabel(f"{heir}:{self.will[w]['heirs'][heir][3]}"))
+                if self.will[w]['willexecutor']:
+                    detaillayout.addWidget(QLabel(_("Willexecutor:")))
+                    detaillayout.addWidget(QLabel(f"{self.will[w]['willexecutor']['url']}:{self.will[w]['willexecutor']['base_fee']}"))
+                detaillayout.addStretch()
+                pal = QPalette()
+                if self.will[w].get("invalidated",False):
+                    pal.setColor(QPalette.Background, QColor(255,0, 0))
+                elif self.will[w].get("replaced",False):
+                    pal.setColor(QPalette.Background, QColor(255, 255, 0))
+                else:
+                    pal.setColor(QPalette.Background, QColor(0,255, 0))
+                qwidget.setAutoFillBackground(True)
+                qwidget.setPalette(pal)
 
+                hlayout.addWidget(detailw)
+                hlayout.addWidget(self.get_will_widget(w))
+        return box
+
+    def preview_modal_dialog(self):
+        Will.add_willtree(self.will)
+        print(self.will)
+        d = WindowModalDialog(self.window,self.get_window_title("Preview"))
+        d.setMinimumSize(1024,768)
+        vlayout= QVBoxLayout(d)
+        scroll = QScrollArea()
+        viewport = QWidget()
+        willlayout = QVBoxLayout(viewport)
+        willlayout.addWidget(QLabel("viva la figa"))
+        willlayout.addWidget(QLabel("e chi la castiga"))
+        willlayout.addWidget(QLabel("viva la figa"))
+        willlayout.addWidget(self.get_will_widget())
+
+
+
+
+        scroll.setWidget(viewport)
+        viewport.setLayout(willlayout)
+        i=0
+        vlayout.addWidget(scroll)
+        
+        if not d.exec_():
+            return
+
+
+            
     def settings_dialog(self):
         d = WindowModalDialog(self.window, self.get_window_title("Settings"))
 
