@@ -207,7 +207,7 @@ class Will:
                         if ntx.locktime >= anticipate:
                             nw['tx'].locktime = otx.locktime
                             print("ntx locktime >=anticipate")
-                            if util.cmp_outputs(ow[1]['tx'].outputs(),nw['tx'].outputs()):
+                            if Util.cmp_outputs(ow[1]['tx'].outputs(),nw['tx'].outputs()):
                                 found = True
                                 print("keeping old tx")
                                 new_will[nid]=ow[1]
