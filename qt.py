@@ -366,7 +366,8 @@ class BalWindow():
                 self.window.show_message(_("Will is not complete some utxo was not included I will rebuild it"))
             try:
                 willexecutors = Willexecutors.get_willexecutors(self.bal_plugin) 
-                Willexecutors.ping_servers(willexecutors)
+                if self.window.question(_("Contact willexecutors servers to update payment informations?")):
+                    Willexecutors.ping_servers(willexecutors)
                 #print(willexecutors)
                 txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,date_to_check)
                 creation_time = time()

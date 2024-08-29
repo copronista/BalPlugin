@@ -61,29 +61,6 @@ def get_current_height(network:'Network'):
 
 
 
-def parse_locktime_string(locktime,w=None):
-    try:
-        return int(locktime)
-
-    except Exception as e:
-        print("parse_locktime_string",e)
-    try:
-        now = datetime.datetime.now()
-        if locktime[-1] == 'y':
-            locktime = str(int(locktime[:-1])*365) + "d"
-        if locktime[-1] == 'd':
-            return int((now + datetime.timedelta(days = int(locktime[:-1]))).replace(hour=0,minute=0,second=0,microsecond=0).timestamp())
-        if locktime[-1] == 'b':
-            locktime = int(locktime[:-1])
-            height = 0
-            if w:
-                height = get_current_height(w.network)
-            locktime+=int(height)
-        return int(locktime)
-    except Exception as e:
-        print("parse_locktime_string",e)
-        raise e
-
 
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
@@ -164,7 +141,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
 
         #reduce_outputs(in_amount,out_amount,fees[locktime],outputs)
 
-        tx = PartialTransaction.from_io(used_utxos, outputs, locktime=parse_locktime_string(locktime,wallet), version=2)
+        tx = PartialTransaction.from_io(used_utxos, outputs, locktime=Util.parse_locktime_string(locktime,wallet), version=2)
         if len(description)>0: tx.description = description[:-1]
         else: tx.description = ""
         tx.heirsvalue = heirsvalue
@@ -334,7 +311,7 @@ class Heirs(dict, Logger):
     def get_locktimes(self,from_locktime):
         locktimes = {}
         for key in self.keys():
-            locktime = parse_locktime_string(self[key][HEIR_LOCKTIME])
+            locktime = Util.parse_locktime_string(self[key][HEIR_LOCKTIME])
             if locktime > from_locktime:
                 locktimes[int(locktime)]=None
         return locktimes.keys()
@@ -395,7 +372,7 @@ class Heirs(dict, Logger):
             newbalance -= willexecutors_amount
         for key in self.keys():
             try:
-                if not parse_locktime_string(self[key][HEIR_LOCKTIME]) > from_locktime:
+                if not Util.parse_locktime_string(self[key][HEIR_LOCKTIME]) > from_locktime:
                     continue
                 if Util.is_perc(self[key][HEIR_AMOUNT]):
                     percent_amount += float(self[key][HEIR_AMOUNT][:-1])
@@ -435,7 +412,7 @@ class Heirs(dict, Logger):
             print(fixed_heirs)
             heir_list.update(fixed_heirs)
 
-        heir_list = sorted(heir_list.items(), key = lambda item: parse_locktime_string(item[1][HEIR_LOCKTIME],wallet))
+        heir_list = sorted(heir_list.items(), key = lambda item: Util.parse_locktime_string(item[1][HEIR_LOCKTIME],wallet))
     
 
         locktimes = {}
@@ -657,7 +634,7 @@ class Heirs(dict, Logger):
 
     def validate_locktime(locktime):
         try:
-            flocktime = parse_locktime_string(locktime,None)
+            flocktime = Util.parse_locktime_string(locktime,None)
         except Exception as e:
             print("locktimenotvalid")
             raise LocktimeNotValid(f"locktime string not properly formatted, {e}")
