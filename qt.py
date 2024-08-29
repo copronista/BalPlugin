@@ -520,9 +520,6 @@ class BalWindow():
         scroll = QScrollArea()
         viewport = QWidget()
         willlayout = QVBoxLayout(viewport)
-        willlayout.addWidget(QLabel("viva la figa"))
-        willlayout.addWidget(QLabel("e chi la castiga"))
-        willlayout.addWidget(QLabel("viva la figa"))
         willlayout.addWidget(self.get_will_widget())
 
 
