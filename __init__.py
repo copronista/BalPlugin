@@ -1,7 +1,7 @@
 from electrum.i18n import _
 import subprocess
 
-BUILD_NUMBER = 17
+BUILD_NUMBER = 18
 REVISION_NUMBER = 0
 VERSION_NUMBER = 0
 def version():

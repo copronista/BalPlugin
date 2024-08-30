@@ -218,6 +218,9 @@ class Will:
                             #            print("keeping old tx") 
                             #            new_will[nid]=ow[1]
                             #            found = True
+                            else:
+                                print("actually anticipate outputs are different")
+                                new_will[nid]['tx'].locktime = int(anticipate)
                         else:
                             print("actually anticipate")
                             new_will[nid]['tx'].locktime = int(anticipate)

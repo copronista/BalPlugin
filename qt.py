@@ -477,9 +477,7 @@ class BalWindow():
         box.setLayout(vlayout)
         for w in self.will:
             f = self.will[w].get("father",None)
-            print("father:",father,f)
             if father == f:
-                print(self.will[w]['heirs'])
                 qwidget = QWidget()
                 childWidget = QWidget()
                 hlayout=QHBoxLayout(qwidget)
@@ -488,14 +486,20 @@ class BalWindow():
                 detailw=QWidget()
                 detaillayout=QVBoxLayout()
                 detailw.setLayout(detaillayout)
-                detaillayout.addWidget(QLabel(w))
-                detaillayout.addWidget(QLabel(_("Heirs:")))
+                
+                willpushbutton = QPushButton(w)
+                willpushbutton.clicked.connect(partial(self.show_transaction,txid=w))
+                detaillayout.addWidget(willpushbutton)
+                locktime = Util.locktime_to_str(self.will[w]['tx'].locktime)
+                detaillayout.addWidget(QLabel(_(f"<b>Locktime:</b>\t{locktime}")))
+                detaillayout.addWidget(QLabel(_("<b>Heirs:</b>")))
                 for heir in self.will[w]['heirs']:
                     if "w!ll3x3c\"" not in heir:
-                        detaillayout.addWidget(QLabel(f"{heir}:{self.will[w]['heirs'][heir][3]}"))
+                        decoded_amount = Util.decode_amount(self.will[w]['heirs'][heir][3],self.bal_plugin.config.get_decimal_point())
+                        detaillayout.addWidget(QLabel(f"{heir}:\t{decoded_amount}"))
                 if self.will[w]['willexecutor']:
-                    detaillayout.addWidget(QLabel(_("Willexecutor:")))
-                    detaillayout.addWidget(QLabel(f"{self.will[w]['willexecutor']['url']}:{self.will[w]['willexecutor']['base_fee']}"))
+                    detaillayout.addWidget(QLabel(_("<b>Willexecutor:</b:")))
+                    detaillayout.addWidget(QLabel(f"{self.will[w]['willexecutor']['url']}:\t{self.will[w]['willexecutor']['base_fee']}"))
                 detaillayout.addStretch()
                 pal = QPalette()
                 if self.will[w].get("invalidated",False):
@@ -504,8 +508,8 @@ class BalWindow():
                     pal.setColor(QPalette.Background, QColor(255, 255, 0))
                 else:
                     pal.setColor(QPalette.Background, QColor(0,255, 0))
-                qwidget.setAutoFillBackground(True)
-                qwidget.setPalette(pal)
+                detailw.setAutoFillBackground(True)
+                detailw.setPalette(pal)
 
                 hlayout.addWidget(detailw)
                 hlayout.addWidget(self.get_will_widget(w))
