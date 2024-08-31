@@ -238,9 +238,25 @@ class Util:
             utxos+=willitem['tx'].inputs()
             
         return utxos
-
+    def utxo_to_str(utxo):
+        try: return utxo.to_str()
+        except Exception as e: print(e)
+        try: return utxo.prevout.to_str()
+        except Exception as e: 
+            print(e)
+            try:
+                Util.print_var(utxo)
+                Util.print_var(utxo.prevout,"UTXO")
+            except Exception as ex:
+                print(ex)
+        return str(utxo)
     def cmp_utxo(utxoa,utxob):
-        if utxoa.prevout.txid==utxob.prevout.txid and utxoa.prevout.out_idx == utxob.prevout.out_idx:
+        utxoa=Util.utxo_to_str(utxoa)
+        utxob=Util.utxo_to_str(utxob)
+        print(f"utxoa: {utxoa}")
+        print(f"utxob: {utxob}")
+        if utxoa == utxob:
+        #if utxoa.prevout.txid==utxob.prevout.txid and utxoa.prevout.out_idx == utxob.prevout.out_idx:
             return True
         else:
             return False

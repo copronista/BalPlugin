@@ -67,7 +67,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
             parent=bal_window.window,
             main_window=bal_window.window,
             stretch_column=self.Columns.NAME,
-            editable_columns=[self.Columns.ADDRESS,self.Columns.AMOUNT,self.Columns.LOCKTIME],
+            editable_columns=[self.Columns.NAME,self.Columns.ADDRESS,self.Columns.AMOUNT,self.Columns.LOCKTIME],
         )
         self.decimal_point = bal_window.bal_plugin.config.get_decimal_point()
         self.bal_window = bal_window
@@ -100,6 +100,9 @@ class HeirList(MyTreeView,MessageBoxMixin):
                 text = Util.encode_amount(text,self.decimal_point)
             else:
                 print("porco dio di colonna",col)
+            if col == 0:
+                self.bal_window.delete_heirs([edit_key])
+                edit_key = text
             prior_name[col-1] = text
             prior_name.insert(0,edit_key)
             prior_name = tuple(prior_name)
@@ -141,7 +144,6 @@ class HeirList(MyTreeView,MessageBoxMixin):
                     # would not be editable if openalias
                     persistent = QPersistentModelIndex(idx)
                     menu.addAction(_("Edit {}").format(column_title), lambda p=persistent: self.edit(QModelIndex(p)))
-            menu.addAction(_("Pay to"), lambda: self.bal_window.payto_heirs(selected_keys))
             menu.addAction(_("Delete"), lambda: self.bal_window.delete_heirs(selected_keys))
             URLs = [block_explorer_URL(self.config, 'addr', key) for key in filter(is_address, selected_keys)]
             if URLs:
@@ -166,7 +168,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
             labels[self.Columns.LOCKTIME] =  str(Util.locktime_to_str(heir[2]))
 
             items = [QStandardItem(x) for x in labels]
-            items[self.Columns.NAME].setEditable(False)
+            items[self.Columns.NAME].setEditable(True)
             items[self.Columns.ADDRESS].setEditable(True)
             items[self.Columns.AMOUNT].setEditable(True)
             items[self.Columns.LOCKTIME].setEditable(True)
@@ -190,8 +192,6 @@ class HeirList(MyTreeView,MessageBoxMixin):
         pass
 
     def get_edit_key_from_coordinate(self, row, col):
-        if col == self.Columns.NAME:
-            return None
         #print("role_data",self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY))
         #print(col)
         return self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col+1) 

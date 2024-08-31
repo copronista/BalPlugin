@@ -50,15 +50,15 @@ class PreviewList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         LOCKTIME = enum.auto()
         TXID = enum.auto()
-        DESCRIPTION = enum.auto()
-        VALUE = enum.auto() 
+        #DESCRIPTION = enum.auto()
+        #VALUE = enum.auto() 
         STATUS = enum.auto()
 
     headers = {
         Columns.LOCKTIME: _('Locktime'),
         Columns.TXID: _('Txid'),
-        Columns.DESCRIPTION: _('Description'),
-        Columns.VALUE: _('Value'),
+        #Columns.DESCRIPTION: _('Description'),
+        #Columns.VALUE: _('Value'),
         Columns.STATUS: _('Status'),
     }
 
@@ -68,7 +68,7 @@ class PreviewList(MyTreeView):
     def __init__(self, parent: 'BalWindow',will):
         super().__init__(
             parent=parent.window,
-            stretch_column=self.Columns.DESCRIPTION,
+            stretch_column=self.Columns.TXID,
             #editable_columns=[self.Columns.URL,self.Columns.BASE_FEE,self.Columns.ADDRESS],
 
         )
@@ -115,7 +115,8 @@ class PreviewList(MyTreeView):
             else:
             """    
             #menu.addAction(_("select").format(column_title), lambda: self.select(selected_keys))
-            menu.addAction(_("details").format(column_title), lambda: self.show_transaction(selected_keys))
+            menu.addAction(_("details").format(column_title), lambda: self.show_transaction(selected_keys)).setEnabled(len(selected_keys)<2)
+
             menu.addSeparator()
             menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
 
@@ -192,8 +193,8 @@ class PreviewList(MyTreeView):
             #print("willlocktime",tx.locktime)
             labels[self.Columns.LOCKTIME] = Util.locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
-            labels[self.Columns.DESCRIPTION] = bal_tx.get('description','')
-            labels[self.Columns.VALUE] = Util.decode_amount(bal_tx.get('heirsvalue',0),self.config.get_decimal_point())
+            #labels[self.Columns.DESCRIPTION] = bal_tx.get('description','')
+            #labels[self.Columns.VALUE] = Util.decode_amount(bal_tx.get('heirsvalue',0),self.config.get_decimal_point())
             labels[self.Columns.STATUS] = bal_tx.get('status','None')
             
             
@@ -229,6 +230,7 @@ class PreviewList(MyTreeView):
     def create_toolbar(self, config): 
         toolbar, menu = self.create_toolbar_with_menu('') 
         menu.addAction(_("Prepare Will"), self.build_transactions) 
+        menu.addAction(_("Display Will"), self.bal_window.preview_modal_dialog) 
         menu.addAction(_("Sign Will"), self.ask_password_and_sign_transactions)
         menu.addAction(_("Export Will"), self.export_will)
         menu.addAction(_("Import Will"), self.import_will)
@@ -361,7 +363,7 @@ class PreviewList(MyTreeView):
 
 
     def broadcast(self):
-        push_transactions_to_willexecutors(self.will, self.bal_window.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS))
+        Willexecutors.push_transactions_to_willexecutors(self.will, self.bal_window.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS))
 
 
     def invalidate_will(self):

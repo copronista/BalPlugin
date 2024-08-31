@@ -177,7 +177,10 @@ class Will:
                 return True
         return False
 
-
+    def replace_heir(ow,nw):
+        ow['heirs'] = nw['heirs']
+        ow['valid'] = True
+        return ow
     def update_will(old_will,new_will):
         #write_json_file("/home/steal/Documents/old_will",old_will)
         #write_json_file("/home/steal/Documents/new_will",new_will)
@@ -189,7 +192,7 @@ class Will:
             print("nid",nid)
             if nid in old_will:
                 print("already present")
-                new_will[nid]=old_will[nid]
+                new_will[nid]=Will.replace_heir(old_will[nid],new_will[nid])
                 continue
             nw=new_will[nid]
             print("heirs",nw['heirs'])
@@ -210,7 +213,8 @@ class Will:
                             if Util.cmp_outputs(ow[1]['tx'].outputs(),nw['tx'].outputs()):
                                 found = True
                                 print("keeping old tx")
-                                new_will[nid]=ow[1]
+                                new_will[nid]=Will.replace_heir(ow[1],nw)
+                                
                             #if Util.cmp_heirs(ow[1]['heirs'],nw['heirs']):
                             #    if Util.cmp_willexecutor(ow[1]['willexecutor'],nw['willexecutor']):
                             #        print("equals!!!")
@@ -232,7 +236,7 @@ class Will:
 
         for oid in Will.only_valid(old_will):
             if oid in new_will:
-                new_will[oid]=old_will[oid]
+                new_will[oid]=Will.replace_heir(old_will[oid],new_will[oid])
                 continue
             else:
                 ow = old_will[oid]
@@ -293,36 +297,26 @@ class Will:
 
 
 
-    def is_will_valid(will, block_to_check, timestamp_to_check, all_utxos,callback_not_valid_tx=None):
+    def is_will_valid(will, block_to_check, timestamp_to_check, all_utxos,heirs={},callback_not_valid_tx=None):
         spent_utxos = []
         spent_utxos_tx = []
-        locktimes_time,locktimes_blocks = Util.get_lowest_locktimes_from_will(will)
-        for txid in Will.only_valid(will):
-            willitem=will[txid]
-            for in_ in willitem['tx'].inputs():
-                spent_utxos_tx.append((txid,in_))
-            spent_utxos +=willitem['tx'].inputs()
-            chk_block=True
-            chk_time=True
-            if len(locktimes_blocks)>0:
-                chk_block =  Util.chk_locktime(block_to_check,timestamp_to_check,locktimes_blocks[0])
-
-            if len(locktimes_time)>0:
-                chk_time =  Util.chk_locktime(block_to_check,timestamp_to_check,locktimes_time[0])
-
-            if not (chk_block or chk_time):
-                print("locktime",locktimes_time[0],timestamp_to_check,Util.chk_locktime(timestamp_to_check,block_to_check,locktimes_time[0]))
-                print("blocktime",locktimes_blocks[0],block_to_check,Util.chk_locktime(timestamp_to_check,block_to_check,locktimes_blocks[0]))
-                print("locktime outdated",locktimes_time,locktimes_blocks,block_to_check,timestamp_to_check)
-                print("will need to be invalidated")
-                raise WillExpiredException("expired")
-
+        all_inputs=Will.get_all_inputs(will)
+        all_inputs_min_locktime = Will.get_all_inputs_min_locktime(all_inputs)
+        if heirs:
+            if not Will.check_heirs_are_present(will,heirs,timestamp_to_check):
+                raise NotCompleteWillException("Heirs are changed")
         #check that all utxo in wallet ar e spent
+        for prevout_str, wid in all_inputs_min_locktime.items():
+            print("prevout_str",prevout_str)
+            print("wid:",wid)
+            locktime = wid[0][1]['tx'].locktime
+            if locktime< timestamp_to_check:
+                raise WillExpiredException(f"WillExpired {wid}: {locktime}<{timestamp_to_check}")
         print('check all utxo in wallet are spent')
         for utxo in all_utxos:
-            if not Util.in_utxo(utxo,spent_utxos):
+            if not Util.in_utxo(utxo,all_inputs.keys()):
                     print("utxo is not spent",utxo.to_json())
-                    raise NotCompleteWillException("not complete")
+                    raise NotCompleteWillException("Some utxo in the wallet is not included")
         #check that all spent uxtos are in wallet
         print('check all spent utxos are in wallet')
         for txid,s_utxo in spent_utxos_tx: 
@@ -338,8 +332,26 @@ class Will:
                     #return False
         print('tutto ok')
         return True
-
-
+    
+    def check_heirs_are_present(will,heirs,timestamp_to_check):
+        print("check heirs")
+        for heir in heirs:
+            found = False
+            print(heir,heirs[heir],timestamp_to_check)
+            if Util.parse_locktime_string(heirs[heir][2]) >= timestamp_to_check:
+                print("HEIR ok")
+                for wid in Will.only_valid(will):
+                    for wheir in will[wid]['heirs']:
+                        print("heir found",heir,wheir,will[wid]['heirs'][wheir])
+                        if heir == wheir and heirs[heir][0] == will[wid]['heirs'][wheir][0] and heirs[heir][1] == will[wid]['heirs'][wheir][1]:
+                            found = True
+                            break
+                    if found == True:
+                        break
+                if not found:
+                    print("heir not found:",heir,heirs[heir])
+                    return False
+        return True
 
 class WillExpiredException(Exception):
     pass

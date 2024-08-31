@@ -94,9 +94,20 @@ class Plugin(BalPlugin):
     @hook
     def on_close_window(self,window):
         pass
-            #Util.print_var(window)
-            #w = self.get_window(window)
-            #w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
+        #Util.print_var(window)
+        w = self.get_window(window)
+        w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
+        show_preview = False
+        for wid in w.will:
+            if w.will[wid]['status'] == BalPlugin.STATUS_NEW:
+                show_preview = True
+        #show_preview=self.config_get(BalPlugin.PREVIEW)
+        if show_preview:
+            if self.config_get(BalPlugin.PREVIEW):
+                w.preview_dialog(w.will)
+            elif self.config_get(BalPlugin.BROADCAST):
+                if self.config_get(BalPlugin.ASK_BROADCAST):
+                    w.preview_dialog(self.will)
             
 
 
@@ -333,6 +344,77 @@ class BalWindow():
         except Exception as e:
             print(f"cannot invalidate {txid}")
             raise e
+    def invalidate_will(self):
+        tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
+        self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
+        self.show_transaction(tx)
+
+    def build_will(self,from_date,ignore_duplicate = True, keep_original = True ):
+        will = {}
+        willtodelete=[]
+        willtoappend={}
+        try:
+            willexecutors = Willexecutors.get_willexecutors(self.bal_plugin) 
+            if self.window.question(_("Contact willexecutors servers to update payment informations?")):
+                Willexecutors.ping_servers(willexecutors)
+            #print(willexecutors)
+            txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,from_date)
+            creation_time = time()
+            if txs:
+                for txid in txs:
+                    txtodelete=[]
+                    _break = False
+                    #print(txid,txs[txid].description)
+                    tx = {}
+                    tx['tx'] = txs[txid]
+                    tx['my_locktime'] = txs[txid].my_locktime
+                    tx['heirsvalue'] = txs[txid].heirsvalue
+                    tx['description'] = txs[txid].description
+                    tx['willexecutor'] = txs[txid].willexecutor
+                    tx['status'] = BalPlugin.STATUS_NEW
+                    tx['exported'] = False
+                    tx['broadcasted'] = False
+                    tx['valid'] = True
+                    tx['replaced']=False
+                    tx['invalidated']=False
+                    tx['time'] = creation_time
+                    tx['heirs'] = txs[txid].heirs
+                    tx['txchildren'] = []
+                    will[txid]=tx
+                    
+
+                #print("WILL",will)    
+                Will.update_will(self.will,will)
+                #print("WILL2",will)    
+                Will.normalize_will(will)
+                #print("WILL3",will)    
+
+                for wid in will:
+                    self.will[wid]=will[wid]
+
+                #try:
+                #    Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
+                #except WillExpiredException as e:
+                #    tx = Will.invalidate_will(self.will)
+                #    #self.window.show_transaction(self.will[key]['tx'])
+
+                #    self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
+                #    self.bal_window.window.show_transaction(tx)
+                #except NotCompleteWillException as e:
+                #    self.window.show_message(_("Will is not complete some utxo was not included for unknown reasons"))
+
+
+                
+
+
+
+        except Exception as e:
+            raise e
+            pass
+            #print(e)
+            #self.window.show_message(e)
+            #raise e
+        return self.will 
 
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
@@ -342,10 +424,6 @@ class BalWindow():
             date_to_check = (datetime.datetime.now()+datetime.timedelta(days=locktime_time)).timestamp()
             current_block = Util.get_current_height(self.wallet.network)
             block_to_check = current_block + locktime_blocks
-            will = {}
-            willtodelete=[]
-            willtoappend={}
-            show_preview=self.bal_plugin.config_get(BalPlugin.PREVIEW)
             #for txid in self.will_not_replaced_nor_invalidated():
             #    if not self.will[txid]['status']==BalPlugin.STATUS_NEW:
             #        self.will[txid]['status']+=BalPlugin.STATUS_REPLACED
@@ -355,76 +433,18 @@ class BalWindow():
             #current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, utxos)
             #print("current_will is valid",current_will_is_valid,self.will)
             try:
-                Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
+                Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.heirs,self.delete_not_valid)
             except WillExpiredException as e:
-                tx = Will.invalidate_will(self.will)
-                self.window.show_transaction(self.will[key]['tx'])
-
+                tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
                 self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
-                self.bal_window.window.show_transaction(tx)
+                self.show_transaction(tx)
+
+                return
+
             except NotCompleteWillException as e:
-                self.window.show_message(_("Will is not complete some utxo was not included I will rebuild it"))
-            try:
-                willexecutors = Willexecutors.get_willexecutors(self.bal_plugin) 
-                if self.window.question(_("Contact willexecutors servers to update payment informations?")):
-                    Willexecutors.ping_servers(willexecutors)
-                #print(willexecutors)
-                txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,date_to_check)
-                creation_time = time()
-                if txs:
-                    for txid in txs:
-                        txtodelete=[]
-                        _break = False
-                        #print(txid,txs[txid].description)
-                        tx = {}
-                        tx['tx'] = txs[txid]
-                        tx['my_locktime'] = txs[txid].my_locktime
-                        tx['heirsvalue'] = txs[txid].heirsvalue
-                        tx['description'] = txs[txid].description
-                        tx['willexecutor'] = txs[txid].willexecutor
-                        tx['status'] = BalPlugin.STATUS_NEW
-                        tx['exported'] = False
-                        tx['broadcasted'] = False
-                        tx['valid'] = True
-                        tx['replaced']=False
-                        tx['invalidated']=False
-                        tx['time'] = creation_time
-                        tx['heirs'] = txs[txid].heirs
-                        tx['txchildren'] = []
-                        will[txid]=tx
-                        
+                self.window.show_message(_(f"{str(e)}: will rebuild it"))
+                self.build_will(date_to_check,ignore_duplicate,keep_original)
 
-                    #print("WILL",will)    
-                    Will.update_will(self.will,will)
-                    #print("WILL2",will)    
-                    Will.normalize_will(will)
-                    #print("WILL3",will)    
-
-                    for wid in will:
-                        self.will[wid]=will[wid]
-                    try:
-                        Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
-                    except WillExpiredException as e:
-                        tx = Will.invalidate_will(self.will)
-                        self.window.show_transaction(self.will[key]['tx'])
-
-                        self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
-                        self.bal_window.window.show_transaction(tx)
-                    except NotCompleteWillException as e:
-                        self.window.show_message(_("Will is not complete some utxo was not included for unknown reasons"))
-
-
-                    
-
-
-
-                self.preview_modal_dialog()
-                if show_preview:
-                    if self.bal_plugin.config_get(BalPlugin.PREVIEW):
-                        self.preview_dialog(self.will)
-                    elif self.bal_plugin.config_get(BalPlugin.BROADCAST):
-                        if self.bal_plugin.config_get(BalPlugin.ASK_BROADCAST):
-                            self.preview_dialog(self.will)
 
                 self.window.history_list.update()
                 self.window.utxo_list.update()
@@ -434,13 +454,7 @@ class BalWindow():
                     raise e
                     pass
                     #raise e
-            except Exception as e:
-                raise e
-                pass
-                #print(e)
-                #self.window.show_message(e)
-                #raise e
-            return self.will 
+                return self.will
         except Exception as e:
             #print("ERROR: exception building transactions",e)
             raise e
