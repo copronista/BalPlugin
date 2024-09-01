@@ -439,7 +439,7 @@ class Heirs(dict, Logger):
         willexecutors = Willexecutors.get_willexecutors(bal_plugin) or {}
         tx_fees = bal_plugin.config_get(BalPlugin.TX_FEES)
         self.decimal_point=bal_plugin.config.get_decimal_point()
-
+        no_willexecutors = bal_plugin.config_get(BalPlugin.NO_WILLEXECUTOR)
         for utxo in utxos:
             if utxo.value_sats()> 68*tx_fees:
                 balance += utxo.value_sats()
@@ -462,6 +462,8 @@ class Heirs(dict, Logger):
                 if not Willexecutors.is_selected(willexecutor):
                     continue
             elif j == -1:
+                if no_willexecutors:
+                    continue
                 url = willexecutor = False
             else:
                 break

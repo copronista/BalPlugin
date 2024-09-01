@@ -6,11 +6,13 @@ from datetime import datetime
 from electrum import constants
 from electrum.gui.qt.util import WaitingDialog
 from functools import partial
+from electrum.i18n import _
+
 
 
 
 class Willexecutors():
-    def get_willexecutors(bal_plugin):
+    def get_willexecutors(bal_plugin, update = False,window=False):
         willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
         print("GET WILLEXECUTORS")
         for w in willexecutors:
@@ -22,6 +24,14 @@ class Willexecutors():
             if not bal_url in willexecutors:
                 print("replace bal")
                 willexecutors[bal_url]=bal_executor
+        if update:
+            if bal_plugin.config_get(bal_plugin.PING_WILLEXECUTORS):
+                ping_willexecutors = True
+                if bal_plugin.config_get(bal_plugin.ASK_PING_WILLEXECUTORS):
+                    ping_willexecutors = window.question(_("Contact willexecutors servers to update payment informations?"))
+                if ping_willexecutors:
+                    Willexecutors.ping_servers(willexecutors)
+
         return willexecutors
 
     def is_selected(willexecutor,value=None):
@@ -36,13 +46,12 @@ class Willexecutors():
 
     def push_transactions_to_willexecutors(will):
         willexecutors ={}
-        strtxs=""
         for wid in will:
             willitem = will[wid]
             if 'willexecutor' in willitem:
                 willexecutor=willitem['willexecutor']
                 if  willexecutor and Willexecutors.is_selected(willexecutor):
-                    url=Willexecutors.get_url(willexecutor)
+                    url=willexecutor['url']
                     if not url in willexecutors:
                         willexecutor['txs']=""
                         willexecutors[url]=willexecutor
@@ -53,7 +62,7 @@ class Willexecutors():
         for url in willexecutors:
             willexecutor = willexecutors[url]
             if Willexecutors.is_selected(willexecutor):
-                push_transactions_to_willexecutor(strtxs,url)
+                Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url)
 
 
     def push_transactions_to_willexecutor(strtxs,url):

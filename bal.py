@@ -36,7 +36,9 @@ class BalPlugin(BasePlugin):
     PREVIEW = "bal_preview"
     SAVE_TXS = "bal_save_txs"
     WILLEXECUTORS = "bal_willexecutors"
-    SELECTED_WILLEXECUTORS = "bal_selected_willexecutors"
+    PING_WILLEXECUTORS = "bal_ping_willexecutors"
+    ASK_PING_WILLEXECUTORS = "bal_ask_ping_willexecutors"
+    NO_WILLEXECUTOR = "bal_no_willexecutor"
 
 
 
@@ -52,6 +54,9 @@ class BalPlugin(BasePlugin):
         ASK_INVALIDATE: True,
         PREVIEW: True,
         SAVE_TXS: True,
+        PING_WILLEXECUTORS: False,
+        ASK_PING_WILLEXECUTORS: False,
+        NO_WILLEXECUTOR: False,
         WILLEXECUTORS:  {
             'https://bitcoin-after.life/': {
                 "base_fee": 100000,
@@ -60,7 +65,6 @@ class BalPlugin(BasePlugin):
                 "address":"bcrt1qa5cntu4hgadw8zd3n6sq2nzjy34sxdtd9u0gp7"
             }
         },
-        SELECTED_WILLEXECUTORS:[],
     }
 
     STATUS_NEW = 'New'
@@ -71,6 +75,8 @@ class BalPlugin(BasePlugin):
     STATUS_REPLACED = 'Replaced'
     STATUS_INVALIDATED = 'Invalidated' 
     STATUS_ANTICIPATED = 'Anticipated'
+    STATUS_RESTORED = 'Restored'
+    STATUS_VALID = 'Valid'
 
     LATEST_VERSION = '1'
     KNOWN_VERSIONS = ('0', '1')

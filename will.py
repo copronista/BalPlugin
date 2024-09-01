@@ -1,8 +1,10 @@
+from .willexecutors import Willexecutors
 from .util import Util
 from .bal import BalPlugin
-from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTransaction,PartialTxOutput
-from electrum.util import bfh
+from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTransaction,PartialTxOutput,Transaction
+from electrum.util import bfh, decimal_point_to_base_unit_name
 from electrum.util import write_json_file,read_json_file,FileImportFailed
+import copy
 
 class Will:
     MIN_LOCKTIME = 1
@@ -33,10 +35,12 @@ class Will:
     
     def only_valid(will):
         for k,v in will.items():
-            if not BalPlugin.STATUS_REPLACED in v['status']:
-                if not BalPlugin.STATUS_INVALIDATED in v['status']:
-                    if not BalPlugin.STATUS_ANTICIPATED in v['status']:
-                        yield k
+            if v[BalPlugin.STATUS_VALID]:
+                yield k
+            #if not BalPlugin.STATUS_REPLACED in v['status']:
+            #    if not BalPlugin.STATUS_INVALIDATED in v['status']:
+            #        if not BalPlugin.STATUS_ANTICIPATED in v['status']:
+            #            yield k
 
     def search_equal_tx(will,tx,wid):
         for w in will:
@@ -54,28 +58,49 @@ class Will:
             raise e
 
         return x
+    def add_info_from_will(will,wid,wallet):
+        if isinstance(will[wid]['tx'],str):
+            will[wid]['tx']=Will.get_will(will[wid])
+        if wallet:
+            will[wid]['tx'].add_info_from_wallet(wallet)
+        for txin in will[wid]['tx'].inputs():
+            txid = txin.prevout.txid.hex()
+            if txid in will:
+                change = will[txid]['tx'].outputs()[txin.prevout.out_idx]
+                txin._trusted_value_sats = change.value
+                try:
+                    txin.script_descriptor = change.script_descriptor
+                except:
+                    pass
+                txin.is_mine=True
+                txin._TxInput__address=change.address
+                txin._TxInput__scriptpubkey = change.scriptpubkey
+                txin._TxInput__value_sats = change.value
 
     def normalize_will(will,wallet = None):
         to_delete = []
         to_add = []
+        all_input = Will.get_all_inputs(will)
+        for wid in Will.only_valid(will):
+            w=will[wid]
+            print(wid,w['heirs'])
+            for i in w['tx'].inputs():
+                prevout_str = i.prevout.to_str()
+                print("prevout_str:",prevout_str)
+                if prevout_str in all_input:
+                    nws=all_input[prevout_str]
+                    nws_locktime = min(nws,key=lambda x:x[1]['tx'].locktime)[1]['tx'].locktime
+                    print(f"nws_locktime = {nws_locktime},{w['tx'].locktime}",nws)
+                    if w['tx'].locktime > nws_locktime:
+                        print(f"{nws_locktime} < {w['tx'].locktime}")
+                        will[wid][BalPlugin.STATUS_VALID]=False
+                        will[wid][BalPlugin.STATUS_INVALIDATED]=True
+                        will[wid]['status']+=BalPlugin.STATUS_INVALIDATED
+                    
+                        #new_will[wid]['status']+=alPlugin.STATUS_ANTICIPATED
+                        #new_will[wid]['tx'].locktime = nws_locktime
         for wid in will:
-            if isinstance(will[wid]['tx'],str):
-                will[wid]['tx']=Will.get_will(will[wid])
-            if wallet:
-                will[wid]['tx'].add_info_from_wallet(wallet)
-            for txin in will[wid]['tx'].inputs():
-                txid = txin.prevout.txid.hex()
-                if txid in will:
-                    change = will[txid]['tx'].outputs()[txin.prevout.out_idx]
-                    txin._trusted_value_sats = change.value
-                    try:
-                        txin.script_descriptor = change.script_descriptor
-                    except:
-                        pass
-                    txin.is_mine=True
-                    txin._TxInput__address=change.address
-                    txin._TxInput__scriptpubkey = change.scriptpubkey
-                    txin._TxInput__value_sats = change.value
+            Will.add_info_from_will(will,wid,wallet)
  
 
             txid = will[wid]['tx'].txid()
@@ -87,7 +112,7 @@ class Will:
                 print("txid is none")
                 will[wid]['status']+="ERROR!"
                 continue
-                #raise Exception("txid is none")
+                #raise Exception("txid is none should not")
             if txid != wid:
                 to_delete.append(wid)
                 to_add.append([txid,will[wid]])
@@ -97,9 +122,13 @@ class Will:
         for warr in to_add:
             #print("warr0:",warr[0])
             #print("war1:",warr[1])
-            will[warr[0]] = warr[1]
+            warr[1][BalPlugin.STATUS_REPLACED]=True
+            warr[1][BalPlugin.STATUS_VALID]=False
+            will[warr[0]] = copy.deepcopy(warr[1])
+            Will.reset_status(will[warr[0]])
         for wid in to_delete:
             if wid in will:
+                print(f"delete will {wid}")
                 del will[wid]
 
     
@@ -119,15 +148,23 @@ class Will:
             for wid in will:
                 wtx=will[wid]['tx']
                 inputs = wtx.inputs()
+                outputs = wtx.outputs()
                 found = False
                 old_txid = wtx.txid()
+                ntx = None
                 for i in range(0,len(inputs)):
                     if inputs[i].prevout.txid.hex() == otxid and inputs[i].prevout.out_idx == idx:
+                        if isinstance(wtx,Transaction):
+                            will[wid]['tx']=PartialTransaction.from_tx(wtx)
                         will[wid]['tx']._inputs[i]=Will.new_input(ntxid,idx,change)
                         found = True
-                if found:
-                    will[wid]['tx'].set_rbf(True)
-                    will[wid]['tx'].remove_signatures()
+                if found == True:
+                    pass
+                    #ntx = PartialTransaction.from_io(inputs,outputs,locktime=wtx.locktime,version=2)
+                    #ntx.set_rbf(True)
+                    #ntx.remove_signatures()
+                    #will[wid]['tx'] = ntx
+                    #Will.reset_status(will,wid)
 
                 new_txid = will[wid]['tx'].txid()
                 if old_txid != new_txid:
@@ -140,17 +177,18 @@ class Will:
 
 
             
-    def get_all_inputs(will):
+    def get_all_inputs(will,only_valid = False):
         all_inputs = {}
         for w in will:
-            inputs = will[w]['tx'].inputs()
-            for i in inputs:
-                prevout_str = i.prevout.to_str()
-                inp=[w,will[w]]
-                if not prevout_str in all_inputs:
-                    all_inputs[prevout_str] = [inp]
-                else:
-                    all_inputs[prevout_str].append(inp)
+            if will[w][BalPlugin.STATUS_VALID]:
+                inputs = will[w]['tx'].inputs()
+                for i in inputs:
+                    prevout_str = i.prevout.to_str()
+                    inp=[w,will[w],i]
+                    if not prevout_str in all_inputs:
+                        all_inputs[prevout_str] = [inp]
+                    else:
+                        all_inputs[prevout_str].append(inp)
         return all_inputs
 
     def get_all_inputs_min_locktime(all_inputs):
@@ -179,8 +217,12 @@ class Will:
 
     def replace_heir(ow,nw):
         ow['heirs'] = nw['heirs']
-        ow['valid'] = True
+        ow['status'] +=BalPlugin.STATUS_RESTORED
+        #ow[BalPlugin.STATUS_VALID] = True
+        ow[BalPlugin.STATUS_REPLACED] = False
+        ow[BalPlugin.STATUS_INVALIDATED] = False
         return ow
+
     def update_will(old_will,new_will):
         #write_json_file("/home/steal/Documents/old_will",old_will)
         #write_json_file("/home/steal/Documents/new_will",new_will)
@@ -190,10 +232,10 @@ class Will:
         print("_______________UPDATE WILL______________") 
         for nid in new_will:
             print("nid",nid)
-            if nid in old_will:
-                print("already present")
-                new_will[nid]=Will.replace_heir(old_will[nid],new_will[nid])
-                continue
+            #if nid in old_will:
+            #    print("already present")
+            #new_will[nid]=Will.replace_heir(old_will[nid],new_will[nid])
+            #    continue
             nw=new_will[nid]
             print("heirs",nw['heirs'])
             print("locktime",nw['tx'].locktime)
@@ -202,42 +244,70 @@ class Will:
                 prevout_str = inp.prevout.to_str()
                 if prevout_str in all_inputs_min_locktime:
                     ows = all_inputs_min_locktime[prevout_str]
+                    anticipate = ntx.locktime
+                    found = False
                     for ow in ows:
                         otx = ow[1]['tx']
                         anticipate = Util.anticipate_locktime(otx.locktime,days=1)
-                        found = False
                         print(nw['tx'].locktime,otx.locktime)
-                        if ntx.locktime >= anticipate:
+                        if ntx.locktime > anticipate:
                             nw['tx'].locktime = otx.locktime
                             print("ntx locktime >=anticipate")
-                            if Util.cmp_outputs(ow[1]['tx'].outputs(),nw['tx'].outputs()):
+                            if Util.cmp_outputs(otx.outputs(),ntx.outputs()):
+                                print("keeping old tx") 
+                                new_will[nid]['tx'].locktime = ow[1]['tx'].locktime
                                 found = True
-                                print("keeping old tx")
-                                new_will[nid]=Will.replace_heir(ow[1],nw)
-                                
-                            #if Util.cmp_heirs(ow[1]['heirs'],nw['heirs']):
-                            #    if Util.cmp_willexecutor(ow[1]['willexecutor'],nw['willexecutor']):
-                            #        print("equals!!!")
-                            #        if Util.cmp_txs(otx,ntx):
-                            #            print("keeping old tx") 
-                            #            new_will[nid]=ow[1]
-                            #            found = True
-                            else:
-                                print("actually anticipate outputs are different")
-                                new_will[nid]['tx'].locktime = int(anticipate)
-                        else:
-                            print("actually anticipate")
-                            new_will[nid]['tx'].locktime = int(anticipate)
+
+                            """
+                            if Util.cmp_heirs(ow[1]['heirs'],nw['heirs']):
+                                if Util.cmp_willexecutor(ow[1]['willexecutor'],nw['willexecutor']):
+                                    print("equals!!!")
+                                    if Util.cmp_txs(otx,ntx):
+                                        print("keeping old tx") 
+                                        new_will[nid]['tx'].locktime = ow[1]['tx'].locktime
+                                        found = True
+                            """
+                    if not found:
+                        print("actually anticipate outputs are different")
+                        new_will[nid]['tx'].locktime = int(anticipate)
+                        new_will[nid][BalPlugin.STATUS_ANTICIPATED]=True
+
+        new_input_min_locktime=Will.get_all_inputs(new_will)
+        import pprint
+        pprint.pprint(new_input_min_locktime)
+        for wid,w in new_will.items():
+            print(wid,w['heirs'])
+            for i in w['tx'].inputs():
+                prevout_str = i.prevout.to_str()
+                print("prevout_str:",prevout_str)
+                if prevout_str in new_input_min_locktime:
+                    nws=new_input_min_locktime[prevout_str]
+                    nws_locktime = min(nws,key=lambda x:x[1]['tx'].locktime)[1]['tx'].locktime
+                    print(f"nws_locktime = {nws_locktime},{w['tx'].locktime}",nws)
+                    if w['tx'].locktime > nws_locktime:
+                        print(f"{nws_locktime} < {w['tx'].locktime}")
+                        new_will[wid]['status']+=BalPlugin.STATUS_ANTICIPATED
+                        new_will[wid]['tx'].locktime = nws_locktime
+
+
         try:
             Will.normalize_will(new_will)
-        except:
-            pass
+        except Exception as e:
+            raise e
                             
 
         for oid in Will.only_valid(old_will):
             if oid in new_will:
-                new_will[oid]=Will.replace_heir(old_will[oid],new_will[oid])
+                new_heirs = new_will[oid]['heirs']
+                new_we = new_will[oid]['willexecutor']
+
+                new_will[oid]=old_will[oid]
+                new_will[oid]['heirs']=new_heirs
+                new_will[oid]['willexecutor']= new_we
+
+                #new_will[oid]=Will.replace_heir(old_will[oid],new_will[oid])
                 continue
+            """
             else:
                 ow = old_will[oid]
                 otx = ow['tx']
@@ -251,12 +321,28 @@ class Will:
 
                 if not new_will_found:
                     old_will[oid]['status'] += BalPlugin.STATUS_REPLACED
-                    old_will[oid]['replaced'] = True
+                    old_will[oid][BalPlugin.STATUS_REPLACED] = True
+                    old_will[oid][BalPlugin.STATUS_VALID] = False
                     for i in otx.inputs():
                         prevout_str = i.prevout.to_str()
                         if prevout_str not in all_new_inputs:
-                            old_will[oid]['invalidated']=True
                             old_will[oid]['status'] += BalPlugin.STATUS_INVALIDATED
+                            old_will[oid][BalPlugin.STATUS_INVALIDATED]=True
+                            old_will[oid][BalPlugin.STATUS_VALID] = False
+            """
+
+    def reset_status(w):
+                    #w['status'] = BalPlugin.STATUS_NEW
+                    w[BalPlugin.STATUS_NEW] = True
+                    w[BalPlugin.STATUS_VALID] = True
+                    w[BalPlugin.STATUS_REPLACED] = False
+                    w[BalPlugin.STATUS_INVALIDATED] = False
+                    w[BalPlugin.STATUS_EXPORTED] = False
+                    w[BalPlugin.STATUS_BROADCASTED] = False
+                    w[BalPlugin.STATUS_RESTORED] = False
+                    w[BalPlugin.STATUS_COMPLETE] = False
+                    w[BalPlugin.STATUS_PUSHED] = False
+                    w[BalPlugin.STATUS_ANTICIPATED] = False
 
     def get_higher_input_for_tx(will):
         out = {}
@@ -296,22 +382,31 @@ class Will:
 
 
 
+    def is_new(will):
+        for wid in will:
+            if will[wid]['status'] == BalPlugin.STATUS_NEW:
+                return True
 
-    def is_will_valid(will, block_to_check, timestamp_to_check, all_utxos,heirs={},callback_not_valid_tx=None):
+    def is_will_valid(will, block_to_check, timestamp_to_check, all_utxos,heirs={},willexecutors={},callback_not_valid_tx=None):
         spent_utxos = []
         spent_utxos_tx = []
-        all_inputs=Will.get_all_inputs(will)
+        all_inputs=Will.get_all_inputs(will,only_valid = True)
         all_inputs_min_locktime = Will.get_all_inputs_min_locktime(all_inputs)
         if heirs:
             if not Will.check_heirs_are_present(will,heirs,timestamp_to_check):
                 raise NotCompleteWillException("Heirs are changed")
+        if willexecutors:
+            if not Will.check_willexecutors(will,willexecutors):
+                raise NotCompleteWillException("Willexecutors are changed")
         #check that all utxo in wallet ar e spent
         for prevout_str, wid in all_inputs_min_locktime.items():
-            print("prevout_str",prevout_str)
-            print("wid:",wid)
-            locktime = wid[0][1]['tx'].locktime
-            if locktime< timestamp_to_check:
-                raise WillExpiredException(f"WillExpired {wid}: {locktime}<{timestamp_to_check}")
+            #print("prevout_str",prevout_str)
+            #print("wid:",wid)
+            for w in wid: 
+                if w[1][BalPlugin.STATUS_VALID]:
+                    locktime = wid[0][1]['tx'].locktime
+                    if locktime< timestamp_to_check:
+                        raise WillExpiredException(f"WillExpired {wid}: {locktime}<{timestamp_to_check}")
         print('check all utxo in wallet are spent')
         for utxo in all_utxos:
             if not Util.in_utxo(utxo,all_inputs.keys()):
@@ -319,37 +414,57 @@ class Will:
                     raise NotCompleteWillException("Some utxo in the wallet is not included")
         #check that all spent uxtos are in wallet
         print('check all spent utxos are in wallet')
-        for txid,s_utxo in spent_utxos_tx: 
-            if not Util.in_utxo(s_utxo,all_utxos):
-                print("not all utxos")
-                prevout=s_utxo.prevout.to_json()
-
-                if not prevout[0] in will.keys():
-                    print("utxo is not in wallet",s_utxo.to_json(),s_utxo.prevout.to_json(),will.keys(),prevout[0])
-                    if callback_not_valid_tx:
-                        print(f"trying to invalidate {txid}")
-                        callback_not_valid_tx(txid,s_utxo)
+        for inp,ws in all_inputs.items():
+            for w in ws:
+                print(w)
+                if w[1][BalPlugin.STATUS_VALID]:
+                    if not w[2].prevout.txid.hex() in Will.only_valid_list(will):
+                        if not Util.in_utxo(inp,all_utxos):
+                            if callback_not_valid_tx:
+                                print(f"trying to invalidate {w[0]}")
+                                callback_not_valid_tx(w[0],w[2])
                     #return False
         print('tutto ok')
         return True
     
+    def only_valid_list(will):
+        out=[]
+        for wid,w in will.items():
+            if w[BalPlugin.STATUS_VALID]:
+                out.append(wid)
+        return out
     def check_heirs_are_present(will,heirs,timestamp_to_check):
-        print("check heirs")
         for heir in heirs:
             found = False
-            print(heir,heirs[heir],timestamp_to_check)
             if Util.parse_locktime_string(heirs[heir][2]) >= timestamp_to_check:
-                print("HEIR ok")
                 for wid in Will.only_valid(will):
                     for wheir in will[wid]['heirs']:
-                        print("heir found",heir,wheir,will[wid]['heirs'][wheir])
                         if heir == wheir and heirs[heir][0] == will[wid]['heirs'][wheir][0] and heirs[heir][1] == will[wid]['heirs'][wheir][1]:
                             found = True
                             break
                     if found == True:
                         break
                 if not found:
-                    print("heir not found:",heir,heirs[heir])
+                    return False
+        return True
+
+    def check_willexecutors(will,willexecutors):
+        print("check willexecutor")
+        for url,we in willexecutors.items():
+            print("WEEEE",url,we)
+            if Willexecutors.is_selected(we):
+                found = False
+                for wid in Will.only_valid(will):
+                    w=will[wid]
+                    if willexecutor:=w.get("willexecutor",None):
+                        print(willexecutor)
+                        if Util.cmp_willexecutor(we,willexecutor):
+                            print("WE FOUNDDDD",we)
+                            print("WE 2",willexecutor)
+                            found = True
+                            break
+                if not found:
+                    print("we not found:",url,we)
                     return False
         return True
 

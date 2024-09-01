@@ -41,6 +41,7 @@ import urllib.parse
 from ..bal import BalPlugin
 from ..willexecutors import Willexecutors
 from ..util import Util 
+from ..will import Will
 from electrum.transaction import tx_from_any
 from electrum.network import Network
 from functools import partial
@@ -270,9 +271,10 @@ class PreviewList(MyTreeView):
             if signed:
                 msg=_(f"signed: {signed}\n")
             return msg + _(f"signing: {tosign}")
-        for txid,willitem in self.will.items():
+        for txid in Will.only_valid(self.will):
+            willitem = self.will[txid]
             tx = copy.deepcopy(willitem['tx'])
-            if BalPlugin.STATUS_COMPLETE in willitem['status']:
+            if willitem[BalPlugin.STATUS_COMPLETE]:
                 print("altready signed",txid)
                 txs[txid]=tx
                 continue 
@@ -309,6 +311,7 @@ class PreviewList(MyTreeView):
             if tx.is_complete():
                 is_complete=True
                 willitem['status'] += BalPlugin.STATUS_COMPLETE
+                willitem[BalPlugin.STATUS_COMPLETE]=True
             #self.bal_window.window.sign_tx(tx,callback=sign_done,external_keypairs=None)
             print("tx: {} is complete:{}".format(txid, tx.is_complete()))
             txs[txid]=tx
@@ -363,7 +366,7 @@ class PreviewList(MyTreeView):
 
 
     def broadcast(self):
-        Willexecutors.push_transactions_to_willexecutors(self.will, self.bal_window.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS))
+        Willexecutors.push_transactions_to_willexecutors(self.will)
 
 
     def invalidate_will(self):

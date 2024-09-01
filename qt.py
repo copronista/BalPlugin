@@ -19,14 +19,18 @@ from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
 from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
                          QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
 
-from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
+from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,QDialog,
                              QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit,QScrollArea,QWidget,QSpacerItem,QSizePolicy)
 
 from electrum.plugin import hook
 from electrum.i18n import _
 from electrum.util import make_dir, InvalidPassword, UserCancelled
+from electrum.util import bfh, decimal_point_to_base_unit_name
+
 from electrum.gui.qt.util import (read_QIcon, EnterButton, WWLabel, icon_path,
+                                  
                                   WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton,HelpButton,WaitingDialog)
+
 from electrum.gui.qt.qrtextedit import ScanQRTextEdit
 from electrum.gui.qt.main_window import StatusBarButton
 from electrum.gui.qt.password_dialog import PasswordDialog
@@ -97,12 +101,8 @@ class Plugin(BalPlugin):
         #Util.print_var(window)
         w = self.get_window(window)
         w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
-        show_preview = False
-        for wid in w.will:
-            if w.will[wid]['status'] == BalPlugin.STATUS_NEW:
-                show_preview = True
         #show_preview=self.config_get(BalPlugin.PREVIEW)
-        if show_preview:
+        if Will.is_new(w.will):
             if self.config_get(BalPlugin.PREVIEW):
                 w.preview_dialog(w.will)
             elif self.config_get(BalPlugin.BROADCAST):
@@ -312,7 +312,7 @@ class BalWindow():
 
     def prepare_will(self, ignore_duplicate = False, keep_original = False):
         will = self.build_inheritance_transaction(ignore_duplicate = ignore_duplicate, keep_original=keep_original)
-        if not will or  len(will) == 0:
+        if not (will and len(will) > 0 and Will.is_new(will)):
             self.window.show_message(_('no tx to be created'))
         return will
     def will_not_replaced_nor_invalidated(self):
@@ -340,7 +340,8 @@ class BalWindow():
     def delete_not_valid(self,txid,s_utxo):
         try:
             self.will[txid]['status']+=BalPlugin.STATUS_INVALIDATED
-            self.will[txid]['valid']=False
+            self.will[txid][BalPlugin.STATUS_VALID]=False
+            self.will[txid][BalPlugin.STATUS_INVALIDATED]=True
         except Exception as e:
             print(f"cannot invalidate {txid}")
             raise e
@@ -349,14 +350,12 @@ class BalWindow():
         self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
         self.show_transaction(tx)
 
-    def build_will(self,from_date,ignore_duplicate = True, keep_original = True ):
+    def build_will(self,from_date, willexecutors, ignore_duplicate = True, keep_original = True ):
         will = {}
         willtodelete=[]
         willtoappend={}
         try:
-            willexecutors = Willexecutors.get_willexecutors(self.bal_plugin) 
-            if self.window.question(_("Contact willexecutors servers to update payment informations?")):
-                Willexecutors.ping_servers(willexecutors)
+
             #print(willexecutors)
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,from_date)
             creation_time = time()
@@ -372,11 +371,17 @@ class BalWindow():
                     tx['description'] = txs[txid].description
                     tx['willexecutor'] = txs[txid].willexecutor
                     tx['status'] = BalPlugin.STATUS_NEW
-                    tx['exported'] = False
-                    tx['broadcasted'] = False
-                    tx['valid'] = True
-                    tx['replaced']=False
-                    tx['invalidated']=False
+                    tx[BalPlugin.STATUS_NEW] = True
+                    tx[BalPlugin.STATUS_VALID] = True
+                    tx[BalPlugin.STATUS_REPLACED] = False
+                    tx[BalPlugin.STATUS_INVALIDATED] = False
+                    tx[BalPlugin.STATUS_EXPORTED] = False
+                    tx[BalPlugin.STATUS_BROADCASTED] = False
+                    tx[BalPlugin.STATUS_RESTORED] = False
+                    tx[BalPlugin.STATUS_COMPLETE] = False
+                    tx[BalPlugin.STATUS_PUSHED] = False
+                    tx[BalPlugin.STATUS_ANTICIPATED] = False
+
                     tx['time'] = creation_time
                     tx['heirs'] = txs[txid].heirs
                     tx['txchildren'] = []
@@ -386,11 +391,14 @@ class BalWindow():
                 #print("WILL",will)    
                 Will.update_will(self.will,will)
                 #print("WILL2",will)    
-                Will.normalize_will(will)
                 #print("WILL3",will)    
-
                 for wid in will:
+                    print("saving wid",wid,will[wid])
+                    print("tx",str(will[wid]['tx']))
                     self.will[wid]=will[wid]
+                #Will.normalize_will(will)
+
+                Will.normalize_will(self.will)
 
                 #try:
                 #    Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.delete_not_valid)
@@ -430,10 +438,11 @@ class BalWindow():
             #    else:
             #        willtodelete.append((None,txid))
             utxos=self.window.wallet.get_utxos()
+            willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=True,window=self.window) 
             #current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, utxos)
             #print("current_will is valid",current_will_is_valid,self.will)
             try:
-                Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),self.heirs,self.delete_not_valid)
+                Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),callback_not_valid_tx=self.delete_not_valid)
             except WillExpiredException as e:
                 tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
                 self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
@@ -443,8 +452,15 @@ class BalWindow():
 
             except NotCompleteWillException as e:
                 self.window.show_message(_(f"{str(e)}: will rebuild it"))
-                self.build_will(date_to_check,ignore_duplicate,keep_original)
-
+                self.build_will(date_to_check,willexecutors,ignore_duplicate,keep_original)
+                try:
+                    Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),callback_not_valid_tx=self.delete_not_valid)
+                except WillExpiredException as e:
+                    tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
+                    self.window.show_message(_("Was not possible to write the will as it is already expired please publish this transaction") + str(e))
+                    self.show_transaction(tx)
+                except NotCompleteWillException as e:
+                    self.window.show_error( str(e))
 
                 self.window.history_list.update()
                 self.window.utxo_list.update()
@@ -489,6 +505,8 @@ class BalWindow():
         box = QWidget()
         vlayout = QVBoxLayout()
         box.setLayout(vlayout)
+        decimal_point = self.bal_plugin.config.get_decimal_point()
+        base_unit_name = decimal_point_to_base_unit_name(decimal_point)
         for w in self.will:
             f = self.will[w].get("father",None)
             if father == f:
@@ -509,19 +527,21 @@ class BalWindow():
                 detaillayout.addWidget(QLabel(_("<b>Heirs:</b>")))
                 for heir in self.will[w]['heirs']:
                     if "w!ll3x3c\"" not in heir:
-                        decoded_amount = Util.decode_amount(self.will[w]['heirs'][heir][3],self.bal_plugin.config.get_decimal_point())
-                        detaillayout.addWidget(QLabel(f"{heir}:\t{decoded_amount}"))
+                        decoded_amount = Util.decode_amount(self.will[w]['heirs'][heir][3],decimal_point)
+                        detaillayout.addWidget(QLabel(f"{heir}:\t{decoded_amount} {base_unit_name}"))
                 if self.will[w]['willexecutor']:
                     detaillayout.addWidget(QLabel(_("<b>Willexecutor:</b:")))
-                    detaillayout.addWidget(QLabel(f"{self.will[w]['willexecutor']['url']}:\t{self.will[w]['willexecutor']['base_fee']}"))
+                    decoded_amount = Util.decode_amount(self.will[w]['willexecutor']['base_fee'],decimal_point)
+                    
+                    detaillayout.addWidget(QLabel(f"{self.will[w]['willexecutor']['url']}:\t{decoded_amount} {base_unit_name}"))
                 detaillayout.addStretch()
                 pal = QPalette()
-                if self.will[w].get("invalidated",False):
+                if self.will[w].get(BalPlugin.STATUS_INVALIDATED,False):
                     pal.setColor(QPalette.Background, QColor(255,0, 0))
-                elif self.will[w].get("replaced",False):
+                elif self.will[w].get(BalPlugin.STATUS_REPLACED,False):
                     pal.setColor(QPalette.Background, QColor(255, 255, 0))
                 else:
-                    pal.setColor(QPalette.Background, QColor(0,255, 0))
+                    pal.setColor(QPalette.Background, QColor("#57c7d4"))
                 detailw.setAutoFillBackground(True)
                 detailw.setPalette(pal)
 
@@ -532,7 +552,7 @@ class BalWindow():
     def preview_modal_dialog(self):
         Will.add_willtree(self.will)
         print(self.will)
-        d = WindowModalDialog(self.window,self.get_window_title("Preview"))
+        d = QDialog(self.window)
         d.setMinimumSize(1024,768)
         vlayout= QVBoxLayout(d)
         scroll = QScrollArea()
@@ -546,8 +566,14 @@ class BalWindow():
         scroll.setWidget(viewport)
         viewport.setLayout(willlayout)
         i=0
+        vlayout.addWidget(QLabel(_("DON'T PANIC !!! everything is fine, all possible futures are covered")))
         vlayout.addWidget(scroll)
-        
+        w=QWidget()
+        hlayout = QHBoxLayout(w)
+        print(Will.only_valid_list(self.will))
+        hlayout.addWidget(QLabel(_("Valid Txs:")+ str(len(Will.only_valid_list(self.will)))))
+        hlayout.addWidget(QLabel(_("Total Txs:")+ str(len(self.will))))
+        vlayout.addWidget(w)
         if not d.exec_():
             return
 
@@ -608,17 +634,24 @@ class BalWindow():
         heir_invalidate = bal_checkbox(self.bal_plugin, BalPlugin.INVALIDATE)
         heir_ask_invalidate = bal_checkbox(self.bal_plugin, BalPlugin.ASK_INVALIDATE)
         heir_preview = bal_checkbox(self.bal_plugin, BalPlugin.PREVIEW)
+        heir_ping_willexecutors = bal_checkbox(self.bal_plugin, BalPlugin.PING_WILLEXECUTORS)
+        heir_ask_ping_willexecutors = bal_checkbox(self.bal_plugin, BalPlugin.ASK_PING_WILLEXECUTORS)
+        heir_no_willexecutor = bal_checkbox(self.bal_plugin, BalPlugin.NO_WILLEXECUTOR)
+
         
 
         grid=QGridLayout(d)
         add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
         add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1,"Delta blocks for inputs to be invalidated and transaction resubmitted")
         add_widget(grid,"Transaction fees",heir_tx_fees,2,"default transaction fees")
-        add_widget(grid,"Broadcast transactions",heir_broadcast,3,"")
-        add_widget(grid," - Ask before",heir_ask_broadcast,4,"")
-        add_widget(grid,"Invalidate transactions",heir_invalidate,5,"")
-        add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
-        add_widget(grid,"Show preview before sign",heir_preview,7,"")
+        #add_widget(grid,"Broadcast transactions",heir_broadcast,3,"")
+        #add_widget(grid," - Ask before",heir_ask_broadcast,4,"")
+        #add_widget(grid,"Invalidate transactions",heir_invalidate,5,"")
+        #add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
+        #add_widget(grid,"Show preview before sign",heir_preview,7,"")
+        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,3,"ping willexecutors to get payment info before compiling will")
+        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,4,"")
+        add_widget(grid,"NO Backup Transaction",heir_no_willexecutor,5,"Add transactions without willexecutor")
         #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
         #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 
