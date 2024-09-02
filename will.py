@@ -49,18 +49,20 @@ class Will:
                     if Util.cmp_txs(will[w]['tx'],tx):
                         return will[w]['tx']
         return False
-
-    def get_will(x):
+    def get_tx_from_any(x):
         try:
-            x['tx']=tx_from_any(x['tx'])
+            print(x['tx'])
+            a=str(x['tx'])
+            return tx_from_any(str(x['tx']))
+            
         except Exception as e:
             Util.print_var(x)
             raise e
 
-        return x
+        return x['tx']
     def add_info_from_will(will,wid,wallet):
         if isinstance(will[wid]['tx'],str):
-            will[wid]['tx']=Will.get_will(will[wid])
+            will[wid]['tx'] = Will.get_tx_from_any(will[wid])
         if wallet:
             will[wid]['tx'].add_info_from_wallet(wallet)
         for txin in will[wid]['tx'].inputs():
@@ -80,19 +82,18 @@ class Will:
     def normalize_will(will,wallet = None):
         to_delete = []
         to_add = []
+        for wid in will:
+            Will.add_info_from_will(will,wid,wallet)
+
         all_input = Will.get_all_inputs(will)
         for wid in Will.only_valid(will):
             w=will[wid]
-            print(wid,w['heirs'])
             for i in w['tx'].inputs():
                 prevout_str = i.prevout.to_str()
-                print("prevout_str:",prevout_str)
                 if prevout_str in all_input:
                     nws=all_input[prevout_str]
                     nws_locktime = min(nws,key=lambda x:x[1]['tx'].locktime)[1]['tx'].locktime
-                    print(f"nws_locktime = {nws_locktime},{w['tx'].locktime}",nws)
                     if w['tx'].locktime > nws_locktime:
-                        print(f"{nws_locktime} < {w['tx'].locktime}")
                         will[wid][BalPlugin.STATUS_VALID]=False
                         will[wid][BalPlugin.STATUS_INVALIDATED]=True
                         will[wid]['status']+=BalPlugin.STATUS_INVALIDATED
@@ -100,8 +101,6 @@ class Will:
                         #new_will[wid]['status']+=alPlugin.STATUS_ANTICIPATED
                         #new_will[wid]['tx'].locktime = nws_locktime
         for wid in will:
-            Will.add_info_from_will(will,wid,wallet)
- 
 
             txid = will[wid]['tx'].txid()
             if txid is None:
@@ -156,6 +155,7 @@ class Will:
                     if inputs[i].prevout.txid.hex() == otxid and inputs[i].prevout.out_idx == idx:
                         if isinstance(wtx,Transaction):
                             will[wid]['tx']=PartialTransaction.from_tx(wtx)
+                            will[wid]['tx'].set_rbf(True)
                         will[wid]['tx']._inputs[i]=Will.new_input(ntxid,idx,change)
                         found = True
                 if found == True:
@@ -273,8 +273,6 @@ class Will:
                         new_will[nid][BalPlugin.STATUS_ANTICIPATED]=True
 
         new_input_min_locktime=Will.get_all_inputs(new_will)
-        import pprint
-        pprint.pprint(new_input_min_locktime)
         for wid,w in new_will.items():
             print(wid,w['heirs'])
             for i in w['tx'].inputs():

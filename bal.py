@@ -10,11 +10,14 @@ from electrum.transaction import tx_from_any
 
 from .util import Util
 from .willexecutors import Willexecutors
+
 json_db.register_dict('heirs', tuple, None)
 json_db.register_dict('will', lambda x: get_will(x), None)
 
 def get_will(x):
     try:
+        print("______________________________________________________________________________________________________")
+        print(x)
         x['tx']=tx_from_any(x['tx'])
     except Exception as e:
         Util.print_var(x)
@@ -85,6 +88,18 @@ class BalPlugin(BasePlugin):
     SIZE = (159, 97)
 
     def __init__(self, parent, config, name):
+        """
+        print("registered_dicts:",json_db.registered_dicts)
+        print("registered_names:",json_db.registered_names)
+        if not "heirs" in json_db.registered_dicts:
+            print("heir NOT registered")
+            json_db.register_dict('heirs', tuple, None)
+
+        if not "will" in json_db.registered_dicts:
+            print("will NOT registered")
+            json_db.register_dict('will', lambda x: get_will(x), None)
+            json_db.register_name('will', lambda x: get_will(x))
+        """
         BasePlugin.__init__(self, parent, config, name)
         self.base_dir = os.path.join(config.electrum_path(), 'bal')
         print(self.base_dir)

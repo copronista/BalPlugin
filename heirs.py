@@ -222,8 +222,6 @@ def invalidate_inheritance_transactions(wallet):
             if not txid in invalidated:
                 invalidated.append(tx.txid())
                 remaining[key] = value
-    from pprint import pprint
-    pprint(remaining)
 
 def completed_willitem(will):
     for txid,willitem in will.items():

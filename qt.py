@@ -47,19 +47,25 @@ from .balqt.amountedit import PercAmountEdit
 from .willexecutors import Willexecutors
 from electrum.transaction import tx_from_any
 from time import time
+from electrum import json_db
+from electrum.json_db import StoredDict
 import datetime
 class Plugin(BalPlugin):
 
     def __init__(self, parent, config, name):
+        print("INIT BALPLUGIN")
         BalPlugin.__init__(self, parent, config, name)
         self.bal_windows={}
 
 
     @hook
     def init_qt(self,gui_object):
-        
+        print("HOOK init qt")   
         try:
             self.gui_object=gui_object
+            #json_db.register_dict('heirs', tuple, None)
+            #json_db.register_dict('will', lambda x: get_will(x), None)
+
             for window in gui_object.windows:
                 wallet = window.wallet
                 w = BalWindow(self,window)
@@ -71,6 +77,7 @@ class Plugin(BalPlugin):
                                 try:
                                     print(menu_child.title())
                                     if menu_child.title()==_("&Tools"):
+                                        #pass
                                         w.init_menubar_tools(menu_child)
                                             
                                 except:
@@ -85,6 +92,7 @@ class Plugin(BalPlugin):
 
     @hook
     def create_status_bar(self, sb):
+        print("HOOK create status bar")
         return
         b = StatusBarButton(read_QIcon('bal.png'), "Bal "+_("Bitcoin After Life"),
                             partial(self.setup_dialog, sb), sb.height())
@@ -92,11 +100,21 @@ class Plugin(BalPlugin):
 
     @hook
     def init_menubar_tools(self,window,tools_menu):
+        print("HOOK init_menubar")
         w = self.get_window(window)
         w.init_menubar_tools(tools_menu)
 
     @hook
+    def load_wallet(self,wallet, main_window):
+        print("HOOK load wallet")
+        w = self.get_window(main_window)
+        #w.wallet = wallet
+        w.ok=True
+        w.init_will()
+
+    @hook
     def on_close_window(self,window):
+        print("HOOK on close_window")
         pass
         #Util.print_var(window)
         w = self.get_window(window)
@@ -122,6 +140,7 @@ class Plugin(BalPlugin):
         return True
     
     def settings_widget(self, window):
+
         w=self.get_window(window.window)
         #w.window.show_message(_("please reastart electrum to activate BalPlugin"))
         return EnterButton(_('Settings'), partial(w.settings_dialog))
@@ -160,7 +179,7 @@ class Plugin(BalPlugin):
                 window.toggle_tab(bal_window.will_tab)
                 print(6)
 
-                #Util.print_var(window.tabs)
+                
                 window.tabs.update()
                 bal_window.will_tab.hide()
                 #window.tabs.removeTab(bal_window.will_tab.tab_pos-1)
@@ -174,20 +193,15 @@ class BalWindow():
     def __init__(self,bal_plugin: 'BalPlugin',window: 'ElectrumWindow'):
         self.bal_plugin = bal_plugin
         self.window = window
-        self.wallet = self.window.wallet
-        self.heirs = Heirs._validate(Heirs(self.wallet.db))
-        self.will=self.wallet.db.get_dict("will")
-        Will.normalize_will(self.will,self.wallet)
-        for txid,willtx in self.will.items():
-            if isinstance(willtx['tx'],str):
-                tx=tx_from_any(willtx['tx'])
-                willtx['tx']=tx
-            self.add_info_from_will(willtx['tx'])
-        
-
-
+        self.heirs = {}
+        self.will = {}
         self.heirs_tab = self.create_heirs_tab()
         self.will_tab = self.create_will_tab()
+        self.ok= False
+        if self.window.wallet:
+            self.wallet = self.window.wallet
+            self.heirs_tab.wallet = self.wallet
+            self.will_tab.wallet = self.wallet
         print(self.window.windowTitle())
 
     def init_menubar_tools(self,tools_menu):
@@ -204,6 +218,33 @@ class BalWindow():
         add_optional_tab(self.window.tabs, self.will_tab, read_QIcon("will.png"), _("&Will"))
         tools_menu.addSeparator()
         self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
+    def erease_will(self):
+        to_delete = []
+        for w in self.will:
+            to_delete.append(w)
+        for w in to_delete:
+            del self.will[w]
+    def init_will(self):
+        print("********************init_____will____________**********")
+        if not self.heirs:
+            self.heirs = Heirs._validate(Heirs(self.wallet.db))
+        if not self.will:
+            self.will=self.wallet.db.get_dict("will")
+        print("WALLET",dir(self.wallet.db.data))
+        #self.will=json_db._convert_dict(json_db.path,"will",self.will[w])
+
+        for w in self.will:
+            if isinstance(self.will[w]['tx'],str):
+                #dict.__setitem__(self.will,w,dict(self.will[w]))   
+                self.will[w]['tx']=Will.get_tx_from_any(self.will[w])
+                self.will[w]['tx'].get_info_from_wallet(self.wallet)
+
+        if self.will:
+            Will.normalize_will(self.will,self.wallet)
+
+        self.will_list.will=self.will
+        self.will_list.update_will(self.will)
+        self.will_tab.update()
 
     def get_window_title(self,title):
         return _('BAL - ') + _(title) 
