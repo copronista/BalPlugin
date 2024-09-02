@@ -364,7 +364,7 @@ class Will:
             utxo_str=utxo.prevout.to_str()
             if utxo_str in inputs:
                 filtered_inputs.append(inputs[utxo_str])
-                balance += inputs[utxo_str]._TxInput__value_sats 
+                balance += inputs[utxo_str]._TxInput__value_sats or 0
         
         change_addresses = wallet.get_change_addresses_for_new_transaction()
         out = PartialTxOutput.from_address_and_value(change_addresses[0], balance)
