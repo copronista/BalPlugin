@@ -360,24 +360,31 @@ class Will:
         filtered_inputs = []
         balance = 0
         utxos = wallet.get_utxos()
+        utxo_to_spend = []
         for utxo in utxos:
             utxo_str=utxo.prevout.to_str()
             if utxo_str in inputs:
                 filtered_inputs.append(inputs[utxo_str])
                 balance += inputs[utxo_str]._TxInput__value_sats or 0
-        
-        change_addresses = wallet.get_change_addresses_for_new_transaction()
-        out = PartialTxOutput.from_address_and_value(change_addresses[0], balance)
-        out.is_change = True
-        locktime = Util.get_current_height(wallet.network)
-        tx = PartialTransaction.from_io(utxos, [out], locktime=locktime, version=2)
-        fee=tx.estimated_size()*fees_per_byte
-        out = PartialTxOutput.from_address_and_value(change_addresses[0],balance - fee)
-        tx = PartialTransaction.from_io(utxos,[out], locktime=locktime, version=2)
-        tx.set_rbf(True)
-        Util.print_var(tx)
-        return tx
+                utxo_to_spend.append(utxo)
+        if len(utxo_to_spend) > 0: 
+            change_addresses = wallet.get_change_addresses_for_new_transaction()
+            out = PartialTxOutput.from_address_and_value(change_addresses[0], balance)
+            out.is_change = True
+            locktime = Util.get_current_height(wallet.network)
+            tx = PartialTransaction.from_io(utxo_to_spend, [out], locktime=locktime, version=2)
+            fee=tx.estimated_size()*fees_per_byte
+            if balance -fee >0:
+                out = PartialTxOutput.from_address_and_value(change_addresses[0],balance - fee)
+                tx = PartialTransaction.from_io(utxos,[out], locktime=locktime, version=2)
+                tx.set_rbf(True)
+                Util.print_var(tx)
+                return tx
 
+            else:
+                print("balance - fee:",balance - fee)
+        else:
+            print("no input")
 
 
     def is_new(will):

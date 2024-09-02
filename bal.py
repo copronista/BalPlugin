@@ -71,7 +71,7 @@ class BalPlugin(BasePlugin):
     }
 
     STATUS_NEW = 'New'
-    STATUS_COMPLETE = 'Complete'
+    STATUS_COMPLETE = 'Signed'
     STATUS_BROADCASTED = 'Broadcasted'
     STATUS_PUSHED = 'Pushed'
     STATUS_EXPORTED = 'Exported'

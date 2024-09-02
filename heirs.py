@@ -460,7 +460,7 @@ class Heirs(dict, Logger):
                 if not Willexecutors.is_selected(willexecutor):
                     continue
             elif j == -1:
-                if no_willexecutors:
+                if not no_willexecutors:
                     continue
                 url = willexecutor = False
             else:

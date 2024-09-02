@@ -389,8 +389,10 @@ class BalWindow():
     def invalidate_will(self):
         tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
         self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
-        self.show_transaction(tx)
-
+        if tx:
+            self.show_transaction(tx)
+        else:
+            self.window.show_message(_("no inputs to be invalidate"))
     def build_will(self,from_date, willexecutors, ignore_duplicate = True, keep_original = True ):
         will = {}
         willtodelete=[]
@@ -529,10 +531,11 @@ class BalWindow():
 
     def invalidate_will(self):
         def on_success(result):
-            self.window.show_message(_("Please sign and broadcast this transaction to invalidate current will"))
-            a=self.show_transaction(result)
-            Util.print_var(a)
-            
+            if result:
+                self.window.show_message(_("Please sign and broadcast this transaction to invalidate current will"))
+                a=self.show_transaction(result)
+            else:
+                self.window.show_message(_("No transactions to invalidate"))
         def on_failure(exec_info):
             self.window.show_error(f"ERROR:{exec_info}")
             Util.print_var(exec_info)
@@ -683,16 +686,16 @@ class BalWindow():
 
         grid=QGridLayout(d)
         add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
-        add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1,"Delta blocks for inputs to be invalidated and transaction resubmitted")
-        add_widget(grid,"Transaction fees",heir_tx_fees,2,"default transaction fees")
+        #add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1,"Delta blocks for inputs to be invalidated and transaction resubmitted")
+        add_widget(grid,"Transaction fees",heir_tx_fees,1,"Default transaction fees")
         #add_widget(grid,"Broadcast transactions",heir_broadcast,3,"")
         #add_widget(grid," - Ask before",heir_ask_broadcast,4,"")
         #add_widget(grid,"Invalidate transactions",heir_invalidate,5,"")
         #add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
         #add_widget(grid,"Show preview before sign",heir_preview,7,"")
-        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,3,"ping willexecutors to get payment info before compiling will")
-        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,4,"")
-        add_widget(grid,"NO Backup Transaction",heir_no_willexecutor,5,"Add transactions without willexecutor")
+        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,2,"Ping willexecutors to get payment info before compiling will")
+        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,3,"Ask before to ping willexecutor")
+        add_widget(grid,"Backup Transaction",heir_no_willexecutor,4,"Add transactions without willexecutor")
         #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
         #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 
