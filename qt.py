@@ -514,6 +514,7 @@ class BalWindow():
                 return
 
             except NotCompleteWillException as e:
+                print(e)
                 """
                 if isinstance(e,HeirChangeException):
                     self.window.show_message(_(f"Heirs changed"))

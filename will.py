@@ -589,8 +589,9 @@ class Will:
                     if not url in willexecutors_found:
                         print(f"willexecutor: {url} not fount")
                         raise WillexecutorNotPresent()
-        else:
+        elif self_willexecutor and no_willexecutor==0:
             print("no willexecutor selected but not present")
+            print(self_willexecutor,no_willexecutor)
             raise NoWillexecutorNotPresent()
         print("will is coherent with heirs and willexecutors")
         return True
