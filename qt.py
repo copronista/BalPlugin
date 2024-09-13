@@ -642,7 +642,7 @@ class BalWindow():
         d.format_fiat_and_units = self.window.format_fiat_and_units
         d.fx = self.window.fx
         d.format_fee_rate = self.window.format_fee_rate
-        d.setMinimumSize(1024,768)
+        d.setMinimumSize(670,700)
         vlayout= QVBoxLayout()
         scroll = QScrollArea()
         viewport = QWidget(scroll)
