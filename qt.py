@@ -584,6 +584,10 @@ class BalWindow():
         decimal_point = self.bal_plugin.config.get_decimal_point()
         base_unit_name = decimal_point_to_base_unit_name(decimal_point)
         for w in self.will:
+            if self.will[w][BalPlugin.STATUS_REPLACED] and self.bal_plugin._hide_replaced:
+                continue
+            if self.will[w][BalPlugin.STATUS_INVALIDATED] and self.bal_plugin._hide_invalidated:
+                continue
             f = self.will[w].get("father",None)
             if father == f:
                 qwidget = QWidget()
