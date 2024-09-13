@@ -237,7 +237,7 @@ class PreviewList(MyTreeView):
         toolbar, menu = self.create_toolbar_with_menu('') 
         menu.addAction(_("Prepare Will"), self.build_transactions) 
         menu.addAction(_(f"Un/Hide Replaced"), self.hide_replaced) 
-        menu.addAction(_(f"un/Hide Invalidated"), self.hide_invalidated) 
+        menu.addAction(_(f"Un/Hide Invalidated"), self.hide_invalidated) 
         menu.addAction(_("Display Will"), self.bal_window.preview_modal_dialog) 
         menu.addAction(_("Sign Will"), self.ask_password_and_sign_transactions)
         menu.addAction(_("Export Will"), self.export_will)

@@ -39,7 +39,8 @@ from electrum.gui.qt.transaction_dialog import show_transaction
 from .bal import BalPlugin
 from .heirs import Heirs
 from .util import Util
-from .will import Will, WillExpiredException,NotCompleteWillException,WillItem
+from .will import Will, WillExpiredException,NotCompleteWillException,WillItem,HeirChangeException,WillexecutorChangeException,WillexecutorNotPresent,TxFeesChangedException
+
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
 from .balqt.preview_dialog import PreviewDialog,PreviewList
@@ -305,16 +306,16 @@ class BalWindow():
         grid.addWidget(heir_amount,3,1)
         grid.addWidget(HelpButton("Fixed or Percentage amount if end with %"),3,2)
 
-        grid.addWidget(QLabel(_("LockTime")), 4, 0)
-        grid.addWidget(heir_locktime, 4, 1)
-        grid.addWidget(HelpButton("if you choose Raw, you can insert various options based on suffix:\n " 
-                                  +" - b: number of blocks after current block(ex: 144b means tomorrow)\n" 
-                                  +" - d: number of days after current day(ex: 1d means tomorrow)\n"  
-                                   +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n" 
-                                  +"when using d or y time will be set to 00:00 for privacy reasons\n" 
-                                  +"when used without suffix it can be used to indicate:\n" 
-                                  +" - exact block(if value is less than 500,000,000)\n"
-                                  +" - exact block timestamp(if value greater than 500,000,000"),4,2)
+        #grid.addWidget(QLabel(_("LockTime")), 4, 0)
+        #grid.addWidget(heir_locktime, 4, 1)
+        #grid.addWidget(HelpButton("if you choose Raw, you can insert various options based on suffix:\n " 
+        #                          +" - b: number of blocks after current block(ex: 144b means tomorrow)\n" 
+        #                          +" - d: number of days after current day(ex: 1d means tomorrow)\n"  
+        #                           +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n" 
+        #                          +"when using d or y time will be set to 00:00 for privacy reasons\n" 
+        #                          +"when used without suffix it can be used to indicate:\n" 
+        #                          +" - exact block(if value is less than 500,000,000)\n"
+        #                          +" - exact block timestamp(if value greater than 500,000,000"),4,2)
 
         vbox.addLayout(grid)
         vbox.addLayout(Buttons(CancelButton(d), OkButton(d)))
@@ -423,6 +424,8 @@ class BalWindow():
                     tx['description'] = txs[txid].description
                     tx['willexecutor'] = txs[txid].willexecutor
                     tx['status'] = BalPlugin.STATUS_NEW
+                    tx['tx_fees'] = txs[txid].tx_fees
+                    print("porcodio",txs[txid].tx_fees)
                     tx[BalPlugin.STATUS_NEW] = True
                     tx[BalPlugin.STATUS_VALID] = True
                     tx[BalPlugin.STATUS_REPLACED] = False
@@ -502,19 +505,28 @@ class BalWindow():
                 for heir in self.heirs:
                     h=self.heirs[heir]
                     self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
-                Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),self_willexecutor=no_willexecutor,callback_not_valid_tx=self.delete_not_valid)
+                Will.is_will_valid(self.will, block_to_check, date_to_check, self.will_settings['tx_fees'],self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),self_willexecutor=no_willexecutor,callback_not_valid_tx=self.delete_not_valid)
             except WillExpiredException as e:
-                tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
+                tx = Will.invalidate_will(self.will,self.wallet,self.will_settings['tx_fees'])
                 self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
                 self.show_transaction(tx)
 
                 return
 
             except NotCompleteWillException as e:
-                self.window.show_message(_(f"{str(e)}: will rebuild it"))
+                """
+                if isinstance(e,HeirChangeException):
+                    self.window.show_message(_(f"Heirs changed"))
+                elif isinstance(e,WillexecutorNotPresent):
+                    self.window.show_message(_(f"new willexecutor have been selected"))
+                elif isinstance(e,WillexecutorChangeException):
+                    self.window.show_message(_("some willexecutor have changes his settings"))
+                elif isinstance(e,TxFeesChangedException):
+                    self.window.show_message(_("tx fees are changed"))
+                """
                 self.build_will(date_to_check,willexecutors,ignore_duplicate,keep_original)
                 try:
-                    Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),self_willexecutor=no_willexecutor,callback_not_valid_tx=self.delete_not_valid)
+                    Will.is_will_valid(self.will, block_to_check, date_to_check, self.will_settings['tx_fees'], self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),self_willexecutor=no_willexecutor,callback_not_valid_tx=self.delete_not_valid)
                 except WillExpiredException as e:
                     tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
                     Util.print_var(tx,"INVALIDATE_TX")
@@ -714,17 +726,17 @@ class BalWindow():
         
 
         grid=QGridLayout(d)
-        add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
+        #add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
         #add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1,"Delta blocks for inputs to be invalidated and transaction resubmitted")
-        add_widget(grid,"Transaction fees",heir_tx_fees,1,"Default transaction fees")
+        #add_widget(grid,"Transaction fees",heir_tx_fees,1,"Default transaction fees")
         #add_widget(grid,"Broadcast transactions",heir_broadcast,3,"")
         #add_widget(grid," - Ask before",heir_ask_broadcast,4,"")
         #add_widget(grid,"Invalidate transactions",heir_invalidate,5,"")
         #add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
         #add_widget(grid,"Show preview before sign",heir_preview,7,"")
-        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,2,"Ping willexecutors to get payment info before compiling will")
-        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,3,"Ask before to ping willexecutor")
-        add_widget(grid,"Backup Transaction",heir_no_willexecutor,4,"Add transactions without willexecutor")
+        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,0,"Ping willexecutors to get payment info before compiling will")
+        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,1,"Ask before to ping willexecutor")
+        add_widget(grid,"Backup Transaction",heir_no_willexecutor,2,"Add transactions without willexecutor")
         #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
         #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 

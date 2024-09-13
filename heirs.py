@@ -521,6 +521,7 @@ class Heirs(dict, Logger):
                     print(txid,tx.to_json())
                     tx.willexecutor = willexecutor
                     fee = tx.estimated_size() * tx_fees    
+                    txs[txid].tx_fees= tx_fees
                     total_fees += fee
                     total_fees_real += tx.get_fee()
                     total_in += tx.input_value()

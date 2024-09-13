@@ -487,21 +487,21 @@ class Will:
                     for child in wi.search(all_inputs):
                         if child.tx.locktime < wi.tx.locktime:
                             print(f"trying to replace {w[0]}")
-                            wi.set_status_replaced()
-                            will[wi._id]=wi.to_dict()
+                            if wi.set_status_replaced():
+                                will[wi._id]=wi.to_dict()
 
 
 
 
 
-    def is_will_valid(will, block_to_check, timestamp_to_check, all_utxos,heirs={},willexecutors={},self_willexecutor=False, callback_not_valid_tx=None):
+    def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,heirs={},willexecutors={},self_willexecutor=False, callback_not_valid_tx=None):
         spent_utxos = []
         spent_utxos_tx = []
         all_inputs=Will.get_all_inputs(will,only_valid = True)
         all_inputs_min_locktime = Will.get_all_inputs_min_locktime(all_inputs)
         Will.search_rai(all_inputs,all_utxos,will,callback_not_valid_tx= callback_not_valid_tx)
         if heirs and willexecutors:
-            if not Will.check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check):
+            if not Will.check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
                 raise NotCompleteWillException()
         #check that all utxo in wallet ar e spent
         for prevout_str, wid in all_inputs_min_locktime.items():
@@ -512,9 +512,10 @@ class Will:
                         raise WillExpiredException(f"WillExpired {wid[0][0]}: {locktime}<{timestamp_to_check}")
         print('check all utxo in wallet are spent')
         for utxo in all_utxos:
-            if not Util.in_utxo(utxo,all_inputs.keys()):
-                    print("utxo is not spent",utxo.to_json())
-                    raise NotCompleteWillException("Some utxo in the wallet is not included")
+            if utxo.value_sats() > 68 * tx_fees: 
+                if not Util.in_utxo(utxo,all_inputs.keys()):
+                        print("utxo is not spent",utxo.to_json())
+                        raise NotCompleteWillException("Some utxo in the wallet is not included")
         """
         #check that all spent uxtos are in wallet
         print('check all spent utxos are in wallet')
@@ -546,13 +547,18 @@ class Will:
             if wi.valid or wi.replaced:
                 out.append(wid)
         return out
-    def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,check_date):
+    def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,check_date,tx_fees):
         print("check willexecutors heirs")
         no_willexecutor = 0
         willexecutors_found = {}
         heirs_found = {}
         for wid in Will.only_valid(will):
             w = will[wid]
+            if w.get('tx_fees',0)!=tx_fees:
+                print("TXFEESSSSSSSSS",w.get('tx_fees',0))
+                wi=WillItem(will[wid])
+                wi.print()
+                raise TxFeesChangedException()
             for wheir in w['heirs']:
                 if not 'w!ll3x3c"' == wheir[:9]:
                     their = will[wid]['heirs'][wheir]
@@ -601,6 +607,7 @@ class WillItem:
             self.description = w.get('description',None) 
             self.time = w.get('time',None) 
             self.change = w.get('change',None) 
+            self.tx_fees = w.get('tx_fees',0)
             self.valid = w.get(BalPlugin.STATUS_VALID,False) 
             self.replaced = w.get(BalPlugin.STATUS_REPLACED,False) 
             self.invalidated = w.get(BalPlugin.STATUS_INVALIDATED,False) 
@@ -630,6 +637,7 @@ class WillItem:
             'description':self.description,
             'time':self.time,
             'change':self.change,
+            'tx_fees':self.tx_fees,
             BalPlugin.STATUS_VALID: self.valid,
             BalPlugin.STATUS_REPLACED: self.replaced,
             BalPlugin.STATUS_INVALIDATED: self.invalidated,
@@ -644,8 +652,8 @@ class WillItem:
 
     def print(self):
         print("WillITem:",self.tx.txid())
-        print(self.tx.locktime)
-        print("Locktime:",Util.locktime_to_str(self.tx.locktime))
+        print("Locktime:",Util.locktime_to_str(self.tx.locktime),self.tx.locktime)
+        print("tx_fees:",self.tx_fees)
         print("Heirs:")
         print("WE:")
         print("status:",self.status)
@@ -700,6 +708,7 @@ class WillItem:
         if not self.anticipated:
             self.status +=BalPlugin.STATUS_ANTICIPATED
             self.anticipated = True
+            return True
 
     def set_status_invalidated(self):
         print("actually invalidated")
@@ -707,6 +716,7 @@ class WillItem:
             self.status +=BalPlugin.STATUS_INVALIDATED
             self.invalidated = True
             self.valid = False
+            return True
 
     def set_status_replaced(self):
         print("actually_replaced")
@@ -714,6 +724,7 @@ class WillItem:
             self.status += BalPlugin.STATUS_REPLACED
             self.replaced = True
             self.valid = False
+            return True
 
                 
 
@@ -722,6 +733,8 @@ class WillExpiredException(Exception):
 class NotCompleteWillException(Exception):
     pass
 class HeirChangeException(NotCompleteWillException):
+    pass
+class TxFeesChangedException(NotCompleteWillException):
     pass
 class HeirNotFoundException(NotCompleteWillException):
     pass
