@@ -427,8 +427,6 @@ class Heirs(dict, Logger):
         print(f"after fixed22 balance: {balance}\tnewbalance: {newbalance}\ttotal_fees:{total_fees}")
         
         heir_list = sorted(heir_list.items(), key = lambda item: Util.parse_locktime_string(item[1][HEIR_LOCKTIME],wallet))
-        from pprint import pprint
-        pprint(heir_list)
     
 
         locktimes = {}

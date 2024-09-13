@@ -5,7 +5,6 @@ from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTr
 from electrum.util import bfh, decimal_point_to_base_unit_name
 from electrum.util import write_json_file,read_json_file,FileImportFailed
 import copy
-from pprint import pprint
 
 class Will:
     MIN_LOCKTIME = 1
@@ -648,9 +647,7 @@ class WillItem:
         print(self.tx.locktime)
         print("Locktime:",Util.locktime_to_str(self.tx.locktime))
         print("Heirs:")
-        pprint(self.heirs)
         print("WE:")
-        pprint(self.we)
         print("status:",self.status)
         #print("description:",self.description)
         print("time:",self.time)
