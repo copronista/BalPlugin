@@ -120,7 +120,6 @@ class Util:
     def cmp_heir_by_values(heira,heirb,values):
         for v in values:
             if heira[v] != heirb[v]:
-                print(f"v: {heira[v]}!={heirb[v]}")
                 return False
         return True
 

@@ -224,8 +224,9 @@ class Will:
     def get_all_inputs(will,only_valid = False):
         all_inputs = {}
         for w in will:
-            if will[w][BalPlugin.STATUS_VALID]:
-                inputs = will[w]['tx'].inputs()
+            wi = WillItem(will[w])
+            if wi.valid:
+                inputs = wi.tx.inputs()
                 for i in inputs:
                     prevout_str = i.prevout.to_str()
                     inp=[w,will[w],i]
@@ -288,6 +289,7 @@ class Will:
                         new_will[wid]['tx'].locktime = nws_locktime
 
     def search_anticipate_rec(will,old_inputs):
+        print("SEARC_ANTICIPATE_REC")
         redo = False
         to_delete = []
         to_append = {}
@@ -297,7 +299,7 @@ class Will:
             print(F"NID:{nid}")
             nwi = WillItem(nw)
             nwi.print()
-            if nwi.search_anticipate(old_inputs):
+            if nwi.search_anticipate(new_inputs) or nwi.search_anticipate(old_inputs):
                 if nid != nwi.tx.txid():
                     print(f"{nid} e' differente da:{nwi.tx.txid()}")
                     redo = True
@@ -541,7 +543,8 @@ class Will:
     def only_valid_or_replaced_list(will):
         out=[]
         for wid,w in will.items():
-            if w[BalPlugin.STATUS_VALID] or w[BalPlugin.STATUS_REPLACED]:
+            wi = WillItem(w)
+            if wi.valid or wi.replaced:
                 out.append(wid)
         return out
     def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,check_date):

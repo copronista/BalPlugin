@@ -196,7 +196,7 @@ class BalWindow():
         self.window = window
         self.heirs = {}
         self.will = {}
-        self.will_settings={} 
+        self.will_settings = None
         self.heirs_tab = self.create_heirs_tab()
         self.will_tab = self.create_will_tab()
         self.ok= False
@@ -237,8 +237,6 @@ class BalWindow():
             if not self.will_settings:
                 self.will_settings={'locktime':'1y','threshold':'180d','tx_fees':100}
             self.heir_list.update_will_settings()
-
-
         print("WALLET",dir(self.wallet.db.data))
         #self.will=json_db._convert_dict(json_db.path,"will",self.will[w])
 
@@ -250,7 +248,7 @@ class BalWindow():
 
         if self.will:
             Will.normalize_will(self.will,self.wallet)
-
+        
         self.will_list.will=self.will
         self.will_list.update_will(self.will)
         self.will_tab.update()
@@ -309,7 +307,7 @@ class BalWindow():
         grid.addWidget(HelpButton("if you choose Raw, you can insert various options based on suffix:\n " 
                                   +" - b: number of blocks after current block(ex: 144b means tomorrow)\n" 
                                   +" - d: number of days after current day(ex: 1d means tomorrow)\n"  
-                                  +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n" 
+                                   +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n" 
                                   +"when using d or y time will be set to 00:00 for privacy reasons\n" 
                                   +"when used without suffix it can be used to indicate:\n" 
                                   +" - exact block(if value is less than 500,000,000)\n"
@@ -408,7 +406,7 @@ class BalWindow():
         try:
 
             #print(willexecutors)
-            txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,None,from_date)
+            txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,from_date)
             creation_time = time()
             if txs:
                 for txid in txs:
@@ -482,11 +480,10 @@ class BalWindow():
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
             print("start building transactions")
-            locktime_time=Util.parse_locktime_string(self.will_settings['threshold'])
+            #locktime_time=self.bal_plugin.config_get(BalPlugin.LOCKTIME_TIME)
             locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
             #date_to_check = (datetime.datetime.now()+datetime.timedelta(days=locktime_time)).timestamp()
-            print("locktime_time:",locktime_time)
-            date_to_check=locktime_time
+            date_to_check = Util.parse_locktime_string(self.will_settings['threshold'])
             current_block = Util.get_current_height(self.wallet.network)
             block_to_check = current_block + locktime_blocks
             no_willexecutor = self.bal_plugin.config_get(BalPlugin.NO_WILLEXECUTOR)
@@ -495,14 +492,13 @@ class BalWindow():
             #        self.will[txid]['status']+=BalPlugin.STATUS_REPLACED
             #    else:
             #        willtodelete.append((None,txid))
-            utxos=self.window.wallet.get_utxos()
             willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=True,window=self.window) 
             #current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, utxos)
             #print("current_will is valid",current_will_is_valid,self.will)
-            for heir in self.heirs:
-                h=self.heirs[heir]
-                self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
             try:
+                for heir in self.heirs:
+                    h=self.heirs[heir]
+                    self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
                 Will.is_will_valid(self.will, block_to_check, date_to_check, self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),self_willexecutor=no_willexecutor,callback_not_valid_tx=self.delete_not_valid)
             except WillExpiredException as e:
                 tx = Will.invalidate_will(self.will,self.wallet,self.bal_plugin.config_get(BalPlugin.TX_FEES))
