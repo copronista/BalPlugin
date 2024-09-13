@@ -13,6 +13,7 @@ from .willexecutors import Willexecutors
 
 json_db.register_dict('heirs', tuple, None)
 json_db.register_dict('will', lambda x: get_will(x), None)
+json_db.register_dict('will_settings', lambda x:x, None)
 
 def get_will(x):
     try:

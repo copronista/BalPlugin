@@ -234,8 +234,11 @@ class BalWindow():
             self.will=self.wallet.db.get_dict("will")
         if not self.will_settings:
             self.will_settings=self.wallet.db.get_dict("will_settings")
+            print("will_settings:",self.will_settings)
             if not self.will_settings:
-                self.will_settings={'locktime':'1y','threshold':'180d','tx_fees':100}
+                self.will_settings['tx_fees']=100
+                self.will_settings['threshold']='180d'
+                self.will_settings['locktime']='1y'
             self.heir_list.update_will_settings()
         print("WALLET",dir(self.wallet.db.data))
         #self.will=json_db._convert_dict(json_db.path,"will",self.will[w])
