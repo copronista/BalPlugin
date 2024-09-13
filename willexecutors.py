@@ -10,7 +10,6 @@ from electrum.i18n import _
 
 
 
-
 class Willexecutors():
     def get_willexecutors(bal_plugin, update = False,window=False):
         willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
@@ -48,22 +47,31 @@ class Willexecutors():
         willexecutors ={}
         for wid in will:
             willitem = will[wid]
-            if 'willexecutor' in willitem:
-                willexecutor=willitem['willexecutor']
-                if  willexecutor and Willexecutors.is_selected(willexecutor):
-                    url=willexecutor['url']
-                    if not url in willexecutors:
-                        willexecutor['txs']=""
-                        willexecutors[url]=willexecutor
-                    willexecutors[url]['txs']+=str(willitem['tx'])+"\n"
+            if willitem['Valid']:
+                if willitem['Signed']:
+                    if not willitem['Pushed']:
+                        if 'willexecutor' in willitem:
+                            willexecutor=willitem['willexecutor']
+                            if  willexecutor and Willexecutors.is_selected(willexecutor):
+                                url=willexecutor['url']
+                                if not url in willexecutors:
+                                    willexecutor['txs']=""
+                                    willexecutor['txsids']=[]
+                                    willexecutors[url]=willexecutor
+                                willexecutors[url]['txs']+=str(willitem['tx'])+"\n"
+                                willexecutors[url]['txsids'].append(wid)
         #print(willexecutors)
         if not willexecutors:
             return
         for url in willexecutors:
             willexecutor = willexecutors[url]
             if Willexecutors.is_selected(willexecutor):
-                Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url)
-
+                if 'txs' in willexecutor:
+                    if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
+                        for wid in willexecutors[url]['txsids']:
+                            will[wid]['Pushed']=True
+                            will[wid]['status']+='Pushed'
+                    del willexecutor['txs']
 
     def push_transactions_to_willexecutor(strtxs,url):
         print(url,strtxs)
@@ -74,6 +82,9 @@ class Willexecutors():
                 response_data = response.read().decode('utf-8')
                 if response.status != 200:
                     print(f"error{response.status} pushing txs to: {url}")
+                else:
+                    return True
+                
         except Exception as e:
             print(f"error contacting {url} for pushing txs",e)
 

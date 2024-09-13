@@ -35,7 +35,8 @@ class Util:
             return int(locktime) 
      
         except Exception as e: 
-            print("parse_locktime_string",e) 
+            pass
+            #print("parse_locktime_string",e) 
         try: 
             now = datetime.now() 
             if locktime[-1] == 'y': 
@@ -90,7 +91,7 @@ class Util:
             return False
 
     def cmp_heir(heira,heirb):
-        if heira[0] == heirb[0] and heira[3] == heirb[3]: 
+        if heira[0] == heirb[0] and heira[1] == heirb[1]: 
             return True
         return False
 
@@ -104,18 +105,53 @@ class Util:
             return False
         return False
 
-    def cmp_heirs(heirsa,heirsb):
+    def search_heir_by_values(heirs,heir,values):
+        print()
+        for h,v in heirs.items():
+            found = False
+            for val in values:
+                if val in v and v[val] != heir[val]:
+                    found = True
+
+            if not found:
+                return h
+        return False
+
+    def cmp_heir_by_values(heira,heirb,values):
+        for v in values:
+            if heira[v] != heirb[v]:
+                print(f"v: {heira[v]}!={heirb[v]}")
+                return False
+        return True
+
+    def cmp_heirs_by_values(heirsa,heirsb,values,exclude_willexecutors=False,reverse = True):
+        for heira in heirsa:
+            if (exclude_willexecutors and not "w!ll3x3c\"" in heira) or not exclude_willexecutors:
+                found = False
+                for heirb in heirsb:
+                    if Util.cmp_heir_by_values(heirsa[heira],heirsb[heirb],values):
+                        found=True
+                if not found:
+                    print(f"not_found {heira}--{heirsa[heira]}")
+                    return False
+        if reverse:
+            return Util.cmp_heirs_by_values(heirsb,heirsa,values,exclude_willexecutors=exclude_willexecutors,reverse=False)
+        else:
+            return True
+        
+    def cmp_heirs(heirsa,heirsb,cmp_function = lambda x,y: x[0]==y[0] and x[3]==y[3],reverse=True):
         try:
             for heir in heirsa:
                 if not "w!ll3x3c\"" in heir:
-                    if not Util.cmp_heir(heirsa[heir],heirsb[heir]):
-                        return False
-            for heir in heirsb:
-                if not "w!ll3x3c\"" in heir:
-                    if not Util.cmp_heir(heirsa[heir],heirsb[heir]):
-                        return False
-            return True
-        except:
+                    if not heir in heirsb or not cmp_function(heirsa[heir],heirsb[heir]):
+                        if not Util.search_heir_by_values(heirsb,heirsa[heir],[0,3]):
+                            return False
+            if reverse:
+                return Util.cmp_heirs(heirsb,heirsa,cmp_function,False)
+            else:
+                return True
+        except Exception as e:
+            raise e
             return False
 
     def cmp_inputs(inputsa,inputsb):
@@ -126,12 +162,13 @@ class Util:
                 return False
         return True
 
-    def cmp_outputs(outputsa,outputsb):
+    def cmp_outputs(outputsa,outputsb,willexecutor_output = None):
         if len(outputsa) != len(outputsb): 
             return False 
         for outputa in outputsa: 
-            if not Util.in_output(outputa,outputsb): 
-                return False
+            if not Util.cmp_output(outputa,willexecutor_output):
+                if not Util.in_output(outputa,outputsb): 
+                    return False
         return True
 
     def cmp_txs(txa,txb):
@@ -196,6 +233,20 @@ class Util:
             out = 1 
         return out
 
+    def cmp_locktime(locktimea,locktimeb):
+        if locktimea==locktimeb:
+            return 0
+        strlocktime = str(locktimea)
+        strlocktimeb = str(locktimeb)
+        intlocktimea = Util.str_to_locktime(strlocktimea)
+        intlocktimeb = Util.str_to_locktime(strlocktimeb)
+        if locktimea[-1] in "ydb":
+            if locktimeb[-1] == locktimea[-1]:
+                return int(strlocktimea[-1])-int(strlocktimeb[-1])
+            else:
+                return int(locktimea)-(locktimeb)
+        
+
     def get_lowest_valid_tx(available_utxos,will):
         will = sorted(will.items(),key = lambda x: x[1]['tx'].locktime)
         for txid,willitem in will.items():
@@ -238,23 +289,17 @@ class Util:
             utxos+=willitem['tx'].inputs()
             
         return utxos
+
     def utxo_to_str(utxo):
         try: return utxo.to_str()
-        except Exception as e: print(e)
+        except Exception as e: pass
         try: return utxo.prevout.to_str()
-        except Exception as e: 
-            print(e)
-            try:
-                Util.print_var(utxo)
-                Util.print_var(utxo.prevout,"UTXO")
-            except Exception as ex:
-                print(ex)
+        except Exception as e: pass
         return str(utxo)
+
     def cmp_utxo(utxoa,utxob):
         utxoa=Util.utxo_to_str(utxoa)
         utxob=Util.utxo_to_str(utxob)
-        print(f"utxoa: {utxoa}")
-        print(f"utxob: {utxob}")
         if utxoa == utxob:
         #if utxoa.prevout.txid==utxob.prevout.txid and utxoa.prevout.out_idx == utxob.prevout.out_idx:
             return True
@@ -272,11 +317,16 @@ class Util:
             if s_u.prevout.txid == txid:
                 return True
         return False
+
+    def cmp_output(outputa,outputb):
+        return outputa.address == outputb.address and outputa.value == outputb.value
+
     def in_output(output,outputs):
         for s_o in outputs:
-            if s_o.address == output.address and s_o.value == output.value:
+            if Util.cmp_output(s_o,output):
                 return True
         return False
+
     #check all output with the same amount if none have the same address it can be a change
     #return true true same address same amount 
     #return true false same amount different address

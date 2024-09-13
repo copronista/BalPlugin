@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtCore import Qt, QPersistentModelIndex, QModelIndex
-from PyQt5.QtWidgets import (QAbstractItemView, QMenu)
+from PyQt5.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox)
 
 from electrum.i18n import _
 from electrum.bitcoin import is_address
@@ -39,6 +39,7 @@ from electrum.gui.qt.util import webopen, MessageBoxMixin
 from electrum.gui.qt.my_treeview import MyTreeView
 from datetime import datetime
 from ..util import Util
+from .locktimeedit import HeirsLockTimeEdit
 if TYPE_CHECKING:
     from electrum.gui.qt.main_window import ElectrumWindow
 
@@ -49,13 +50,13 @@ class HeirList(MyTreeView,MessageBoxMixin):
         NAME = enum.auto()
         ADDRESS = enum.auto()
         AMOUNT = enum.auto()
-        LOCKTIME = enum.auto()
+        #LOCKTIME = enum.auto()
 
     headers = {
         Columns.NAME: _('Name'),
         Columns.ADDRESS: _('Address'),
         Columns.AMOUNT: _('Amount'),
-        Columns.LOCKTIME:_('LockTime'),
+        #Columns.LOCKTIME:_('LockTime'),
     }
     filter_columns = [Columns.NAME, Columns.ADDRESS]
 
@@ -67,7 +68,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
             parent=bal_window.window,
             main_window=bal_window.window,
             stretch_column=self.Columns.NAME,
-            editable_columns=[self.Columns.NAME,self.Columns.ADDRESS,self.Columns.AMOUNT,self.Columns.LOCKTIME],
+            editable_columns=[self.Columns.NAME,self.Columns.ADDRESS,self.Columns.AMOUNT],
         )
         self.decimal_point = bal_window.bal_plugin.config.get_decimal_point()
         self.bal_window = bal_window
@@ -88,19 +89,17 @@ class HeirList(MyTreeView,MessageBoxMixin):
         if not prior_name:
             return
         col = idx.column()
-        print("column",col,self.Columns.LOCKTIME)
+        #print("column",col,self.Columns.LOCKTIME)
         try:
-            if col == 3:
-                try:
-                    text = Util.str_to_locktime(text)
-                except:
-                    print("not a valid locktime")
-                    pass
+            #if col == 3:
+            #    try:
+            #        text = Util.str_to_locktime(text)
+            #    except:
+            #        print("not a valid locktime")
+            #        pass
             if col == 2:
                 text = Util.encode_amount(text,self.decimal_point)
-            else:
-                print("porco dio di colonna",col)
-            if col == 0:
+            elif col == 0:
                 self.bal_window.delete_heirs([edit_key])
                 edit_key = text
             prior_name[col-1] = text
@@ -165,17 +164,17 @@ class HeirList(MyTreeView,MessageBoxMixin):
             labels[self.Columns.NAME] = key
             labels[self.Columns.ADDRESS] = heir[0]
             labels[self.Columns.AMOUNT] = Util.decode_amount(heir[1],self.decimal_point)
-            labels[self.Columns.LOCKTIME] =  str(Util.locktime_to_str(heir[2]))
+            #labels[self.Columns.LOCKTIME] =  str(Util.locktime_to_str(heir[2]))
 
             items = [QStandardItem(x) for x in labels]
             items[self.Columns.NAME].setEditable(True)
             items[self.Columns.ADDRESS].setEditable(True)
             items[self.Columns.AMOUNT].setEditable(True)
-            items[self.Columns.LOCKTIME].setEditable(True)
+            #items[self.Columns.LOCKTIME].setEditable(True)
             items[self.Columns.NAME].setData(key, self.ROLE_HEIR_KEY+1)
             items[self.Columns.ADDRESS].setData(key, self.ROLE_HEIR_KEY+2)
             items[self.Columns.AMOUNT].setData(key, self.ROLE_HEIR_KEY+3)
-            items[self.Columns.LOCKTIME].setData(key, self.ROLE_HEIR_KEY+4)
+            #items[self.Columns.LOCKTIME].setData(key, self.ROLE_HEIR_KEY+4)
             row_count = self.model().rowCount()
             self.model().insertRow(row_count, items)
             if key == current_key:
@@ -202,8 +201,44 @@ class HeirList(MyTreeView,MessageBoxMixin):
         menu.addAction(_("&New Heir"), self.bal_window.new_heir_dialog)
         menu.addAction(_("Import"), self.bal_window.import_heirs)
         menu.addAction(_("Export"), lambda: self.bal_window.export_heirs())
-        #menu.addAction(_("Build Transactions"), self.build_transactions)
+        #menu.addAction(_("Build Traonsactions"), self.build_transactions)
+
+        self.heir_locktime = HeirsLockTimeEdit(self.bal_window.window,0)
+        def on_heir_locktime(value):
+            self.bal_window.will_settings['locktime'] = self.heir_locktime.value()
+        self.heir_locktime.on_change = on_heir_locktime
+
+        self.heir_threshold = HeirsLockTimeEdit(self.bal_window.window,0)
+        def on_heir_threshold(value):
+            self.bal_window.will_settings['threshold'] = self.heir_threshold.get_locktime()
+        self.heir_threshold.on_change=on_heir_threshold
+
+        self.heir_tx_fees = QSpinBox()
+        self.heir_tx_fees.setMinimum(1)
+        self.heir_tx_fees.setMaximum(10000)
+        def on_heir_tx_fees():
+            self.bal_window.will_settings['tx_fees'] = self.heir_tx_fees.value()
+        self.heir_tx_fees.valueChanged.connect(on_heir_tx_fees)
+
+
+        self.heirs_widget = QWidget()
+        layout = QHBoxLayout()
+        self.heirs_widget.setLayout(layout)
+        
+        layout.addWidget(QLabel(_("locktime")))
+        layout.addWidget(self.heir_locktime)
+        layout.addWidget(QLabel(_("alive threshold")))
+        layout.addWidget(self.heir_threshold)
+        layout.addWidget(QLabel(_("TxFees")))
+        layout.addWidget(self.heir_tx_fees)
+        toolbar.insertWidget(2, self.heirs_widget)
+
         return toolbar
+    def update_will_settings(self):
+        self.heir_threshold.set_locktime(self.bal_window.will_settings['threshold'])
+        self.heir_locktime.set_locktime(self.bal_window.will_settings['locktime'])
+        self.heir_tx_fees.setValue(int(self.bal_window.will_settings['tx_fees']))
+
     def build_transactions(self):
         will = self.bal_window.prepare_will()
 

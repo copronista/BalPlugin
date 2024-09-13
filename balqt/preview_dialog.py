@@ -186,8 +186,13 @@ class PreviewList(MyTreeView):
 
 
         set_current = None
-
         for txid,bal_tx in self.will.items():
+            if self.bal_window.bal_plugin._hide_replaced and bal_tx[BalPlugin.STATUS_REPLACED]:
+                continue
+            if self.bal_window.bal_plugin._hide_invalidated and bal_tx[BalPlugin.STATUS_INVALIDATED]:
+                continue
+
+
             #self.ping_server(url)
             tx=bal_tx['tx']
             labels = [""] * len(self.Columns)
@@ -231,6 +236,8 @@ class PreviewList(MyTreeView):
     def create_toolbar(self, config): 
         toolbar, menu = self.create_toolbar_with_menu('') 
         menu.addAction(_("Prepare Will"), self.build_transactions) 
+        menu.addAction(_(f"Un/Hide Replaced"), self.hide_replaced) 
+        menu.addAction(_(f"un/Hide Invalidated"), self.hide_invalidated) 
         menu.addAction(_("Display Will"), self.bal_window.preview_modal_dialog) 
         menu.addAction(_("Sign Will"), self.ask_password_and_sign_transactions)
         menu.addAction(_("Export Will"), self.export_will)
@@ -239,6 +246,14 @@ class PreviewList(MyTreeView):
         menu.addAction(_("Broadcast"), self.broadcast)
         menu.addAction(_("Invalidate Will"), self.invalidate_will)
         return toolbar
+
+    def hide_replaced(self):
+        self.bal_window.bal_plugin.hide_replaced()
+        self.update()
+    def hide_invalidated(self):
+        self.bal_window.bal_plugin.hide_invalidated()
+        self.update()
+
 
     def build_transactions(self):
         will = self.bal_window.prepare_will()
@@ -367,6 +382,7 @@ class PreviewList(MyTreeView):
 
     def broadcast(self):
         Willexecutors.push_transactions_to_willexecutors(self.will)
+        self.update()
 
 
     def invalidate_will(self):
@@ -434,7 +450,7 @@ class PreviewDialog(WindowModalDialog,MessageBoxMixin):
         vbox.addLayout(buttonbox)
 
         self.update()
-
+    
 
     def update_will(self,will):
         self.will.update(will)

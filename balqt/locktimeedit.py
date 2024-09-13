@@ -21,7 +21,7 @@ class HeirsLockTimeEdit(QWidget):
 
     valueEdited = pyqtSignal()
 
-    def __init__(self, parent=None,default_index = 1):
+    def __init__(self, parent=None,default_index = 1,on_change = None):
         QWidget.__init__(self, parent)
 
         hbox = QHBoxLayout()
@@ -29,9 +29,9 @@ class HeirsLockTimeEdit(QWidget):
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(0)
 
-        self.locktime_raw_e = LockTimeRawEdit(self)
+        self.locktime_raw_e = LockTimeRawEdit(self,on_change=on_change)
         #self.locktime_height_e = LockTimeHeightEdit(self)
-        self.locktime_date_e = LockTimeDateEdit(self)
+        self.locktime_date_e = LockTimeDateEdit(self,on_change=on_change)
         #self.editors = [self.locktime_raw_e, self.locktime_height_e, self.locktime_date_e]
         self.editors = [self.locktime_raw_e, self.locktime_date_e]
 
@@ -102,13 +102,14 @@ class _LockTimeEditor:
 
 class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None,on_change=None):
         QLineEdit.__init__(self, parent)
         self.setFixedWidth(14 * char_width_in_lineedit())
         self.textChanged.connect(self.numbify)
         self.isdays = False
         self.isyears = False
         self.isblocks = False
+        self.on_change=on_change
 
     def replace_str(self,text):
         return str(text).replace('d','').replace('y','').replace('b','')
@@ -154,6 +155,8 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
         # if updates were because of user modification.
         self.setModified(self.hasFocus())
         self.setCursorPosition(pos)
+        if self.on_change:
+            self.on_change(s)
 
     def get_locktime(self) -> Optional[str]:
         try:
@@ -163,11 +166,11 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
 
     def set_locktime(self, x: Any) -> None:
         out = str(x)
-        if self.isdays: 
+        if 'd' in out:
             out = self.replace_str(x)+'d'
-        elif self.isyears:
+        elif 'y' in out:
             out = self.replace_str(x)+'y'
-        elif self.isblocks:
+        elif 'b' in out:
             out = self.replace_str(x)+'b'
         else:
             try:
@@ -177,15 +180,17 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
                 return
             out = max(out, self.min_allowed_value)
             out = min(out, self.max_allowed_value)
+        print("set locktime:",str(out))
         self.setText(str(out))
 
 
 class LockTimeHeightEdit(LockTimeRawEdit):
     max_allowed_value = NLOCKTIME_BLOCKHEIGHT_MAX
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None,on_change=None):
         LockTimeRawEdit.__init__(self, parent)
         self.setFixedWidth(20 * char_width_in_lineedit())
+        self.on_change = on_change
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -214,11 +219,12 @@ class LockTimeDateEdit(QDateTimeEdit, _LockTimeEditor):
     min_allowed_value = NLOCKTIME_BLOCKHEIGHT_MAX + 1
     max_allowed_value = get_max_allowed_timestamp()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None,on_change=None):
         QDateTimeEdit.__init__(self, parent)
         self.setMinimumDateTime(datetime.fromtimestamp(self.min_allowed_value))
         self.setMaximumDateTime(datetime.fromtimestamp(self.max_allowed_value))
         self.setDateTime(QDateTime.currentDateTime())
+        self.on_change = on_change
 
     def get_locktime(self) -> Optional[int]:
         dt = self.dateTime().toPyDateTime()
@@ -236,3 +242,5 @@ class LockTimeDateEdit(QDateTimeEdit, _LockTimeEditor):
             return
         dt = datetime.fromtimestamp(x)
         self.setDateTime(dt)
+        if self.on_change:
+            self.on_change(x)
