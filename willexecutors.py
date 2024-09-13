@@ -24,12 +24,17 @@ class Willexecutors():
                 print("replace bal")
                 willexecutors[bal_url]=bal_executor
         if update:
-            if bal_plugin.config_get(bal_plugin.PING_WILLEXECUTORS):
-                ping_willexecutors = True
-                if bal_plugin.config_get(bal_plugin.ASK_PING_WILLEXECUTORS):
-                    ping_willexecutors = window.question(_("Contact willexecutors servers to update payment informations?"))
-                if ping_willexecutors:
-                    Willexecutors.ping_servers(willexecutors)
+            found = False
+            for url,we in willexecutors.items():
+                if Willexecutors.is_selected(we):
+                    found = True
+            if found:
+                if bal_plugin.config_get(bal_plugin.PING_WILLEXECUTORS):
+                    ping_willexecutors = True
+                    if bal_plugin.config_get(bal_plugin.ASK_PING_WILLEXECUTORS):
+                        ping_willexecutors = window.question(_("Contact willexecutors servers to update payment informations?"))
+                    if ping_willexecutors:
+                        Willexecutors.ping_servers(willexecutors)
 
         return willexecutors
 
