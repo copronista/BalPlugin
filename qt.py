@@ -608,7 +608,7 @@ class BalWindow():
                 
                 willpushbutton = QPushButton(w)
             
-                willpushbutton.clicked.connect(partial(self.show_transaction,txid=w, parent = parent))
+                willpushbutton.clicked.connect(partial(self.show_transaction,txid=w))
                 detaillayout.addWidget(willpushbutton)
                 locktime = Util.locktime_to_str(self.will[w]['tx'].locktime)
                 detaillayout.addWidget(QLabel(_(f"<b>Locktime:</b>\t{locktime}")))
@@ -640,7 +640,7 @@ class BalWindow():
     def preview_modal_dialog(self):
         Will.add_willtree(self.will)
         print(self.will)
-        d = QDialog(parent = None)
+        d = QDialog(parent = self.window)
         d.config = self.window.config
         d.wallet = self.wallet
         d.format_amount = self.window.format_amount

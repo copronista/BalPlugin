@@ -421,26 +421,29 @@ class Will:
     def invalidate_will(will,wallet,fees_per_byte):
         will_only_valid = Will.only_valid_list(will)
         inputs = Will.get_all_inputs(will_only_valid)
-        inputs = sort(inputs,key=lambda x:x[1][2].value,reverse=True)
+        #inputs = sorted(inputs,key=lambda x:x[1][2].value,reverse=True)
         utxos = wallet.get_utxos()
         filtered_inputs = []
         prevout_to_spend = []
         for prevout_str,ws in inputs.items(): 
             for w in ws:
+                print("wid = ",w[0])
                 if not w[0] in filtered_inputs: 
-                    filtered_inputs.appent(w[0])
-                    if not prevout_str in utxo_to_spend:
+                    filtered_inputs.append(w[0])
+                    if not prevout_str in prevout_to_spend:
                         prevout_to_spend.append(prevout_str)
                     break
+        print("prevout to spends")
+        print(prevout_to_spend)
         balance = 0
-
+        utxo_to_spend = []
         for utxo in utxos:
             utxo_str=utxo.prevout.to_str()
-            if utxo_str in inputs:
-                filtered_inputs.append(inputs[utxo_str])
-                Util.print_var(inputs[utxo_str],"INPUT")
-                balance += inputs[utxo_str].value_sats()
+            if utxo_str in prevout_to_spend:
+                #Util.print_var(inputs[utxo_str],"INPUT")
+                balance += inputs[utxo_str][0][2].value_sats()
                 utxo_to_spend.append(utxo)
+
         if len(utxo_to_spend) > 0: 
             change_addresses = wallet.get_change_addresses_for_new_transaction()
             out = PartialTxOutput.from_address_and_value(change_addresses[0], balance)
@@ -451,7 +454,7 @@ class Will:
             fee=tx.estimated_size()*fees_per_byte
             if balance -fee >0:
                 out = PartialTxOutput.from_address_and_value(change_addresses[0],balance - fee)
-                tx = PartialTransaction.from_io(utxos,[out], locktime=locktime, version=2)
+                tx = PartialTransaction.from_io(utxo_to_spend,[out], locktime=locktime, version=2)
                 tx.set_rbf(True)
 
                 Util.print_var(tx)
