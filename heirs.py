@@ -85,14 +85,22 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         out_amount = fee
         description = ""
         print("out_amount_start",out_amount,fee)
+        outputs = []
+        paid_heirs = {}
         for name,heir in heirs.items():
 
             try:
-                out_amount += math.floor(heir[HEIR_REAL_AMOUNT])
-                print("out_amount",heir,out_amount)
-                description += f"{name}\n"
+                if len(heir)>HEIR_REAL_AMOUNT:
+                    real_amount = heir[HEIR_REAL_AMOUNT]
+                    out_amount += real_amount
+                    print("out_amount",heir,real_amount,out_amount)
+                    description += f"{name}\n"
+                    paid_heirs[name]=heir
+                    outputs.append(PartialTxOutput.from_address_and_value(heir[HEIR_ADDRESS], real_amount))
+                else:
+                    print(f"{name} real amount not present so not including")
             except Exception as e:
-                print("ERROR, PREPARE TRANSACTIONS",e)
+                print("ERROR, PREPARE TRANSACTIONS",e,name,heir)
                 pass
 
         in_amount = 0.0
@@ -111,28 +119,6 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         if int(in_amount) < int(out_amount):
             print(f"in_amount{in_amount}<out_amount{out_amount}")
             break
-            #for heir in heirs:
-            #    heir[3] = int(in_amount/out_amount*float(heir[3]))
-            #raise Exception(f"error building heirs transactions in_amount < out_amount ({in_amount}<{out_amount}) not enought funds")
-            ####TODO: costruire le transazioni
-        outputs = []
-        for name,heir in heirs.items():
-
-            try:
-                outputs.append(PartialTxOutput.from_address_and_value(heir[HEIR_ADDRESS], math.floor(heir[HEIR_REAL_AMOUNT])))
-
-            except Exception as e:
-                e.heir=heir
-                e.heirname=name
-                print("impossible to append output abort")
-                raise e
-
-        
-        #tx = wallet.make_unsigned_transaction(
-        #    coins=used_utxos,
-        #    outputs=outputs,
-        #    fee=1000,
-        #    is_sweep=False)
         heirsvalue=out_amount
         
 
@@ -155,7 +141,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         if txid is None:
             raise Exception("txid is none",tx)
         
-        tx.heirs = heirs
+        tx.heirs = paid_heirs
         tx.my_locktime = locktime
         txsout[txid]=tx
          
@@ -318,16 +304,20 @@ class Heirs(dict, Logger):
     def check_locktime(self):
         return False
 
-    def normalize_perc(self, heir_list, total_balance, relative_balance,wallet):
+    def normalize_perc(self, heir_list, total_balance, relative_balance,wallet,real=False):
         amount = 0
-        for key,value in heir_list.items():
+        for key,v in heir_list.items():
             try:
-                value = math.floor(total_balance/relative_balance*self.amount_to_float(value[HEIR_AMOUNT]))
+                column = HEIR_AMOUNT
+                if  real: column = HEIR_REAL_AMOUNT
+                value = int(math.floor(total_balance/relative_balance*self.amount_to_float(v[column])))
+                print(f"{total_balance}/{relative_balance}*{self.amount_to_float(v[HEIR_AMOUNT])} = {value}")
                 if value > wallet.dust_threshold():
                     heir_list[key].insert(HEIR_REAL_AMOUNT, value)
                     amount += value
 
             except Exception as e:
+                raise e
                 print("error getting heirs",e,key,heir_list[key],total_balance,relative_balance)
         return amount
 
@@ -386,10 +376,10 @@ class Heirs(dict, Logger):
                     percent_amount += float(self[key][HEIR_AMOUNT][:-1])
                     percent_heirs[key] =list(self[key])
                 else:
-                    print("is fixed")
-                    heir_amount = int(float(self[key][HEIR_AMOUNT]))
+                    print("is fixed",float(self[key][HEIR_AMOUNT]))
+                    heir_amount = int(math.floor(float(self[key][HEIR_AMOUNT])))
                     if heir_amount>wallet.dust_threshold():
-                        print("good")
+                        print("good",fixed_amount,heir_amount)
                         fixed_amount += heir_amount
                         print("fixed_amount:", fixed_amount)
                         fixed_heirs[key] = list(self[key])
@@ -420,7 +410,7 @@ class Heirs(dict, Logger):
         if newbalance > 0:
             print("percentage amount not enought to fill all utxos, retrying with fixed heirs:",newbalance)
             newbalance += fixed_amount
-            fixed_amount = self.normalize_perc(fixed_heirs,newbalance,fixed_amount,wallet)
+            fixed_amount = self.normalize_perc(fixed_heirs,newbalance,fixed_amount,wallet,real=True)
             newbalance -= fixed_amount
             print(fixed_heirs)
             heir_list.update(fixed_heirs)

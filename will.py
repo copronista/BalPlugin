@@ -419,11 +419,21 @@ class Will:
         return out
 
     def invalidate_will(will,wallet,fees_per_byte):
-        inputs = Will.get_higher_input_for_tx(will)
-        filtered_inputs = []
-        balance = 0
+        will_only_valid = Will.only_valid_list(will)
+        inputs = Will.get_all_inputs(will_only_valid)
+        inputs = sort(inputs,key=lambda x:x[1][2].value,reverse=True)
         utxos = wallet.get_utxos()
-        utxo_to_spend = []
+        filtered_inputs = []
+        prevout_to_spend = []
+        for prevout_str,ws in inputs.items(): 
+            for w in ws:
+                if not w[0] in filtered_inputs: 
+                    filtered_inputs.appent(w[0])
+                    if not prevout_str in utxo_to_spend:
+                        prevout_to_spend.append(prevout_str)
+                    break
+        balance = 0
+
         for utxo in utxos:
             utxo_str=utxo.prevout.to_str()
             if utxo_str in inputs:
@@ -502,7 +512,7 @@ class Will:
         Will.search_rai(all_inputs,all_utxos,will,callback_not_valid_tx= callback_not_valid_tx)
         if heirs and willexecutors:
             if not Will.check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
-                raise NotCompleteWillException()
+                raise NotCompleteWillException("not complete")
         #check that all utxo in wallet ar e spent
         for prevout_str, wid in all_inputs_min_locktime.items():
             for w in wid: 
@@ -534,10 +544,10 @@ class Will:
         return True
     
     def only_valid_list(will):
-        out=[]
+        out={}
         for wid,w in will.items():
             if w[BalPlugin.STATUS_VALID]:
-                out.append(wid)
+                out[wid]=w
         return out
 
     def only_valid_or_replaced_list(will):
@@ -547,6 +557,7 @@ class Will:
             if wi.valid or wi.replaced:
                 out.append(wid)
         return out
+
     def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,check_date,tx_fees):
         print("check willexecutors heirs")
         no_willexecutor = 0
@@ -558,7 +569,7 @@ class Will:
                 print("TXFEESSSSSSSSS",w.get('tx_fees',0))
                 wi=WillItem(will[wid])
                 wi.print()
-                raise TxFeesChangedException()
+                raise TxFeesChangedException(f"{tx_fees}:",w.get('tx_fees',0))
             for wheir in w['heirs']:
                 if not 'w!ll3x3c"' == wheir[:9]:
                     their = will[wid]['heirs'][wheir]
@@ -581,18 +592,18 @@ class Will:
         for h in heirs:
             if Util.parse_locktime_string(heirs[h][2])>=check_date:
                 if not h in heirs_found:
-                    print(f"heir: {h} not fount")
-                    raise HeirNotFoundException()
+                    print(f"heir: {h} not found")
+                    raise HeirNotFoundException(h)
         if self_willexecutor and no_willexecutor > 0:
             for url,we in willexecutors.items():
                 if Willexecutors.is_selected(we):
                     if not url in willexecutors_found:
                         print(f"willexecutor: {url} not fount")
-                        raise WillexecutorNotPresent()
+                        raise WillexecutorNotPresent(url)
         elif self_willexecutor and no_willexecutor==0:
             print("no willexecutor selected but not present")
             print(self_willexecutor,no_willexecutor)
-            raise NoWillexecutorNotPresent()
+            raise NoWillexecutorNotPresent("Backup tx")
         print("will is coherent with heirs and willexecutors")
         return True
     

@@ -39,7 +39,7 @@ from electrum.gui.qt.transaction_dialog import show_transaction
 from .bal import BalPlugin
 from .heirs import Heirs
 from .util import Util
-from .will import Will, WillExpiredException,NotCompleteWillException,WillItem,HeirChangeException,WillexecutorChangeException,WillexecutorNotPresent,TxFeesChangedException
+from .will import Will, WillExpiredException,NotCompleteWillException,WillItem,HeirChangeException,WillexecutorChangeException,WillexecutorNotPresent,TxFeesChangedException,HeirNotFoundException
 
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
@@ -343,6 +343,9 @@ class BalWindow():
                 f.write('\n')
  
     def set_heir(self,heir):
+        heir=list(heir)
+        heir[3]=self.will_settings['locktime']
+
         h=Heirs.validate_heir(heir[0],heir[1:])
         print("print_h",h)
         self.heirs[heir[0]]=h
@@ -411,6 +414,7 @@ class BalWindow():
 
             #print(willexecutors)
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,from_date)
+            print(txs)
             creation_time = time()
             if txs:
                 for txid in txs:
@@ -514,17 +518,19 @@ class BalWindow():
                 return
 
             except NotCompleteWillException as e:
-                print(e)
-                """
+                print(type(e),":",e)
+                message = ""
                 if isinstance(e,HeirChangeException):
-                    self.window.show_message(_(f"Heirs changed"))
+                    message ="heirs changed:"
                 elif isinstance(e,WillexecutorNotPresent):
-                    self.window.show_message(_(f"new willexecutor have been selected"))
+                    message = "Willexecutor not present:"
                 elif isinstance(e,WillexecutorChangeException):
-                    self.window.show_message(_("some willexecutor have changes his settings"))
+                    message = "Willexecutor changed"
                 elif isinstance(e,TxFeesChangedException):
-                    self.window.show_message(_("tx fees are changed"))
-                """
+                    message = "txfees are changed"
+                elif isinstance(e,HeirNotFoundException):
+                    message = "heir not found"
+                self.window.show_message(f"{_(message)}: {e}")
                 self.build_will(date_to_check,willexecutors,ignore_duplicate,keep_original)
                 try:
                     Will.is_will_valid(self.will, block_to_check, date_to_check, self.will_settings['tx_fees'], self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=Willexecutors.get_willexecutors(self.bal_plugin),self_willexecutor=no_willexecutor,callback_not_valid_tx=self.delete_not_valid)

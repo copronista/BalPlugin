@@ -50,7 +50,6 @@ class HeirList(MyTreeView,MessageBoxMixin):
         NAME = enum.auto()
         ADDRESS = enum.auto()
         AMOUNT = enum.auto()
-        #LOCKTIME = enum.auto()
 
     headers = {
         Columns.NAME: _('Name'),
@@ -119,8 +118,8 @@ class HeirList(MyTreeView,MessageBoxMixin):
             try:
                 print("setup_original",(edit_key,)+original)
                 self.bal_window.set_heir((edit_key,)+original)
-            except:
-                print("errore nellimpostare original",original)
+            except Exception as e:
+                print("errore nellimpostare original",e,original)
                 self.update()
 
     def create_menu(self, position):
