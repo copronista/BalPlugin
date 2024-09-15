@@ -35,7 +35,7 @@ from electrum.bitcoin import is_address
 from electrum.util import block_explorer_URL
 from electrum.plugin import run_hook
 
-from electrum.gui.qt.util import webopen, MessageBoxMixin
+from electrum.gui.qt.util import webopen, MessageBoxMixin,HelpButton
 from electrum.gui.qt.my_treeview import MyTreeView
 from datetime import datetime
 from ..util import Util
@@ -224,12 +224,28 @@ class HeirList(MyTreeView,MessageBoxMixin):
         layout = QHBoxLayout()
         self.heirs_widget.setLayout(layout)
         
-        layout.addWidget(QLabel(_("locktime")))
+        layout.addWidget(QLabel(_("Locktime:")))
         layout.addWidget(self.heir_locktime)
-        layout.addWidget(QLabel(_("alive threshold")))
+        layout.addWidget(HelpButton("Locktime to be used in the transaction\n"
+                                    +"if you choose Raw, you can insert various options based on suffix:\n"
+                                    #+" - b: number of blocks after current block(ex: 144b means tomorrow)\n"
+                                    +" - d: number of days after current day(ex: 1d means tomorrow)\n"
+                                    +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n"))
+
+        layout.addWidget(QLabel(" "))
+        layout.addWidget(QLabel(_("Threshold:")))
         layout.addWidget(self.heir_threshold)
-        layout.addWidget(QLabel(_("TxFees")))
+        layout.addWidget(HelpButton("Threshold to ask for invalidation\n"
+                                    +"When less then this time is missing, ask to invalidate\n"
+                                    +"if you choose Raw, you can insert various options based on suffix:\n"
+                                    #+" - b: number of blocks after current block(ex: 144b means tomorrow)\n"
+                                    +" - d: number of days after current day(ex: 1d means tomorrow)\n"
+                                    +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n"))
+        layout.addWidget(QLabel(" "))
+        layout.addWidget(QLabel(_("Fees:")))
         layout.addWidget(self.heir_tx_fees)
+        layout.addWidget(HelpButton("Fee to be used in the transaction"))
+        layout.addWidget(QLabel(" "))
         toolbar.insertWidget(2, self.heirs_widget)
 
         return toolbar

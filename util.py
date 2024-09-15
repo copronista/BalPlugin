@@ -5,6 +5,8 @@ from electrum.i18n import _
 from electrum.transaction import PartialTxOutput
 import urllib.request
 import urllib.parse
+from electrum.util import write_json_file,FileImportFailed,FileExportFailed
+
 class Util:
     LOCKTIME_THRESHOLD = 500000000
     def locktime_to_str(locktime):
@@ -430,7 +432,7 @@ class Util:
         filename = getSaveFileName(
             parent=electrum_window,
             title=_("Select file to save your {}").format(title),
-            filename='electrum_{}'.format(title),
+            filename='BALplugin_{}'.format(title),
             filter=filter_,
             config=electrum_window.config,
         )

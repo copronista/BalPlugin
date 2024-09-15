@@ -75,7 +75,7 @@ class Willexecutors():
                     if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
                         for wid in willexecutors[url]['txsids']:
                             will[wid]['Pushed']=True
-                            will[wid]['status']+='Pushed'
+                            will[wid]['status']+='.Pushed'
                     del willexecutor['txs']
 
     def push_transactions_to_willexecutor(strtxs,url):

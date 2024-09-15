@@ -80,6 +80,10 @@ class Will:
                 txin._TxInput__address=change.address
                 txin._TxInput__scriptpubkey = change.scriptpubkey
                 txin._TxInput__value_sats = change.value
+                txin._trusted_value_sats = change.value
+                print(txin.to_json())
+
+                
 
     def normalize_will(will,wallet = None,others_inputs = {}):
         to_delete = []
@@ -721,14 +725,14 @@ class WillItem:
     def set_status_anticipated(self):
         print("actually anticipated")
         if not self.anticipated:
-            self.status +=BalPlugin.STATUS_ANTICIPATED
+            self.status +="."+BalPlugin.STATUS_ANTICIPATED
             self.anticipated = True
             return True
 
     def set_status_invalidated(self):
         print("actually invalidated")
         if not self.invalidated:
-            self.status +=BalPlugin.STATUS_INVALIDATED
+            self.status +="."+BalPlugin.STATUS_INVALIDATED
             self.invalidated = True
             self.valid = False
             return True
@@ -736,7 +740,7 @@ class WillItem:
     def set_status_replaced(self):
         print("actually_replaced")
         if not self.replaced:
-            self.status += BalPlugin.STATUS_REPLACED
+            self.status += "."+BalPlugin.STATUS_REPLACED
             self.replaced = True
             self.valid = False
             return True

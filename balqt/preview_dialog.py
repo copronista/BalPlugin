@@ -236,13 +236,13 @@ class PreviewList(MyTreeView):
     def create_toolbar(self, config): 
         toolbar, menu = self.create_toolbar_with_menu('') 
         menu.addAction(_("Prepare Will"), self.build_transactions) 
-        menu.addAction(_(f"Un/Hide Replaced"), self.hide_replaced) 
-        menu.addAction(_(f"Un/Hide Invalidated"), self.hide_invalidated) 
+        menu.addAction(_(f"Toggle Replaced"), self.hide_replaced) 
+        menu.addAction(_(f"Toggle Invalidated"), self.hide_invalidated) 
         menu.addAction(_("Display Will"), self.bal_window.preview_modal_dialog) 
         menu.addAction(_("Sign Will"), self.ask_password_and_sign_transactions)
         menu.addAction(_("Export Will"), self.export_will)
         menu.addAction(_("Import Will"), self.import_will)
-        menu.addAction(_("Export Transactions"), self.export_file)
+        #menu.addAction(_("Export Transactions"), self.export_file)
         menu.addAction(_("Broadcast"), self.broadcast)
         menu.addAction(_("Invalidate Will"), self.invalidate_will)
         return toolbar
@@ -259,23 +259,16 @@ class PreviewList(MyTreeView):
         will = self.bal_window.prepare_will()
         if will:
             self.update_will(will)
+
     def export_json_file(self,path):
         write_json_file(path, self.will)
 
     def export_will(self):
-        export_meta_gui(self.bal_window.window, _('will'), self.export_json_file)
-
-    def import_json_file(self,path):
-        try:
-            data = read_json_file(path)
-            for k,v in data.items():
-                data[k]['tx']=tx_from_any(v['tx'])
-            self.will.update(data)
-        except:
-            raise FileImportFailed(_("Invalid will file"))
+        self.bal_window.export_will()
+        self.update()
 
     def import_will(self):
-        import_meta_gui(self.bal_window.window, _('will'), self.import_json_file,self.update)
+        self.bal_window.import_will()
 
     def sign_transactions(self,password):
         txs={}
@@ -293,19 +286,11 @@ class PreviewList(MyTreeView):
                 print("altready signed",txid)
                 txs[txid]=tx
                 continue 
-            #if not tx.is_complete() and tx.is_missing_info_from_network():
-             #   await tx.add_info_from_network(self.wallet.network, timeout=10)
-
-            #task = partial(self.wallet.sign_transaction, tx, password,ignore_warnings=True)
-            #msg = _(f"Signing transactions...{txid}")
-            #WaitingDialog(self, msg, task, on_success, on_failure)
             tosign=txid
             self.waiting_dialog.update(get_message())
             for txin in tx.inputs():
-                #print_utxo(txin,"UTXO")
                 prevout = txin.prevout.to_json()
                 if prevout[0] in self.will:
-                    #print("TROVATO",self.will[prevout[0]])
                     change = self.will[prevout[0]]['tx'].outputs()[prevout[1]]
                     txin._trusted_value_sats = change.value
                     try:
@@ -316,7 +301,6 @@ class PreviewList(MyTreeView):
                     txin._TxInput__address=change.address
                     txin._TxInput__scriptpubkey = change.scriptpubkey
                     txin._TxInput__value_sats = change.value
-                    #print_utxo(txin)
                 print(">>>>>>>>",txin.spent_txid)
          
 
@@ -327,35 +311,12 @@ class PreviewList(MyTreeView):
                 is_complete=True
                 willitem['status'] += BalPlugin.STATUS_COMPLETE
                 willitem[BalPlugin.STATUS_COMPLETE]=True
-            #self.bal_window.window.sign_tx(tx,callback=sign_done,external_keypairs=None)
             print("tx: {} is complete:{}".format(txid, tx.is_complete()))
             txs[txid]=tx
         return txs
 
     def ask_password_and_sign_transactions(self):
-        def on_success(txs):
-            for txid,tx in txs.items():
-                self.bal_window.will[txid]['tx'] = self.will[txid]['tx']=copy.deepcopy(tx)
-            #self.bal_window.will[txid]['tx']=tx_from_any(str(tx))
-            self.update()
-            try:
-                self.bal_window.will_list.update()
-            except:
-                print("failed to update willlist")
-                pass
-        def on_failure(exc_info):
-            print("sign fail",exc_info)
-
-
-        password = None
-        if self.wallet.has_keystore_encryption():
-            password = self.bal_plugin.password_dialog(parent=self.bal_window.window)
-        #self.sign_transactions(password)
-        
-        task = partial(self.sign_transactions, password)
-        msg = _('Signing transactions...')
-        self.waiting_dialog = WaitingDialog(self, msg, task, on_success, on_failure)
-        
+       self.bal_window.ask_password_and_sign_transactions(callback=self.update) 
                     
 
 
@@ -381,12 +342,12 @@ class PreviewList(MyTreeView):
 
 
     def broadcast(self):
-        Willexecutors.push_transactions_to_willexecutors(self.will)
-        self.update()
-
+        self.bal_window.broadcast_transactions()
+        self.update
 
     def invalidate_will(self):
         self.bal_window.invalidate_will()
+        self.update()
 
 class PreviewDialog(WindowModalDialog,MessageBoxMixin):
     def __init__(self, bal_window, will):
@@ -416,9 +377,9 @@ class PreviewDialog(WindowModalDialog,MessageBoxMixin):
         vbox.addWidget(self.transactions_list)
         buttonbox = QHBoxLayout()
 
-        b = QPushButton(_('Write Will'))
-        b.clicked.connect(self.transactions_list.export_file)
-        buttonbox.addWidget(b)
+        #b = QPushButton(_('Write Will'))
+        #b.clicked.connect(self.transactions_list.export_file)
+        #buttonbox.addWidget(b)
 
         b = QPushButton(_('Sign'))
         b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
@@ -426,17 +387,17 @@ class PreviewDialog(WindowModalDialog,MessageBoxMixin):
 
 
         b = QPushButton(_('Export Will'))
-        b.clicked.connect(self.transactions_list.export_file)
+        b.clicked.connect(self.transactions_list.export_will)
         buttonbox.addWidget(b)
 
-        b = QPushButton(_('Importt Will'))
-        b.clicked.connect(self.transactions_list.export_file)
-        buttonbox.addWidget(b)
+        #b = QPushButton(_('Importt Will'))
+        #b.clicked.connect(self.transactions_list.export_file)
+        #buttonbox.addWidget(b)
 
 
-        b = QPushButton(_('Export Transactions'))
-        b.clicked.connect(self.transactions_list.export_file)
-        buttonbox.addWidget(b)
+        #b = QPushButton(_('Export Transactions'))
+        #b.clicked.connect(self.transactions_list.export_file)
+        #buttonbox.addWidget(b)
 
         b = QPushButton(_('Broadcast'))
         b.clicked.connect(self.transactions_list.broadcast)
