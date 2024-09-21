@@ -63,8 +63,8 @@ class BalPlugin(BasePlugin):
         PING_WILLEXECUTORS: False,
         ASK_PING_WILLEXECUTORS: False,
         NO_WILLEXECUTOR: False,
-        HIDE_REPLACED:False,
-        HIDE_INVALIDATED:False,
+        HIDE_REPLACED:True,
+        HIDE_INVALIDATED:True,
         WILLEXECUTORS:  {
             'https://bitcoin-after.life/': {
                 "base_fee": 100000,
@@ -114,7 +114,7 @@ class BalPlugin(BasePlugin):
         self._hide_invalidated= self.config_get(self.HIDE_INVALIDATED)
         self._hide_replaced= self.config_get(self.HIDE_REPLACED)
 
-        self.willexecutors = Willexecutors.get_willexecutors(self)
+        #self.willexecutors = Willexecutors.get_willexecutors(self)
 
         #self.selected_willexecutors = self.get_config(self.SELECTED_WILLEXECUTORS)
 

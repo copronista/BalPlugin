@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtCore import Qt, QPersistentModelIndex, QModelIndex
-from PyQt5.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox)
+from PyQt5.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox,QPushButton)
 
 from electrum.i18n import _
 from electrum.bitcoin import is_address
@@ -203,20 +203,26 @@ class HeirList(MyTreeView,MessageBoxMixin):
         #menu.addAction(_("Build Traonsactions"), self.build_transactions)
 
         self.heir_locktime = HeirsLockTimeEdit(self.bal_window.window,0)
-        def on_heir_locktime(value):
-            self.bal_window.will_settings['locktime'] = self.heir_locktime.value()
-        self.heir_locktime.on_change = on_heir_locktime
+        def on_heir_locktime():
+            self.bal_window.will_settings['locktime'] = self.heir_locktime.get_locktime()
+            print("bal windows settings",self.bal_window.will_settings)
+            #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
+        self.heir_locktime.valueEdited.connect(on_heir_locktime)
 
         self.heir_threshold = HeirsLockTimeEdit(self.bal_window.window,0)
-        def on_heir_threshold(value):
+        def on_heir_threshold():
             self.bal_window.will_settings['threshold'] = self.heir_threshold.get_locktime()
-        self.heir_threshold.on_change=on_heir_threshold
+            print("bal windows settings",self.bal_window.will_settings)
+            #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
+        self.heir_threshold.valueEdited.connect(on_heir_threshold)
 
         self.heir_tx_fees = QSpinBox()
         self.heir_tx_fees.setMinimum(1)
         self.heir_tx_fees.setMaximum(10000)
         def on_heir_tx_fees():
             self.bal_window.will_settings['tx_fees'] = self.heir_tx_fees.value()
+            print("bal windows settings",self.bal_window.will_settings)
+            #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
         self.heir_tx_fees.valueChanged.connect(on_heir_tx_fees)
 
 
@@ -245,7 +251,12 @@ class HeirList(MyTreeView,MessageBoxMixin):
         layout.addWidget(QLabel(_("Fees:")))
         layout.addWidget(self.heir_tx_fees)
         layout.addWidget(HelpButton("Fee to be used in the transaction"))
+        layout.addWidget(QLabel("sats/vbyte"))
         layout.addWidget(QLabel(" "))
+        newHeirButton = QPushButton("New Heir")
+        newHeirButton.clicked.connect(self.bal_window.new_heir_dialog)
+        layout.addWidget(newHeirButton)
+
         toolbar.insertWidget(2, self.heirs_widget)
 
         return toolbar

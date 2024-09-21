@@ -517,9 +517,11 @@ class Will:
         all_inputs=Will.get_all_inputs(will,only_valid = True)
         all_inputs_min_locktime = Will.get_all_inputs_min_locktime(all_inputs)
         Will.search_rai(all_inputs,all_utxos,will,callback_not_valid_tx= callback_not_valid_tx)
-        if heirs and willexecutors:
+        if heirs:
             if not Will.check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
                 raise NotCompleteWillException("not complete")
+        else:
+            return
         #check that all utxo in wallet ar e spent
         for prevout_str, wid in all_inputs_min_locktime.items():
             for w in wid: 
@@ -583,7 +585,7 @@ class Will:
                     if heir := heirs.get(wheir,None):
                 
                         print(heir[0]==their[0],heir[1]==their[1], Util.parse_locktime_string(heir[2])>=Util.parse_locktime_string(their[2]))
-                        if heir[0] == their[0] and heir[1] == their[1] and heir[2] >= their[2]:
+                        if heir[0] == their[0] and heir[1] == their[1] and Util.parse_locktime_string(heir[2]) >= Util.parse_locktime_string(their[2]):
                             count = heirs_found.get(wheir,0)
                             heirs_found[wheir]=count + 1
                     else:
@@ -596,18 +598,22 @@ class Will:
 
             else:
                 no_willexecutor += 1
+        count_heirs = 0
         for h in heirs:
             if Util.parse_locktime_string(heirs[h][2])>=check_date:
+                count_heirs +=1
                 if not h in heirs_found:
                     print(f"heir: {h} not found")
                     raise HeirNotFoundException(h)
+        if not count_heirs:
+            raise NoHeirsException("there are not valid heirs")
         if self_willexecutor and no_willexecutor > 0:
             for url,we in willexecutors.items():
                 if Willexecutors.is_selected(we):
                     if not url in willexecutors_found:
                         print(f"willexecutor: {url} not fount")
                         raise WillexecutorNotPresent(url)
-        elif self_willexecutor and no_willexecutor==0:
+        elif self_willexecutor and no_willexecutor==0 and len(heirs_found)>0:
             print("no willexecutor selected but not present")
             print(self_willexecutor,no_willexecutor)
             raise NoWillexecutorNotPresent("Backup tx")
@@ -762,4 +768,6 @@ class WillexecutorChangeException(NotCompleteWillException):
 class NoWillexecutorNotPresent(NotCompleteWillException):
     pass
 class WillexecutorNotPresent(NotCompleteWillException):
+    pass
+class NoHeirsException(Exception):
     pass

@@ -40,7 +40,7 @@ from electrum import constants
 from .bal import BalPlugin
 from .heirs import Heirs
 from .util import Util
-from .will import Will, WillExpiredException,NotCompleteWillException,WillItem,HeirChangeException,WillexecutorChangeException,WillexecutorNotPresent,TxFeesChangedException,HeirNotFoundException
+from .will import Will, WillExpiredException,NotCompleteWillException,WillItem,HeirChangeException,WillexecutorChangeException,WillexecutorNotPresent,TxFeesChangedException,HeirNotFoundException,WillItem,NoHeirsException
 
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
@@ -76,6 +76,9 @@ class Plugin(BalPlugin):
 
             for window in gui_object.windows:
                 wallet = window.wallet
+                if wallet:
+                    window.show_warning(_('Please restart Electrum to activate the BAL plugin'), title=_('Success'))
+                    return
                 w = BalWindow(self,window)
                 self.bal_windows[window.winId]= w
                 for child in window.children():
@@ -88,10 +91,12 @@ class Plugin(BalPlugin):
                                         #pass
                                         w.init_menubar_tools(menu_child)
                                             
-                                except:
+                                except Exception as e:
+                                    raise e
                                     print("except:",menu_child.text())
                                     
         except Exception as e:
+            raise e
             print("Error loading plugin",e)
             Util.print_var(window)
             Util.print_var(window.window())
@@ -116,16 +121,18 @@ class Plugin(BalPlugin):
     def load_wallet(self,wallet, main_window):
         print("HOOK load wallet")
         w = self.get_window(main_window)
-        #w.wallet = wallet
-        w.ok=True
+        w.wallet = wallet
         w.init_will()
+        w.disable_plugin = False
+        w.ok=True
 
     @hook
     def on_close_window(self,window):
         print("HOOK on close_window")
-        pass
         #Util.print_var(window)
         w = self.get_window(window)
+        if w.disable_plugin:
+            return
         w.build_inheritance_transaction(ignore_duplicate=True,keep_original=True)
         #show_preview=self.config_get(BalPlugin.PREVIEW)
         if Will.is_new(w.will):
@@ -176,28 +183,39 @@ class Plugin(BalPlugin):
         print("close plugin")
         try:
             for winid,bal_window in self.bal_windows.items():
-                print(1)
-                window=bal_window.window
-                print(2)
-                bal_window.heirs_tab.close()
-                print(3)
-                bal_window.will_tab.close()
-                print(4)
-                window.toggle_tab(bal_window.heirs_tab)
-                print(5)
-                window.toggle_tab(bal_window.will_tab)
-                print(6)
+                try:
+                    print(1)
+                    window=bal_window.window
+                    print(2)
+                    bal_window.heirs_tab.close()
+                    print(3)
+                    bal_window.will_tab.close()
+                    print(4)
+                    window.toggle_tab(bal_window.heirs_tab)
+                    print(5)
+                    window.toggle_tab(bal_window.will_tab)
+                    print(6)
 
-                
-                window.tabs.update()
-                bal_window.will_tab.hide()
-                #window.tabs.removeTab(bal_window.will_tab.tab_pos-1)
-                print(7)
-                #Util.print_var(bal_window.tools_menu.willexecutors_action)
-                bal_window.tools_menu.removeAction(bal_window.tools_menu.willexecutors_action)
+                    
+                    window.tabs.update()
+                    bal_window.will_tab.hide()
+                    #window.tabs.removeTab(bal_window.will_tab.tab_pos-1)
+                    print(7)
+                    #Util.print_var(bal_window.tools_menu.willexecutors_action)
+                    bal_window.tools_menu.removeAction(bal_window.tools_menu.willexecutors_action)
+                except:
+                    pass
         except Exception as e:
+            raise e
             print("error closing plugin",e)
-            
+class shown_cv():
+    _type= bool
+    def __init__(self,value):
+        self.value=value
+    def get(self):
+        return self.value
+    def set(self,value):
+        self.value=value
 class BalWindow():
     def __init__(self,bal_plugin: 'BalPlugin',window: 'ElectrumWindow'):
         self.bal_plugin = bal_plugin
@@ -208,10 +226,12 @@ class BalWindow():
         self.heirs_tab = self.create_heirs_tab()
         self.will_tab = self.create_will_tab()
         self.ok= False
+        self.disable_plugin = True
         if self.window.wallet:
             self.wallet = self.window.wallet
             self.heirs_tab.wallet = self.wallet
             self.will_tab.wallet = self.wallet
+            #self.init_will()
         print(self.window.windowTitle())
 
     def init_menubar_tools(self,tools_menu):
@@ -234,6 +254,7 @@ class BalWindow():
             to_delete.append(w)
         for w in to_delete:
             del self.will[w]
+
     def init_will(self):
         print("********************init_____will____________**********")
         if not self.heirs:
@@ -248,15 +269,20 @@ class BalWindow():
                 self.will_settings['threshold']='180d'
                 self.will_settings['locktime']='1y'
             self.heir_list.update_will_settings()
-        print("WALLET",dir(self.wallet.db.data))
         #self.will=json_db._convert_dict(json_db.path,"will",self.will[w])
-
+        self.willitems={}
         for w in self.will:
             if isinstance(self.will[w]['tx'],str):
                 #dict.__setitem__(self.will,w,dict(self.will[w]))   
-                self.will[w]['tx']=Will.get_tx_from_any(self.will[w])
-                self.will[w]['tx'].get_info_from_wallet(self.wallet)
-
+                try:
+                    self.will[w]['tx']=Will.get_tx_from_any(self.will[w])
+                    self.will[w]['tx'].get_info_from_wallet(self.wallet)
+                except:
+                    self.disable_plugin=True
+                    self.window.show_warning(_('Please restart Electrum to activate the BAL plugin'), title=_('Success'))
+                    self.bal_plugin.on_close()
+                    return
+                
         if self.will:
             Will.normalize_will(self.will,self.wallet)
         
@@ -274,13 +300,13 @@ class BalWindow():
     def create_heirs_tab(self):
         self.heir_list = l = HeirList(self)
         tab = self.window.create_list_tab(l)
-        tab.is_shown_cv = True
+        tab.is_shown_cv = shown_cv(True)
         return tab
 
     def create_will_tab(self):
         self.will_list = l = PreviewList(self,None)
         tab = self.window.create_list_tab(l)
-        tab.is_shown_cv = True
+        tab.is_shown_cv = shown_cv(True)
         #self.will_tab.update_will(self.will)
         return tab
 
@@ -360,8 +386,9 @@ class BalWindow():
         self.heir_list.update()
         return True
 
-    def delete_heirs(self,heir):
-        del self.heirs[heir[0]]
+    def delete_heirs(self,heirs):
+        for heir in heirs:
+            del self.heirs[heir]
         self.heirs.save()
         self.heir_list.update()
         return True
@@ -370,7 +397,7 @@ class BalWindow():
         import_meta_gui(self.window, _('heirs'), self.heirs.import_file, self.heir_list.update)
 
     def export_heirs(self):
-        export_meta_gui(self.window, _('heirs'), self.heirs.export_file)
+        Util.export_meta_gui(self.window, _('heirs'), self.heirs.export_file)
 
     def prepare_will(self, ignore_duplicate = False, keep_original = False):
         will = self.build_inheritance_transaction(ignore_duplicate = ignore_duplicate, keep_original=keep_original)
@@ -500,29 +527,44 @@ class BalWindow():
 
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
-            print("start building transactions")
-            self.date_to_check = Util.parse_locktime_string(self.will_settings['threshold'])
-            self.locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
-            self.current_block = Util.get_current_height(self.wallet.network)
-            self.block_to_check = self.current_block + self.locktime_blocks
-            #locktime_time=self.bal_plugin.config_get(BalPlugin.LOCKTIME_TIME)
-            #date_to_check = (datetime.datetime.now()+datetime.timedelta(days=locktime_time)).timestamp()
-            self.no_willexecutor = self.bal_plugin.config_get(BalPlugin.NO_WILLEXECUTOR)
-            #for txid in self.will_not_replaced_nor_invalidated():
-            #    if not self.will[txid]['status']==BalPlugin.STATUS_NEW:
-            #        self.will[txid]['status']+=BalPlugin.STATUS_REPLACED
-            #    else:
-            #        willtodelete.append((None,txid))
-            self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=False,window=self.window) 
+            if self.disable_plugin:
+                print("plugin is disabled")
+                return
+            if not self.heirs:
+                print("not heirs",self.heirs)
+                return
+            try: 
+                print("start building transactions")
+                self.date_to_check = Util.parse_locktime_string(self.will_settings['threshold'])
+
+                self.locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
+                self.current_block = Util.get_current_height(self.wallet.network)
+                self.block_to_check = self.current_block + self.locktime_blocks
+                #locktime_time=self.bal_plugin.config_get(BalPlugin.LOCKTIME_TIME)
+                #date_to_check = (datetime.datetime.now()+datetime.timedelta(days=locktime_time)).timestamp()
+                self.no_willexecutor = self.bal_plugin.config_get(BalPlugin.NO_WILLEXECUTOR)
+                #for txid in self.will_not_replaced_nor_invalidated():
+                #    if not self.will[txid]['status']==BalPlugin.STATUS_NEW:
+                #        self.will[txid]['status']+=BalPlugin.STATUS_REPLACED
+                #    else:
+                #        willtodelete.append((None,txid))
+                self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=False,window=self.window) 
+            except Exception as e:
+                raise e
+                return
             #current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, utxos)
             #print("current_will is valid",current_will_is_valid,self.will)
             try:
                 for heir in self.heirs:
                     h=self.heirs[heir]
                     self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
+                    print("will_Settings locktime",self.will_settings['locktime'])
+                    print(self.heirs[heir])
                 self.check_will()
             except WillExpiredException as e:
                 self.invalidate_will()
+                return
+            except NoHeirsException:
                 return
 
             except NotCompleteWillException as e:
@@ -547,6 +589,7 @@ class BalWindow():
                 except WillExpiredException as e:
                     self.invalidate_will()
                 except NotCompleteWillException as e:
+                    raise e
                     self.window.show_error( str(e))
 
                 self.window.history_list.update()
@@ -720,7 +763,7 @@ class BalWindow():
         if not willexecutors:
             return
         def getMsg(willexecutors):
-            msg = "Pushing Transactions to willexecutors:"
+            msg = "Pushing Transactions to willexecutors:\n"
             for url in willexecutors:
                 msg += f"{url}:\t{willexecutors[url]['broadcast_status']}\n"
             return msg
@@ -974,6 +1017,8 @@ class BalWindow():
         heir_no_willexecutor = bal_checkbox(self.bal_plugin, BalPlugin.NO_WILLEXECUTOR)
 
         
+        heir_hide_replaced = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_REPLACED)
+        heir_hide_invalidated = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_INVALIDATED)
 
         grid=QGridLayout(d)
         #add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
@@ -984,9 +1029,12 @@ class BalWindow():
         #add_widget(grid,"Invalidate transactions",heir_invalidate,5,"")
         #add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
         #add_widget(grid,"Show preview before sign",heir_preview,7,"")
-        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,0,"Ping willexecutors to get payment info before compiling will")
-        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,1,"Ask before to ping willexecutor")
-        add_widget(grid,"Backup Transaction",heir_no_willexecutor,2,"Add transactions without willexecutor")
+
+        add_widget(grid,"Hide Replaced",heir_ping_willexecutors,0,"Hide replaced transactions from will detail and list")
+        add_widget(grid,"Hide Invalidated",heir_ping_willexecutors,1,"Hide invalidated transactions from will detail and list")
+        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,2,"Ping willexecutors to get payment info before compiling will")
+        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,3,"Ask before to ping willexecutor")
+        add_widget(grid,"Backup Transaction",heir_no_willexecutor,4,"Add transactions without willexecutor")
         #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
         #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 

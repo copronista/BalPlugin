@@ -28,7 +28,7 @@ import copy
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView)
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
 
 from electrum.i18n import _
 from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin,BlockingWaitingDialog,WaitingDialog,WindowModalDialog)
@@ -236,8 +236,8 @@ class PreviewList(MyTreeView):
     def create_toolbar(self, config): 
         toolbar, menu = self.create_toolbar_with_menu('') 
         menu.addAction(_("Prepare Will"), self.build_transactions) 
-        menu.addAction(_(f"Toggle Replaced"), self.hide_replaced) 
-        menu.addAction(_(f"Toggle Invalidated"), self.hide_invalidated) 
+#        menu.addAction(_(f"Toggle Replaced"), self.hide_replaced) 
+#        menu.addAction(_(f"Toggle Invalidated"), self.hide_invalidated) 
         menu.addAction(_("Display Will"), self.bal_window.preview_modal_dialog) 
         menu.addAction(_("Sign Will"), self.ask_password_and_sign_transactions)
         menu.addAction(_("Export Will"), self.export_will)
@@ -245,6 +245,23 @@ class PreviewList(MyTreeView):
         #menu.addAction(_("Export Transactions"), self.export_file)
         menu.addAction(_("Broadcast"), self.broadcast)
         menu.addAction(_("Invalidate Will"), self.invalidate_will)
+        prepareButton = QPushButton("Prepare")
+        prepareButton.clicked.connect(self.build_transactions)
+        signButton = QPushButton("Sign")
+        signButton.clicked.connect(self.ask_password_and_sign_transactions)
+        pushButton = QPushButton("Push")
+        pushButton.clicked.connect(self.broadcast)
+        displayButton = QPushButton("Display")
+        displayButton.clicked.connect(self.bal_window.preview_modal_dialog)
+        hlayout = QHBoxLayout()
+        widget = QWidget()
+        hlayout.addWidget(prepareButton)
+        hlayout.addWidget(signButton)
+        hlayout.addWidget(pushButton)
+        hlayout.addWidget(displayButton)
+        widget.setLayout(hlayout)
+        toolbar.insertWidget(2,widget)
+
         return toolbar
 
     def hide_replaced(self):

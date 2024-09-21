@@ -21,7 +21,9 @@ class WillDetailDialog(QDialog):
 
 
     def __init__(self, bal_window):
+
         self.will = bal_window.will
+        self.threshold = Util.parse_locktime_string(bal_window.will_settings['threshold'])
         self.bal_window = bal_window 
         Will.add_willtree(self.will)
         print(self.will)
@@ -35,7 +37,7 @@ class WillDetailDialog(QDialog):
         self.format_fee_rate = bal_window.window.format_fee_rate
         self.decimal_point = bal_window.bal_plugin.config.get_decimal_point()
         self.base_unit_name = decimal_point_to_base_unit_name(self.decimal_point)
-
+        self.setWindowTitle(_('Will details'))
         self.setMinimumSize(670,700)
         self.vlayout= QVBoxLayout()
         w=QWidget()
@@ -49,10 +51,10 @@ class WillDetailDialog(QDialog):
         b.clicked.connect(self.broadcast_transactions) 
         hlayout.addWidget(b) 
 
-        b = QPushButton(_('export'))
+        b = QPushButton(_('Export'))
         b.clicked.connect(self.export_will)
         hlayout.addWidget(b)
-
+        """
         toggle = "Hide"
         if self.bal_window.bal_plugin._hide_replaced:
             toggle = "Unhide"
@@ -67,7 +69,7 @@ class WillDetailDialog(QDialog):
         self.toggle_invalidate_button = QPushButton(_(f"{toggle} invalidated"))
         self.toggle_invalidate_button.clicked.connect(self.toggle_invalidated)
         hlayout.addWidget(self.toggle_invalidate_button)
-
+        """
         b = QPushButton(_('Invalidate'))
         b.clicked.connect(bal_window.invalidate_will)
         hlayout.addWidget(b)
@@ -75,6 +77,7 @@ class WillDetailDialog(QDialog):
 
         self.paint_scroll_area()
         #vlayout.addWidget(QLabel(_("DON'T PANIC !!! everything is fine, all possible futures are covered")))
+        self.vlayout.addWidget(QLabel(_("Expiration date: ")+Util.locktime_to_str(self.threshold)))
         self.vlayout.addWidget(self.scrollbox)
         w=QWidget()
         hlayout = QHBoxLayout(w)
@@ -163,8 +166,10 @@ class WillWidget(QWidget):
                     return QLabel(label)
                 detaillayout.addWidget(qlabel("Locktime",locktime))
                 detaillayout.addWidget(qlabel("Creation Time",creation))
-                decoded_fees = Util.decode_amount(self.will[w]['tx'].input_value() - self.will[w]['tx'].output_value(),self.parent.decimal_point)
-                fees_str = str(decoded_fees) + " ("+  str(self.will[w]['tx_fees']) + " sats/vbyte)"
+                total_fees = self.will[w]['tx'].input_value() - self.will[w]['tx'].output_value()
+                decoded_fees = Util.decode_amount(total_fees,self.parent.decimal_point)
+                fee_per_byte = round(total_fees/self.will[w]['tx'].estimated_size(),3)
+                fees_str = str(decoded_fees) + " ("+  str(fee_per_byte) + " sats/vbyte)"
                 detaillayout.addWidget(qlabel("Transaction fees",fees_str))
                 detaillayout.addWidget(qlabel("Status",self.will[w]['status']))
                 detaillayout.addWidget(QLabel(""))

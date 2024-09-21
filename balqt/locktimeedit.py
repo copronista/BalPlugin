@@ -20,8 +20,8 @@ from electrum.gui.qt.util import char_width_in_lineedit, ColorScheme
 class HeirsLockTimeEdit(QWidget):
 
     valueEdited = pyqtSignal()
-
-    def __init__(self, parent=None,default_index = 1,on_change = None):
+    locktime_threshold = 50000000
+    def __init__(self, parent=None,default_index = 1):
         QWidget.__init__(self, parent)
 
         hbox = QHBoxLayout()
@@ -29,16 +29,16 @@ class HeirsLockTimeEdit(QWidget):
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(0)
 
-        self.locktime_raw_e = LockTimeRawEdit(self,on_change=on_change)
+        self.locktime_raw_e = LockTimeRawEdit(self,time_edit = self)
         #self.locktime_height_e = LockTimeHeightEdit(self)
-        self.locktime_date_e = LockTimeDateEdit(self,on_change=on_change)
+        self.locktime_date_e = LockTimeDateEdit(self,time_edit = self)
         #self.editors = [self.locktime_raw_e, self.locktime_height_e, self.locktime_date_e]
         self.editors = [self.locktime_raw_e, self.locktime_date_e]
 
         self.combo = QComboBox()
         #options = [_("Raw"), _("Block height"), _("Date")]
         options = [_("Raw"),_("Date")]
-        option_index_to_editor_map = {
+        self.option_index_to_editor_map = {
             0: self.locktime_raw_e,
             #1: self.locktime_height_e,
             1: self.locktime_date_e,
@@ -46,21 +46,11 @@ class HeirsLockTimeEdit(QWidget):
         }
         self.combo.addItems(options)
 
-        def on_current_index_changed(i):
-            for w in self.editors:
-                w.setVisible(False)
-                w.setEnabled(False)
-            prev_locktime = self.editor.get_locktime()
-            self.editor = option_index_to_editor_map[i]
-            if self.editor.is_acceptable_locktime(prev_locktime):
-                self.editor.set_locktime(prev_locktime)
-            self.editor.setVisible(True)
-            self.editor.setEnabled(True)
 
-        self.editor = option_index_to_editor_map[default_index]
-        self.combo.currentIndexChanged.connect(on_current_index_changed)
+        self.editor = self.option_index_to_editor_map[default_index]
+        self.combo.currentIndexChanged.connect(self.on_current_index_changed)
         self.combo.setCurrentIndex(default_index)
-        on_current_index_changed(default_index)
+        self.on_current_index_changed(default_index)
 
         hbox.addWidget(self.combo)
         for w in self.editors:
@@ -72,11 +62,26 @@ class HeirsLockTimeEdit(QWidget):
         self.locktime_date_e.dateTimeChanged.connect(self.valueEdited.emit)
         self.combo.currentIndexChanged.connect(self.valueEdited.emit)
 
+    def on_current_index_changed(self,i):
+        for w in self.editors:
+            w.setVisible(False)
+            w.setEnabled(False)
+        prev_locktime = self.editor.get_locktime()
+        self.editor = self.option_index_to_editor_map[i]
+        if self.editor.is_acceptable_locktime(prev_locktime):
+            self.editor.set_locktime(prev_locktime,force=True)
+        self.editor.setVisible(True)
+        self.editor.setEnabled(True)
+
     def get_locktime(self) -> Optional[str]:
         return self.editor.get_locktime()
 
-    def set_locktime(self, x: Any) -> None:
-        self.editor.set_locktime(x)
+    def set_index(self,index):
+        self.combo.setCurrentIndex(index)
+        self.on_current_index_changed(index)
+
+    def set_locktime(self, x: Any,force=True) -> None:
+        self.editor.set_locktime(x,force)
 
 
 class _LockTimeEditor:
@@ -86,7 +91,7 @@ class _LockTimeEditor:
     def get_locktime(self) -> Optional[int]:
         raise NotImplementedError()
 
-    def set_locktime(self, x: Any) -> None:
+    def set_locktime(self, x: Any,force=True) -> None:
         raise NotImplementedError()
 
     @classmethod
@@ -95,21 +100,21 @@ class _LockTimeEditor:
             return True
         try:
             x = int(x)
-        except Exception:
+        except Exception as e:
             return False
         return cls.min_allowed_value <= x <= cls.max_allowed_value
 
 
 class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
 
-    def __init__(self, parent=None,on_change=None):
+    def __init__(self, parent=None,time_edit=None):
         QLineEdit.__init__(self, parent)
         self.setFixedWidth(14 * char_width_in_lineedit())
         self.textChanged.connect(self.numbify)
         self.isdays = False
         self.isyears = False
         self.isblocks = False
-        self.on_change=on_change
+        self.time_edit=time_edit
 
     def replace_str(self,text):
         return str(text).replace('d','').replace('y','').replace('b','')
@@ -150,13 +155,11 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
         if self.isyears: s = self.replace_str(s) + 'y'
         if self.isblocks: s= self.replace_str(s) + 'b'
 
-        self.set_locktime(s)
+        self.set_locktime(s,force=False)
         # setText sets Modified to False.  Instead we want to remember
         # if updates were because of user modification.
         self.setModified(self.hasFocus())
         self.setCursorPosition(pos)
-        if self.on_change:
-            self.on_change(s)
 
     def get_locktime(self) -> Optional[str]:
         try:
@@ -164,7 +167,7 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
         except Exception as e:
             return None
 
-    def set_locktime(self, x: Any) -> None:
+    def set_locktime(self, x: Any,force=True) -> None:
         out = str(x)
         if 'd' in out:
             out = self.replace_str(x)+'d'
@@ -180,17 +183,20 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
                 return
             out = max(out, self.min_allowed_value)
             out = min(out, self.max_allowed_value)
-        print("set locktime:",str(out))
         self.setText(str(out))
-
+        try:
+            if self.time_edit and int(out)>self.time_edit.locktime_threshold and not force:
+                self.time_edit.set_index(1)
+        except:
+            pass
 
 class LockTimeHeightEdit(LockTimeRawEdit):
     max_allowed_value = NLOCKTIME_BLOCKHEIGHT_MAX
 
-    def __init__(self, parent=None,on_change=None):
+    def __init__(self, parent=None,time_edit=None):
         LockTimeRawEdit.__init__(self, parent)
         self.setFixedWidth(20 * char_width_in_lineedit())
-        self.on_change = on_change
+        self.time_edit = time_edit
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -219,19 +225,19 @@ class LockTimeDateEdit(QDateTimeEdit, _LockTimeEditor):
     min_allowed_value = NLOCKTIME_BLOCKHEIGHT_MAX + 1
     max_allowed_value = get_max_allowed_timestamp()
 
-    def __init__(self, parent=None,on_change=None):
+    def __init__(self, parent=None,time_edit=None):
         QDateTimeEdit.__init__(self, parent)
         self.setMinimumDateTime(datetime.fromtimestamp(self.min_allowed_value))
         self.setMaximumDateTime(datetime.fromtimestamp(self.max_allowed_value))
         self.setDateTime(QDateTime.currentDateTime())
-        self.on_change = on_change
+        self.time_edit = time_edit
 
     def get_locktime(self) -> Optional[int]:
         dt = self.dateTime().toPyDateTime()
         locktime = int(time.mktime(dt.timetuple()))
         return locktime
 
-    def set_locktime(self, x: Any) -> None:
+    def set_locktime(self, x: Any,force = False) -> None:
         if not self.is_acceptable_locktime(x):
             self.setDateTime(QDateTime.currentDateTime())
             return
@@ -242,5 +248,3 @@ class LockTimeDateEdit(QDateTimeEdit, _LockTimeEditor):
             return
         dt = datetime.fromtimestamp(x)
         self.setDateTime(dt)
-        if self.on_change:
-            self.on_change(x)

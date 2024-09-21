@@ -257,7 +257,7 @@ class WillExecutorDialog(QDialog,MessageBoxMixin):
         import_meta_gui(self, _('willexecutors'), self.import_json_file, self.willexecutors_list.update)
 
     def export_file(self, path):
-        export_meta_gui(self, _('willexecutors'), self.export_json_file)
+        Util.export_meta_gui(self, _('willexecutors'), self.export_json_file)
 
     def export_json_file(self,path):
         write_json_file(path, self.willexecutors_list)
