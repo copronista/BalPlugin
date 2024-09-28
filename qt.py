@@ -237,7 +237,7 @@ class BalWindow():
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
         def icon_path(icon_basename: str):
-            path = resource_path('plugins', 'BalPlugin', "icons",icon_basename)
+            path = self.bal_plugin.resource_path('icons',icon_basename)
             print("-----------------<resourcepath:",path)
             return path
 
@@ -623,7 +623,7 @@ class BalWindow():
         if not tx:
             raise Exception(_("no tx"))
         return show_transaction(tx,parent=parent)
-            #self.show_transaction(self.will[key]['tx'], parent=self.bal_window.window.top_level_window())
+            #self.show_transaction(self.will[key]['tx'], parent=.self.bal_window.window.top_level_window())
 
 
     def invalidate_will(self):

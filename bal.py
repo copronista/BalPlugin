@@ -10,7 +10,7 @@ from electrum.transaction import tx_from_any
 
 from .util import Util
 from .willexecutors import Willexecutors
-
+import os
 json_db.register_dict('heirs', tuple, None)
 json_db.register_dict('will', lambda x: get_will(x), None)
 json_db.register_dict('will_settings', lambda x:x, None)
@@ -114,10 +114,14 @@ class BalPlugin(BasePlugin):
         self._hide_invalidated= self.config_get(self.HIDE_INVALIDATED)
         self._hide_replaced= self.config_get(self.HIDE_REPLACED)
 
+        self.plugin_dir = os.path.split(os.path.realpath(__file__))[0]
+
         #self.willexecutors = Willexecutors.get_willexecutors(self)
 
         #self.selected_willexecutors = self.get_config(self.SELECTED_WILLEXECUTORS)
 
+    def resource_path(self,*parts):
+        return os.path.join(self.plugin_dir, *parts)
 
 
     def config_get(self,key):
