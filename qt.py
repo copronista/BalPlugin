@@ -885,85 +885,6 @@ class BalWindow():
     def preview_modal_dialog(self):
         self.dw=WillDetailDialog(self)
         self.dw.show()
-    def preview_modal_dialog_old(self):
-        Will.add_willtree(self.will)
-        print(self.will)
-        d = QDialog(parent = self.window)
-        d.config = self.window.config
-        d.wallet = self.wallet
-        d.format_amount = self.window.format_amount
-        d.base_unit = self.window.base_unit
-        d.format_fiat_and_units = self.window.format_fiat_and_units
-        d.fx = self.window.fx
-        d.format_fee_rate = self.window.format_fee_rate
-        d.setMinimumSize(670,700)
-        vlayout= QVBoxLayout()
-        scroll = QScrollArea()
-        viewport = QWidget(scroll)
-        willlayout = QVBoxLayout(viewport)
-        willlayout.addWidget(self.get_will_widget(parent = d))
-
-
-
-
-        scroll.setWidget(viewport)
-        viewport.setLayout(willlayout)
-        i=0
-        w=QWidget()
-        hlayout = QHBoxLayout(w)
-
-        b = QPushButton(_('Sign'))
-        b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
-        hlayout.addWidget(b)
-
-        b = QPushButton(_('Broadcast'))
-        b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
-        hlayout.addWidget(b)
-
-        b = QPushButton(_('export'))
-        b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
-        hlayout.addWidget(b)
-        
-        toggle = "Hide"
-        if self.bal_plugin.hide_replaced:
-            toggle = "Unhide"
-        
-        b = QPushButton(_(f"{toggle} replaced"))
-        b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
-        hlayout.addWidget(b)
-
-        toggle = "Hide"
-        if self.bal_plugin.hide_replaced:
-            toggle = "Unhide"
-        
-        b = QPushButton(_(f"{toggle} invalidated"))
-        b = QPushButton(_('Sign'))
-        b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
-        hlayout.addWidget(b)
-
-        b = QPushButton(_('Invalidate'))
-        b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
-        buttonbox.addWidget(b)
-
-
-
-
-        hlayout.addWidget(QLabel(_("Valid Txs:")+ str(len(Will.only_valid_list(self.will)))))
-        hlayout.addWidget(QLabel(_("Total Txs:")+ str(len(self.will))))
-        vlayout.addWidget(w)
-        #vlayout.addWidget(QLabel(_("DON'T PANIC !!! everything is fine, all possible futures are covered")))
-        vlayout.addWidget(scroll)
-        w=QWidget()
-        hlayout = QHBoxLayout(w)
-        print(Will.only_valid_list(self.will))
-        hlayout.addWidget(QLabel(_("Valid Txs:")+ str(len(Will.only_valid_list(self.will)))))
-        hlayout.addWidget(QLabel(_("Total Txs:")+ str(len(self.will))))
-        vlayout.addWidget(w)
-        d.setLayout(vlayout)
-        if not d.show():
-            return
-
-
             
     def settings_dialog(self):
         d = WindowModalDialog(self.window, self.get_window_title("Settings"))
@@ -1025,8 +946,8 @@ class BalWindow():
         heir_no_willexecutor = bal_checkbox(self.bal_plugin, BalPlugin.NO_WILLEXECUTOR)
 
         
-        heir_hide_replaced = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_REPLACED)
-        heir_hide_invalidated = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_INVALIDATED)
+        heir_hide_replaced = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_REPLACED,self)
+        heir_hide_invalidated = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_INVALIDATED,self)
 
         grid=QGridLayout(d)
         #add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
@@ -1038,8 +959,8 @@ class BalWindow():
         #add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
         #add_widget(grid,"Show preview before sign",heir_preview,7,"")
 
-        add_widget(grid,"Hide Replaced",heir_ping_willexecutors,0,"Hide replaced transactions from will detail and list")
-        add_widget(grid,"Hide Invalidated",heir_ping_willexecutors,1,"Hide invalidated transactions from will detail and list")
+        add_widget(grid,"Hide Replaced",heir_hide_replaced, 0, "Hide replaced transactions from will detail and list")
+        add_widget(grid,"Hide Invalidated",heir_hide_invalidated ,1,"Hide invalidated transactions from will detail and list")
         add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,2,"Ping willexecutors to get payment info before compiling will")
         add_widget(grid," - Ask before",heir_ask_ping_willexecutors,3,"Ask before to ping willexecutor")
         add_widget(grid,"Backup Transaction",heir_no_willexecutor,4,"Add transactions without willexecutor")
@@ -1048,7 +969,19 @@ class BalWindow():
 
 
         if not d.exec_():
+            try:
+                print("setting closed")
+                self.update_all()
+            except:
+                pass
             return
+    def update_all(self):
+        print("update all")
+        self.will_list.update_will(self.will)
+        self.heirs_tab.update()
+        self.will_tab.update()
+        self.will_list.update()
+
     #TODO IMPLEMENT PREVIEW DIALOG
     #tx list display txid, willexecutor, qrcode, button to sign
     #   :def preview_dialog(self, txs):
@@ -1062,11 +995,18 @@ class BalWindow():
 
 
 class bal_checkbox(QCheckBox):
-    def __init__(self, plugin,variable):
+    def __init__(self, plugin,variable,window=None):
         QCheckBox.__init__(self)
         self.setChecked(plugin.config_get(variable))
+        window=window
         def on_check(v):
+            print("checked")
             plugin.config.set_key(variable, v == Qt.Checked, save=True)
+            if window:
+                plugin._hide_invalidated= plugin.config_get(plugin.HIDE_INVALIDATED)
+                plugin._hide_replaced= plugin.config_get(plugin.HIDE_REPLACED)
+
+                window.update_all()
         self.stateChanged.connect(on_check)
 
 
