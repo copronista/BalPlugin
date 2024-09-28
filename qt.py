@@ -16,7 +16,7 @@ import copy
 
 from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
-from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
+from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,QIcon,
                          QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
 
 from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,QDialog,
@@ -24,10 +24,10 @@ from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,QDial
 
 from electrum.plugin import hook
 from electrum.i18n import _
-from electrum.util import make_dir, InvalidPassword, UserCancelled
+from electrum.util import make_dir, InvalidPassword, UserCancelled,resource_path
 from electrum.util import bfh, read_json_file,write_json_file,decimal_point_to_base_unit_name,FileImportFailed,FileExportFailed
 
-from electrum.gui.qt.util import (read_QIcon, EnterButton, WWLabel, icon_path,
+from electrum.gui.qt.util import (EnterButton, WWLabel, 
                                   
                                   WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton,HelpButton,WaitingDialog)
 
@@ -236,6 +236,14 @@ class BalWindow():
 
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
+        def icon_path(icon_basename: str):
+            path = resource_path('plugins', 'BalPlugin', "icons",icon_basename)
+            print("-----------------<resourcepath:",path)
+            return path
+
+        def read_QIcon(icon_basename: str) -> QIcon:
+            return QIcon(icon_path(icon_basename))
+
 
         def add_optional_tab(tabs, tab, icon, description):
             tab.tab_icon = icon
@@ -243,8 +251,8 @@ class BalWindow():
             tab.tab_pos = len(tabs)
             if tab.is_shown_cv:
                 tabs.addTab(tab, icon, description.replace("&", ""))
-
-        add_optional_tab(self.window.tabs, self.heirs_tab, read_QIcon("will.png"), _("&Heirs"))
+        
+        add_optional_tab(self.window.tabs, self.heirs_tab, read_QIcon("heir.png"), _("&Heirs"))
         add_optional_tab(self.window.tabs, self.will_tab, read_QIcon("will.png"), _("&Will"))
         tools_menu.addSeparator()
         self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
