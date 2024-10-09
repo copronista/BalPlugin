@@ -572,7 +572,10 @@ class Will:
         no_willexecutor = 0
         willexecutors_found = {}
         heirs_found = {}
-        for wid in Will.only_valid(will):
+        will_only_valid = Will.only_valid_list(will)
+        if len(will_only_valid)<1:
+            return True
+        for wid in Will.only_valid_list(will):
             w = will[wid]
             if w.get('tx_fees',0)!=tx_fees:
                 print("TXFEESSSSSSSSS",w.get('tx_fees',0))
@@ -584,7 +587,7 @@ class Will:
                     their = will[wid]['heirs'][wheir]
                     if heir := heirs.get(wheir,None):
                 
-                        print(heir[0]==their[0],heir[1]==their[1], Util.parse_locktime_string(heir[2])>=Util.parse_locktime_string(their[2]))
+                        #print(heir[0]==their[0],heir[1]==their[1], Util.parse_locktime_string(heir[2])>=Util.parse_locktime_string(their[2]))
                         if heir[0] == their[0] and heir[1] == their[1] and Util.parse_locktime_string(heir[2]) >= Util.parse_locktime_string(their[2]):
                             count = heirs_found.get(wheir,0)
                             heirs_found[wheir]=count + 1

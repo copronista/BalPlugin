@@ -17,8 +17,8 @@ json_db.register_dict('will_settings', lambda x:x, None)
 
 def get_will(x):
     try:
-        print("______________________________________________________________________________________________________")
-        print(x)
+        #print("______________________________________________________________________________________________________")
+        #print(x)
         x['tx']=tx_from_any(x['tx'])
     except Exception as e:
         Util.print_var(x)

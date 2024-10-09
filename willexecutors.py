@@ -13,10 +13,8 @@ from electrum.i18n import _
 class Willexecutors():
     def get_willexecutors(bal_plugin, update = False,window=False):
         willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
-        print("GET WILLEXECUTORS")
         for w in willexecutors:
             Willexecutors.initialize_willexecutor(willexecutors[w],w)
-        print(willexecutors)
 
         bal=bal_plugin.DEFAULT_SETTINGS[bal_plugin.WILLEXECUTORS]
         for bal_url,bal_executor in bal.items():

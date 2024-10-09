@@ -238,7 +238,6 @@ class BalWindow():
         self.tools_menu=tools_menu
         def icon_path(icon_basename: str):
             path = self.bal_plugin.resource_path('icons',icon_basename)
-            print("-----------------<resourcepath:",path)
             return path
 
         def read_QIcon(icon_basename: str) -> QIcon:
@@ -544,7 +543,7 @@ class BalWindow():
             try: 
                 print("start building transactions")
                 self.date_to_check = Util.parse_locktime_string(self.will_settings['threshold'])
-
+                print("date_to_check:",self.date_to_check)
                 self.locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
                 self.current_block = Util.get_current_height(self.wallet.network)
                 self.block_to_check = self.current_block + self.locktime_blocks
@@ -864,7 +863,6 @@ class BalWindow():
                     txin._TxInput__address=change.address
                     txin._TxInput__scriptpubkey = change.scriptpubkey
                     txin._TxInput__value_sats = change.value
-                print(">>>>>>>>",txin.spent_txid)
 
 
             self.wallet.sign_transaction(tx, password,ignore_warnings=True)

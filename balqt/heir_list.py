@@ -205,14 +205,12 @@ class HeirList(MyTreeView,MessageBoxMixin):
         self.heir_locktime = HeirsLockTimeEdit(self.bal_window.window,0)
         def on_heir_locktime():
             self.bal_window.will_settings['locktime'] = self.heir_locktime.get_locktime()
-            print("bal windows settings",self.bal_window.will_settings)
             #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
         self.heir_locktime.valueEdited.connect(on_heir_locktime)
 
         self.heir_threshold = HeirsLockTimeEdit(self.bal_window.window,0)
         def on_heir_threshold():
             self.bal_window.will_settings['threshold'] = self.heir_threshold.get_locktime()
-            print("bal windows settings",self.bal_window.will_settings)
             #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
         self.heir_threshold.valueEdited.connect(on_heir_threshold)
 
@@ -221,7 +219,6 @@ class HeirList(MyTreeView,MessageBoxMixin):
         self.heir_tx_fees.setMaximum(10000)
         def on_heir_tx_fees():
             self.bal_window.will_settings['tx_fees'] = self.heir_tx_fees.value()
-            print("bal windows settings",self.bal_window.will_settings)
             #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
         self.heir_tx_fees.valueChanged.connect(on_heir_tx_fees)
 
