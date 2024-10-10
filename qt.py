@@ -670,7 +670,7 @@ class BalWindow():
         msg = _('Signing transactions...')
         self.waiting_dialog = WaitingDialog(self.window, msg, task, on_success, on_failure)
 
-    def broadcast_transactions(self):
+    def broadcast_transactions(self,force=False):
         def on_success(sulcess):
             print("OK, sulcess transaction was sent")
             self.will_list.update_will(self.will)
@@ -678,16 +678,16 @@ class BalWindow():
         def on_failure(err):
             print(err)
        
-        self.broadcasting_dialog = WaitingDialog(self.window,"selecting willexecutors",self.push_transactions_to_willexecutors,on_success,on_failure)
+        self.broadcasting_dialog = WaitingDialog(self.window,"selecting willexecutors",partial(self.push_transactions_to_willexecutors,force),on_success,on_failure)
         self.will_list.update()
 
-    def push_transactions_to_willexecutors(self):
+    def push_transactions_to_willexecutors(self,force=False):
         willexecutors ={}
         for wid in self.will:
             willitem = self.will[wid]
             if willitem[BalPlugin.STATUS_VALID]:
                 if willitem[BalPlugin.STATUS_COMPLETE]:
-                    if not willitem[BalPlugin.STATUS_PUSHED] or self.bal_plugin.config_get(self.bal_plugin.ALLOW_REPUSH):
+                    if not willitem[BalPlugin.STATUS_PUSHED] or force:
                         if 'willexecutor' in willitem:
                             willexecutor=willitem['willexecutor']
                             if  willexecutor and Willexecutors.is_selected(willexecutor):
@@ -710,6 +710,7 @@ class BalWindow():
         for url in willexecutors:
             willexecutor = willexecutors[url]
             if Willexecutors.is_selected(willexecutor):
+                print("msg:",getMsg(willexecutors))
                 self.broadcasting_dialog.update(getMsg(willexecutors))
                 if 'txs' in willexecutor:
                     if self.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
@@ -879,8 +880,8 @@ class BalWindow():
         heir_hide_replaced = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_REPLACED,self)
         heir_hide_invalidated = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_INVALIDATED,self)
         heir_allow_repush = bal_checkbox(self.bal_plugin,BalPlugin.ALLOW_REPUSH,self)
-        heir_repush = QPushButton("Repush transactions")
-        heirs_repush.clicked.connect(Partial(self.push_transactions_to_willexecutors,True))
+        heir_repush = QPushButton("Rebroadcast transactions")
+        heir_repush.clicked.connect(partial(self.broadcast_transactions,True))
         grid=QGridLayout(d)
         #add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
         #add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1,"Delta blocks for inputs to be invalidated and transaction resubmitted")
@@ -891,12 +892,13 @@ class BalWindow():
         #add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
         #add_widget(grid,"Show preview before sign",heir_preview,7,"")
 
+
         add_widget(grid,"Hide Replaced",heir_hide_replaced, 0, "Hide replaced transactions from will detail and list")
         add_widget(grid,"Hide Invalidated",heir_hide_invalidated ,1,"Hide invalidated transactions from will detail and list")
         add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,2,"Ping willexecutors to get payment info before compiling will")
         add_widget(grid," - Ask before",heir_ask_ping_willexecutors,3,"Ask before to ping willexecutor")
         add_widget(grid,"Backup Transaction",heir_no_willexecutor,4,"Add transactions without willexecutor")
-        add_widget(grid,"Repush Transactions",heir_repush,5,"Repush Transactions to willexecutors")
+        add_widget(grid,"",heir_repush,5,"Broadcast all transactions to willexecutors including those already pushed")
         #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
         #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 
