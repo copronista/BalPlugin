@@ -107,7 +107,7 @@ class Plugin(BalPlugin):
     def create_status_bar(self, sb):
         print("HOOK create status bar")
         return
-        b = StatusBarButton(read_QIcon('bal.png'), "Bal "+_("Bitcoin After Life"),
+        b = StatusBarButton(self.read_QIcon('bal.png'), "Bal "+_("Bitcoin After Life"),
                             partial(self.setup_dialog, sb), sb.height())
         sb.addPermanentWidget(b)
 
@@ -234,14 +234,17 @@ class BalWindow():
             #self.init_will()
         #print(self.window.windowTitle())
 
+    def read_QIcon(self,icon_basename: str) -> QIcon:
+            return QIcon(self.icon_path(icon_basename))
+
+    def read_QPixmap(self,icon_basename: str) -> QIcon:
+            return QPixmap(self.icon_path(icon_basename))
+
+    def icon_path(self,icon_basename: str):
+        path = self.bal_plugin.resource_path('icons',icon_basename)
+        return path
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
-        def icon_path(icon_basename: str):
-            path = self.bal_plugin.resource_path('icons',icon_basename)
-            return path
-
-        def read_QIcon(icon_basename: str) -> QIcon:
-            return QIcon(icon_path(icon_basename))
 
 
         def add_optional_tab(tabs, tab, icon, description):
@@ -251,8 +254,8 @@ class BalWindow():
             if tab.is_shown_cv:
                 tabs.addTab(tab, icon, description.replace("&", ""))
         
-        add_optional_tab(self.window.tabs, self.heirs_tab, read_QIcon("heir.png"), _("&Heirs"))
-        add_optional_tab(self.window.tabs, self.will_tab, read_QIcon("will.png"), _("&Will"))
+        add_optional_tab(self.window.tabs, self.heirs_tab, self.read_QIcon("heir.png"), _("&Heirs"))
+        add_optional_tab(self.window.tabs, self.will_tab, self.read_QIcon("will.png"), _("&Will"))
         tools_menu.addSeparator()
         self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
     def erease_will(self):
@@ -821,7 +824,10 @@ class BalWindow():
         d = WindowModalDialog(self.window, self.get_window_title("Settings"))
 
         d.setMinimumSize(100, 200)
-
+        
+        qicon=self.read_QPixmap("bal.png")
+        lbl_logo = QLabel()
+        lbl_logo.setPixmap(qicon)
         heir_locktime_time = QSpinBox()
         heir_locktime_time.setMinimum(0)
         heir_locktime_time.setMaximum(3650)
@@ -892,13 +898,14 @@ class BalWindow():
         #add_widget(grid," - Ask before",heir_ask_invalidate,6,"")
         #add_widget(grid,"Show preview before sign",heir_preview,7,"")
 
-
-        add_widget(grid,"Hide Replaced",heir_hide_replaced, 0, "Hide replaced transactions from will detail and list")
-        add_widget(grid,"Hide Invalidated",heir_hide_invalidated ,1,"Hide invalidated transactions from will detail and list")
-        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,2,"Ping willexecutors to get payment info before compiling will")
-        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,3,"Ask before to ping willexecutor")
-        add_widget(grid,"Backup Transaction",heir_no_willexecutor,4,"Add transactions without willexecutor")
-        add_widget(grid,"",heir_repush,5,"Broadcast all transactions to willexecutors including those already pushed")
+        grid.addWidget(lbl_logo,0,0) 
+        add_widget(grid,"Hide Replaced",heir_hide_replaced, 1, "Hide replaced transactions from will detail and list")
+        add_widget(grid,"Hide Invalidated",heir_hide_invalidated ,2,"Hide invalidated transactions from will detail and list")
+        add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,3,"Ping willexecutors to get payment info before compiling will")
+        add_widget(grid," - Ask before",heir_ask_ping_willexecutors,4,"Ask before to ping willexecutor")
+        add_widget(grid,"Backup Transaction",heir_no_willexecutor,5,"Add transactions without willexecutor")
+        grid.addWidget(heir_repush,6,0)
+        grid.addWidget(HelpButton("Broadcast all transactions to willexecutors including those already pushed"),6,2)
         #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
         #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 
