@@ -185,7 +185,7 @@ class WillExecutorList(MyTreeView):
                     try:
                         items.append(QStandardItem(*e))
                     except Exception as e:
-                        print("e cazzo",e)
+                        print("Errore grave",e)
                 else:
                     items.append(QStandardItem(e))
             items[self.Columns.SELECTED].setEditable(False)

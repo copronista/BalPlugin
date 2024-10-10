@@ -64,13 +64,12 @@ def get_current_height(network:'Network'):
 
 
 def prepare_transactions(locktimes, available_utxos, fees, wallet):
-    print("prepare succhiacazzi")
     available_utxos=sorted(available_utxos, key=lambda x:"{}:{}:{}".format(x.value_sats(),x.prevout.txid,x.prevout.out_idx))
     total_used_utxos = []
     txsout={}
     locktime,_=Util.get_lowest_locktimes(locktimes)
     if not locktime:
-        print("not locktime diocane",locktimes)
+        print("not locktime",locktimes)
         return
     #print(locktime)
     locktime=locktime[0]

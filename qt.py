@@ -377,7 +377,7 @@ class BalWindow():
         txs = self.build_inheritance_transaction(ignore_duplicate=True, keep_original=False)
         with open(path,"w") as f:
             for tx in txs:
-                Util.print_var(tx)
+                #Util.print_var(tx)
                 tx['status']+=BalPlugin.STATUS_EXPORTED
                 f.write(str(tx['tx']))
                 f.write('\n')
@@ -387,9 +387,7 @@ class BalWindow():
         heir[3]=self.will_settings['locktime']
 
         h=Heirs.validate_heir(heir[0],heir[1:])
-        print("print_h",h)
         self.heirs[heir[0]]=h
-        print("cazz")
         self.heir_list.update()
         return True
 
@@ -486,7 +484,6 @@ class BalWindow():
                     tx['willexecutor'] = txs[txid].willexecutor
                     tx['status'] = BalPlugin.STATUS_NEW
                     tx['tx_fees'] = txs[txid].tx_fees
-                    print("porcodio",txs[txid].tx_fees)
                     tx[BalPlugin.STATUS_NEW] = True
                     tx[BalPlugin.STATUS_VALID] = True
                     tx[BalPlugin.STATUS_REPLACED] = False
@@ -562,6 +559,7 @@ class BalWindow():
             #current_will_is_valid = Util.is_will_valid(self.will, block_to_check, date_to_check, utxos)
             #print("current_will is valid",current_will_is_valid,self.will)
             try:
+                print(self.heirs)
                 for heir in self.heirs:
                     h=self.heirs[heir]
                     self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
@@ -576,7 +574,7 @@ class BalWindow():
 
             except NotCompleteWillException as e:
                 print(type(e),":",e)
-                message = ""
+                message = "not complete"
                 if isinstance(e,HeirChangeException):
                     message ="heirs changed:"
                 elif isinstance(e,WillexecutorNotPresent):
@@ -588,7 +586,7 @@ class BalWindow():
                 elif isinstance(e,HeirNotFoundException):
                     message = "heir not found"
                 self.window.show_message(f"{_(message)}: {e} {_('will have to be rebuilt')}")
-
+                print("build will")
                 self.build_will(ignore_duplicate,keep_original)
 
                 try:
@@ -596,8 +594,7 @@ class BalWindow():
                 except WillExpiredException as e:
                     self.invalidate_will()
                 except NotCompleteWillException as e:
-                    raise e
-                    self.window.show_error( str(e))
+                    self.window.show_error("Error:{}\n {}".format(str(e),_("Please, check your heirs, locktime and threshold!")))
 
                 self.window.history_list.update()
                 self.window.utxo_list.update()
@@ -690,7 +687,7 @@ class BalWindow():
             willitem = self.will[wid]
             if willitem[BalPlugin.STATUS_VALID]:
                 if willitem[BalPlugin.STATUS_COMPLETE]:
-                    if not willitem[BalPlugin.STATUS_PUSHED]:
+                    if not willitem[BalPlugin.STATUS_PUSHED] or self.bal_plugin.config_get(self.bal_plugin.ALLOW_REPUSH):
                         if 'willexecutor' in willitem:
                             willexecutor=willitem['willexecutor']
                             if  willexecutor and Willexecutors.is_selected(willexecutor):
@@ -716,13 +713,11 @@ class BalWindow():
                 self.broadcasting_dialog.update(getMsg(willexecutors))
                 if 'txs' in willexecutor:
                     if self.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
-                        print("pushed")
                         for wid in willexecutors[url]['txsids']:
                             self.will[wid][BalPlugin.STATUS_PUSHED]=True
                             self.will[wid]['status']+="."+ BalPlugin.STATUS_PUSHED
                         willexecutors[url]['broadcast_stauts'] = _("Success")
                     else:
-                        print("else")
                         willexecutors[url]['broadcast_stauts'] = _("Failed")
                     del willexecutor['txs']
         self.window.show_message("All transactions are broadcasted to respective willexecutors")
@@ -883,7 +878,9 @@ class BalWindow():
         
         heir_hide_replaced = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_REPLACED,self)
         heir_hide_invalidated = bal_checkbox(self.bal_plugin,BalPlugin.HIDE_INVALIDATED,self)
-
+        heir_allow_repush = bal_checkbox(self.bal_plugin,BalPlugin.ALLOW_REPUSH,self)
+        heir_repush = QPushButton("Repush transactions")
+        heirs_repush.clicked.connect(Partial(self.push_transactions_to_willexecutors,True))
         grid=QGridLayout(d)
         #add_widget(grid,"Refresh Time Days",heir_locktime_time,0,"Delta days for inputs to  be invalidated and transactions resubmitted")
         #add_widget(grid,"Refresh Blocks",heir_locktime_blocks,1,"Delta blocks for inputs to be invalidated and transaction resubmitted")
@@ -899,19 +896,18 @@ class BalWindow():
         add_widget(grid,"Ping Willexecutors",heir_ping_willexecutors,2,"Ping willexecutors to get payment info before compiling will")
         add_widget(grid," - Ask before",heir_ask_ping_willexecutors,3,"Ask before to ping willexecutor")
         add_widget(grid,"Backup Transaction",heir_no_willexecutor,4,"Add transactions without willexecutor")
+        add_widget(grid,"Repush Transactions",heir_repush,5,"Repush Transactions to willexecutors")
         #add_widget(grid,"Max Allowed TimeDelta Days",heir_locktimedelta_time,8,"")
         #add_widget(grid,"Max Allowed BlocksDelta",heir_locktimedelta_blocks,9,"")
 
 
         if not d.exec_():
             try:
-                print("setting closed")
                 self.update_all()
             except:
                 pass
             return
     def update_all(self):
-        print("update all")
         self.will_list.update_will(self.will)
         self.heirs_tab.update()
         self.will_tab.update()
@@ -935,7 +931,33 @@ class bal_checkbox(QCheckBox):
         self.setChecked(plugin.config_get(variable))
         window=window
         def on_check(v):
-            print("checked")
+            plugin.config.set_key(variable, v == Qt.Checked, save=True)
+            if window:
+                plugin._hide_invalidated= plugin.config_get(plugin.HIDE_INVALIDATED)
+                plugin._hide_replaced= plugin.config_get(plugin.HIDE_REPLACED)
+
+                window.update_all()
+        self.stateChanged.connect(on_check)
+
+    #TODO IMPLEMENT PREVIEW DIALOG
+    #tx list display txid, willexecutor, qrcode, button to sign
+    #   :def preview_dialog(self, txs):
+    def preview_dialog(self, txs):
+        w=PreviewDialog(self,txs)
+        w.exec_()
+        return w
+    def add_info_from_will(self,tx):
+        for input in tx.inputs():
+            pass
+
+
+class bal_checkbox(QCheckBox):
+    def __init__(self, plugin,variable,window=None):
+        QCheckBox.__init__(self)
+        self.setChecked(plugin.config_get(variable))
+        window=window
+        def on_check(v):
+            #print("checked")
             plugin.config.set_key(variable, v == Qt.Checked, save=True)
             if window:
                 plugin._hide_invalidated= plugin.config_get(plugin.HIDE_INVALIDATED)

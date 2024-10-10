@@ -45,6 +45,7 @@ class BalPlugin(BasePlugin):
     NO_WILLEXECUTOR = "bal_no_willexecutor"
     HIDE_REPLACED = "bal_hide_replaced"
     HIDE_INVALIDATED = "bal_hide_invalidated"
+    ALLOW_REPUSH = "bal_allow_repush"
 
 
 
@@ -65,6 +66,7 @@ class BalPlugin(BasePlugin):
         NO_WILLEXECUTOR: False,
         HIDE_REPLACED:True,
         HIDE_INVALIDATED:True,
+        ALLOW_REPUSH: False,
         WILLEXECUTORS:  {
             'https://bitcoin-after.life/': {
                 "base_fee": 100000,

@@ -461,7 +461,7 @@ class Will:
                 tx = PartialTransaction.from_io(utxo_to_spend,[out], locktime=locktime, version=2)
                 tx.set_rbf(True)
 
-                Util.print_var(tx)
+                #Util.print_var(tx)
                 return tx
 
             else:
@@ -521,6 +521,7 @@ class Will:
             if not Will.check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
                 raise NotCompleteWillException("not complete")
         else:
+            print("not heirs")
             return
         #check that all utxo in wallet ar e spent
         for prevout_str, wid in all_inputs_min_locktime.items():
@@ -576,7 +577,7 @@ class Will:
         heirs_found = {}
         will_only_valid = Will.only_valid_list(will)
         if len(will_only_valid)<1:
-            return True
+            return False
         for wid in Will.only_valid_list(will):
             w = will[wid]
             if w.get('tx_fees',0)!=tx_fees:
