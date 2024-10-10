@@ -530,11 +530,13 @@ class Will:
                     if int(locktime) < int(timestamp_to_check):
                         raise WillExpiredException(f"WillExpired {wid[0][0]}: {locktime}<{timestamp_to_check}")
         print('check all utxo in wallet are spent')
-        for utxo in all_utxos:
-            if utxo.value_sats() > 68 * tx_fees: 
-                if not Util.in_utxo(utxo,all_inputs.keys()):
-                        print("utxo is not spent",utxo.to_json())
-                        raise NotCompleteWillException("Some utxo in the wallet is not included")
+        if all_inputs:
+            for utxo in all_utxos:
+                if utxo.value_sats() > 68 * tx_fees: 
+                    if not Util.in_utxo(utxo,all_inputs.keys()):
+                            print("utxo is not spent",utxo.to_json())
+                            print(all_inputs.keys())
+                            raise NotCompleteWillException("Some utxo in the wallet is not included")
         """
         #check that all spent uxtos are in wallet
         print('check all spent utxos are in wallet')
