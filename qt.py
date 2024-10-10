@@ -232,7 +232,7 @@ class BalWindow():
             self.heirs_tab.wallet = self.wallet
             self.will_tab.wallet = self.wallet
             #self.init_will()
-        print(self.window.windowTitle())
+        #print(self.window.windowTitle())
 
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
@@ -641,70 +641,6 @@ class BalWindow():
         msg = _("Calculating Transactions")
         self.waiting_dialog = WaitingDialog(self.window, msg, task, on_success, on_failure)
 
-    def get_will_widget(self,father=None,parent = None):
-        box = QWidget()
-        vlayout = QVBoxLayout()
-        box.setLayout(vlayout)
-        decimal_point = self.bal_plugin.config.get_decimal_point()
-        base_unit_name = decimal_point_to_base_unit_name(decimal_point)
-        for w in self.will:
-            if self.will[w][BalPlugin.STATUS_REPLACED] and self.bal_plugin._hide_replaced:
-                continue
-            if self.will[w][BalPlugin.STATUS_INVALIDATED] and self.bal_plugin._hide_invalidated:
-                continue
-            f = self.will[w].get("father",None)
-            if father == f:
-                qwidget = QWidget()
-                childWidget = QWidget()
-                hlayout=QHBoxLayout(qwidget)
-                qwidget.setLayout(hlayout)
-                vlayout.addWidget(qwidget)
-                detailw=QWidget()
-                detaillayout=QVBoxLayout()
-                detailw.setLayout(detaillayout)
-                
-                willpushbutton = QPushButton(w)
-            
-                willpushbutton.clicked.connect(partial(self.show_transaction,txid=w))
-                detaillayout.addWidget(willpushbutton)
-                locktime = Util.locktime_to_str(self.will[w]['tx'].locktime)
-                creation = Util.locktime_to_str(self.will[w]['time'])
-                def qlabel(title,value):
-                    label = "<b>"+_(str(title)) + f":</b>\t{str(value)}"
-                    return QLabel(label) 
-                detaillayout.addWidget(qlabel("Locktime",locktime))
-                detaillayout.addWidget(qlabel("Creation Time",creation))
-                decoded_fees = Util.decode_amount(self.will[w]['tx'].input_value() - self.will[w]['tx'].output_value(),decimal_point)
-                fees_str = str(decoded_fees) + " ("+  str(self.will[w]['tx_fees']) + " sats/vbyte)" 
-                detaillayout.addWidget(qlabel("Transaction fees",fees_str))
-                detaillayout.addWidget(QLabel(""))
-                detaillayout.addWidget(QLabel(_("<b>Heirs:</b>")))
-                for heir in self.will[w]['heirs']:
-                    if "w!ll3x3c\"" not in heir:
-                        decoded_amount = Util.decode_amount(self.will[w]['heirs'][heir][3],decimal_point)
-                        detaillayout.addWidget(qlabel(heir,f"{decoded_amount} {base_unit_name}"))
-                if self.will[w]['willexecutor']:
-                    detaillayout.addWidget(QLabel(""))
-                    detaillayout.addWidget(QLabel(_("<b>Willexecutor:</b:")))
-                    decoded_amount = Util.decode_amount(self.will[w]['willexecutor']['base_fee'],decimal_point)
-                    
-                    detaillayout.addWidget(qlabel(self.will[w]['willexecutor']['url'],f"{decoded_amount} {base_unit_name}"))
-                detaillayout.addStretch()
-                pal = QPalette()
-                if self.will[w].get(BalPlugin.STATUS_INVALIDATED,False):
-                    pal.setColor(QPalette.Background, QColor(255,0, 0))
-                elif self.will[w].get(BalPlugin.STATUS_REPLACED,False):
-                    pal.setColor(QPalette.Background, QColor(255, 255, 0))
-                else:
-                    pal.setColor(QPalette.Background, QColor("#57c7d4"))
-                detailw.setAutoFillBackground(True)
-                detailw.setPalette(pal)
-
-                hlayout.addWidget(detailw)
-                hlayout.addWidget(self.get_will_widget(w,parent = parent))
-        return box
-    
-
     def ask_password_and_sign_transactions(self,callback=None):
         def on_success(txs):
             for txid,tx in txs.items():
@@ -789,6 +725,7 @@ class BalWindow():
                         print("else")
                         willexecutors[url]['broadcast_stauts'] = _("Failed")
                     del willexecutor['txs']
+        self.window.show_message("All transactions are broadcasted to respective willexecutors")
 
     def push_transactions_to_willexecutor(self,strtxs,url):
         print(url,strtxs)
