@@ -15,8 +15,8 @@ import datetime
 import urllib.request
 import urllib.parse
 from .bal import BalPlugin
-from .util import Util
-from .willexecutors import Willexecutors
+from . import util as Util
+from . import willexecutors as Willexecutors
 if TYPE_CHECKING:
     from .wallet_db import WalletDB
     from .simple_config import SimpleConfig

@@ -14,12 +14,11 @@ from functools import partial
 import sys
 import copy
 
-from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
 from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,QIcon,
                          QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
 
-from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,QDialog,
+from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit,QScrollArea,QWidget,QSpacerItem,QSizePolicy)
 
 from electrum.plugin import hook
@@ -28,8 +27,7 @@ from electrum.util import make_dir, InvalidPassword, UserCancelled,resource_path
 from electrum.util import bfh, read_json_file,write_json_file,decimal_point_to_base_unit_name,FileImportFailed,FileExportFailed
 
 from electrum.gui.qt.util import (EnterButton, WWLabel, 
-                                  
-                                  WindowModalDialog, Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton,HelpButton,WaitingDialog)
+                                    Buttons, CloseButton, OkButton,import_meta_gui,export_meta_gui,char_width_in_lineedit,CancelButton,HelpButton)
 
 from electrum.gui.qt.qrtextedit import ScanQRTextEdit
 from electrum.gui.qt.main_window import StatusBarButton
@@ -39,8 +37,8 @@ from electrum import constants
 from electrum.transaction import Transaction
 from .bal import BalPlugin
 from .heirs import Heirs
-from .util import Util
-from .will import Will, WillExpiredException,NotCompleteWillException,WillItem,HeirChangeException,WillexecutorChangeException,WillexecutorNotPresent,TxFeesChangedException,HeirNotFoundException,WillItem,NoHeirsException
+from . import util as Util
+from . import will as Will
 
 from .balqt.locktimeedit import HeirsLockTimeEdit
 from .balqt.willexecutor_dialog import WillExecutorDialog
@@ -48,8 +46,8 @@ from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
 from .balqt.willdetail import WillDetailDialog
-from .willexecutors import Willexecutors
-from . import bal_resources
+from .balqt import qt_resources
+from . import willexecutors as Willexecutors
 from electrum.transaction import tx_from_any
 from time import time
 from electrum import json_db
@@ -58,6 +56,7 @@ import datetime
 import urllib.parse
 import urllib.request
 from typing import TYPE_CHECKING, Callable, Optional, List, Union, Tuple, Mapping
+from .balqt.baldialog import BalDialog,BalWaitingDialog,BalBlockingWaitingDialog
 
 
 class Plugin(BalPlugin):
@@ -109,7 +108,7 @@ class Plugin(BalPlugin):
     def create_status_bar(self, sb):
         print("HOOK create status bar")
         return
-        b = StatusBarButton(self.read_QIcon('bal.png'), "Bal "+_("Bitcoin After Life"),
+        b = StatusBarButton(qt_resources.read_QIcon('bal32x32.png'), "Bal "+_("Bitcoin After Life"),
                             partial(self.setup_dialog, sb), sb.height())
         sb.addPermanentWidget(b)
 
@@ -236,11 +235,6 @@ class BalWindow():
             #self.init_will()
         #print(self.window.windowTitle())
 
-    def read_QIcon(self,icon_basename: str) -> QIcon:
-            return QIcon(bal_resources.icon_path(icon_basename))
-
-    def read_QPixmap(self,icon_basename: str) -> QIcon:
-            return QPixmap(bal_resources.icon_path(icon_basename))
 
     def init_menubar_tools(self,tools_menu):
         self.tools_menu=tools_menu
@@ -253,10 +247,10 @@ class BalWindow():
             if tab.is_shown_cv:
                 tabs.addTab(tab, icon, description.replace("&", ""))
         
-        add_optional_tab(self.window.tabs, self.heirs_tab, self.read_QIcon("heir.png"), _("&Heirs"))
-        add_optional_tab(self.window.tabs, self.will_tab, self.read_QIcon("will.png"), _("&Will"))
+        add_optional_tab(self.window.tabs, self.heirs_tab, qt_resources.read_QIcon("heir.png"), _("&Heirs"))
+        add_optional_tab(self.window.tabs, self.will_tab, qt_resources.read_QIcon("will.png"), _("&Will"))
         tools_menu.addSeparator()
-        self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will Executors"), self.willexecutor_dialog)
+        self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will-Executors"), self.willexecutor_dialog)
     def erease_will(self):
         to_delete = []
         for w in self.will:
@@ -304,7 +298,6 @@ class BalWindow():
 
     def willexecutor_dialog(self):
         h = WillExecutorDialog(self)
-        h.setWindowIcon(self.read_QIcon("bal16x16.png"))
         h.show()
 
     def create_heirs_tab(self):
@@ -321,8 +314,7 @@ class BalWindow():
         return tab
 
     def new_heir_dialog(self):
-        d = WindowModalDialog(self.window, self.get_window_title("New heir"))
-        d.setWindowIcon(self.read_QIcon("bal16x16.png"))
+        d = BalDialog(self.window, self.get_window_title("New heir"))
         vbox = QVBoxLayout(d)
         grid = QGridLayout()
 
@@ -456,7 +448,7 @@ class BalWindow():
         #print("WILL3",will)    
         for wid in will:
             print("saving wid",wid,will[wid])
-            wi = WillItem(will[wid])
+            wi = Will.WillItem(will[wid])
             wi.print()
             #print("tx",str(will[wid]['tx']))
             self.will[wid]=wi.to_dict()
@@ -570,24 +562,24 @@ class BalWindow():
                     print("will_Settings locktime",self.will_settings['locktime'])
                     print(self.heirs[heir])
                 self.check_will()
-            except WillExpiredException as e:
+            except Will.WillExpiredException as e:
                 self.invalidate_will()
                 return
-            except NoHeirsException:
+            except Will.NoHeirsException:
                 return
 
-            except NotCompleteWillException as e:
+            except Will.NotCompleteWillException as e:
                 print(type(e),":",e)
                 message = "not complete"
-                if isinstance(e,HeirChangeException):
+                if isinstance(e,Will.HeirChangeException):
                     message ="heirs changed:"
-                elif isinstance(e,WillexecutorNotPresent):
-                    message = "Willexecutor not present:"
-                elif isinstance(e,WillexecutorChangeException):
-                    message = "Willexecutor changed"
-                elif isinstance(e,TxFeesChangedException):
+                elif isinstance(e,Will.WillExecutorNotPresent):
+                    message = "Will-Executor not present:"
+                elif isinstance(e,Will.WillexecutorChangeException):
+                    message = "Will-Executor changed"
+                elif isinstance(e,Will.TxFeesChangedException):
                     message = "txfees are changed"
-                elif isinstance(e,HeirNotFoundException):
+                elif isinstance(e,Will.HeirNotFoundException):
                     message = "heir not found"
                 self.window.show_message(f"{_(message)}: {e} {_('will have to be rebuilt')}")
                 print("build will")
@@ -595,9 +587,9 @@ class BalWindow():
 
                 try:
                     self.check_will()
-                except WillExpiredException as e:
+                except Will.WillExpiredException as e:
                     self.invalidate_will()
-                except NotCompleteWillException as e:
+                except Will.NotCompleteWillException as e:
                     self.window.show_error("Error:{}\n {}".format(str(e),_("Please, check your heirs, locktime and threshold!")))
 
                 self.window.history_list.update()
@@ -630,7 +622,7 @@ class BalWindow():
                 external_keypairs=external_keypairs,
                 payment_identifier=payment_identifier,
             )
-            d.setWindowIcon(self.read_QIcon("bal16x16.png"))
+            d.setWindowIcon(qt_resources.read_QIcon("bal32x32.png"))
         except SerializationError as e:
             _logger.exception('unable to deserialize the transaction')
             parent.show_critical(_("Electrum was unable to deserialize the transaction:") + "\n" + str(e))
@@ -696,7 +688,7 @@ class BalWindow():
         
         task = partial(self.sign_transactions, password)
         msg = _('Signing transactions...')
-        self.waiting_dialog = WaitingDialog(self.window, msg, task, on_success, on_failure)
+        self.waiting_dialog = BalWaitingDialog(self.window, msg, task, on_success, on_failure)
 
     def broadcast_transactions(self,force=False):
         def on_success(sulcess):
@@ -843,16 +835,13 @@ class BalWindow():
 
     def preview_modal_dialog(self):
         self.dw=WillDetailDialog(self)
-
-        self.dw.setWindowIcon(self.read_QIcon("bal16x16.png"))
         self.dw.show()
             
     def settings_dialog(self):
-        d = WindowModalDialog(self.window, self.get_window_title("Settings"))
-        d.setWindowIcon(self.read_QIcon("bal16x16.png"))
+        d = BalDialog(self.window, self.get_window_title("Settings"))
         d.setMinimumSize(100, 200)
         
-        qicon=self.read_QPixmap("bal32x32.png")
+        qicon=qt_resources.read_QPixmap("bal32x32.png")
         lbl_logo = QLabel()
         lbl_logo.setPixmap(qicon)
         heir_locktime_time = QSpinBox()
@@ -954,7 +943,6 @@ class BalWindow():
     #   :def preview_dialog(self, txs):
     def preview_dialog(self, txs):
         w=PreviewDialog(self,txs)
-        w.setWindowIcon(self.read_QIcon("bal16x16.png"))
         w.show()
         return w
     def add_info_from_will(self,tx):

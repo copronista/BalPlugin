@@ -1,7 +1,7 @@
 from ..bal import BalPlugin
-from ..will import Will
-from ..util import Util
-
+from .. import will as Will
+from .. import util as Util
+from .baldialog import BalDialog
 from electrum.util import decimal_point_to_base_unit_name
 from electrum.i18n import _
 
@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLa
 from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
                          QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
 
+
 from functools import partial
 
 
@@ -17,7 +18,7 @@ from functools import partial
     
 
 
-class WillDetailDialog(QDialog):
+class WillDetailDialog(BalDialog):
 
 
     def __init__(self, bal_window):
@@ -27,7 +28,7 @@ class WillDetailDialog(QDialog):
         self.bal_window = bal_window 
         Will.add_willtree(self.will)
         print(self.will)
-        super().__init__(parent = bal_window.window)
+        super().__init__(bal_window.window)
         self.config = bal_window.window.config
         self.wallet = bal_window.wallet
         self.format_amount = bal_window.window.format_amount

@@ -10,137 +10,136 @@ from electrum.i18n import _
 
 
 
-class Willexecutors():
-    def get_willexecutors(bal_plugin, update = False,window=False):
-        willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
-        for w in willexecutors:
-            Willexecutors.initialize_willexecutor(willexecutors[w],w)
+def get_willexecutors(bal_plugin, update = False,window=False):
+    willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
+    for w in willexecutors:
+        initialize_willexecutor(willexecutors[w],w)
 
-        bal=bal_plugin.DEFAULT_SETTINGS[bal_plugin.WILLEXECUTORS]
-        for bal_url,bal_executor in bal.items():
-            if not bal_url in willexecutors:
-                print("replace bal")
-                willexecutors[bal_url]=bal_executor
-        if update:
-            found = False
-            for url,we in willexecutors.items():
-                if Willexecutors.is_selected(we):
-                    found = True
-            if found:
-                if bal_plugin.config_get(bal_plugin.PING_WILLEXECUTORS):
-                    ping_willexecutors = True
-                    if bal_plugin.config_get(bal_plugin.ASK_PING_WILLEXECUTORS):
-                        ping_willexecutors = window.question(_("Contact willexecutors servers to update payment informations?"))
-                    if ping_willexecutors:
-                        Willexecutors.ping_servers(willexecutors)
-
-        return willexecutors
-
-    def is_selected(willexecutor,value=None):
-        if not value is None:
-            willexecutor['selected']=value
-        try:
-            return willexecutor['selected']
-        except:
-            willexecutor['selected']=False
-            return False
-
-
-    def push_transactions_to_willexecutors(will):
-        willexecutors ={}
-        for wid in will:
-            willitem = will[wid]
-            if willitem['Valid']:
-                if willitem['Signed']:
-                    if not willitem['Pushed']:
-                        if 'willexecutor' in willitem:
-                            willexecutor=willitem['willexecutor']
-                            if  willexecutor and Willexecutors.is_selected(willexecutor):
-                                url=willexecutor['url']
-                                if not url in willexecutors:
-                                    willexecutor['txs']=""
-                                    willexecutor['txsids']=[]
-                                    willexecutors[url]=willexecutor
-                                willexecutors[url]['txs']+=str(willitem['tx'])+"\n"
-                                willexecutors[url]['txsids'].append(wid)
-        #print(willexecutors)
-        if not willexecutors:
-            return
-        for url in willexecutors:
-            willexecutor = willexecutors[url]
-            if Willexecutors.is_selected(willexecutor):
-                if 'txs' in willexecutor:
-                    if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
-                        for wid in willexecutors[url]['txsids']:
-                            will[wid]['Pushed']=True
-                            will[wid]['status']+='.Pushed'
-                    del willexecutor['txs']
-
-    def push_transactions_to_willexecutor(strtxs,url):
-        print(url,strtxs)
-        try:
-            req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
-            req.add_header('Content-Type', 'text/plain')
-            with urllib.request.urlopen(req) as response:
-                response_data = response.read().decode('utf-8')
-                if response.status != 200:
-                    print(f"error{response.status} pushing txs to: {url}")
-                else:
-                    return True
-                
-        except Exception as e:
-            print(f"error contacting {url} for pushing txs",e)
-
-    def ping_servers(willexecutors):
+    bal=bal_plugin.DEFAULT_SETTINGS[bal_plugin.WILLEXECUTORS]
+    for bal_url,bal_executor in bal.items():
+        if not bal_url in willexecutors:
+            print("replace bal")
+            willexecutors[bal_url]=bal_executor
+    if update:
+        found = False
         for url,we in willexecutors.items():
-            willexecutors[url]=Willexecutors.get_info_task(url,we)
+            if is_selected(we):
+                found = True
+        if found:
+            if bal_plugin.config_get(bal_plugin.PING_WILLEXECUTORS):
+                ping_willexecutors = True
+                if bal_plugin.config_get(bal_plugin.ASK_PING_WILLEXECUTORS):
+                    ping_willexecutors = window.question(_("Contact willexecutors servers to update payment informations?"))
+                if ping_willexecutors:
+                    ping_servers(willexecutors)
+
+    return willexecutors
+
+def is_selected(willexecutor,value=None):
+    if not value is None:
+        willexecutor['selected']=value
+    try:
+        return willexecutor['selected']
+    except:
+        willexecutor['selected']=False
+        return False
 
 
+def push_transactions_to_willexecutors(will):
+    willexecutors ={}
+    for wid in will:
+        willitem = will[wid]
+        if willitem['Valid']:
+            if willitem['Signed']:
+                if not willitem['Pushed']:
+                    if 'willexecutor' in willitem:
+                        willexecutor=willitem['willexecutor']
+                        if  willexecutor and is_selected(willexecutor):
+                            url=willexecutor['url']
+                            if not url in willexecutors:
+                                willexecutor['txs']=""
+                                willexecutor['txsids']=[]
+                                willexecutors[url]=willexecutor
+                            willexecutors[url]['txs']+=str(willitem['tx'])+"\n"
+                            willexecutors[url]['txsids'].append(wid)
+    #print(willexecutors)
+    if not willexecutors:
+        return
+    for url in willexecutors:
+        willexecutor = willexecutors[url]
+        if is_selected(willexecutor):
+            if 'txs' in willexecutor:
+                if push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
+                    for wid in willexecutors[url]['txsids']:
+                        will[wid]['Pushed']=True
+                        will[wid]['status']+='.Pushed'
+                del willexecutor['txs']
 
-    def get_info_task(url,willexecutor):
-        w=None
-        try:
-            print("GETINFO_WILLEXECUTOR")
-            print(url)
-            req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info",  method='GET')
-            with urllib.request.urlopen(req,timeout=10) as response:
-                response_data=response.read().decode('utf-8')
-
-                w = json.loads(response_data)
-                print("response_data", w['address'])
-                w['status']=response.status
-                w['selected']=Willexecutors.is_selected(willexecutor)
-                w['url']=url
-                if response.status != 200:
-                    print(f"error{response.status} pushing txs to: {url}")
-        except Exception as e:
-            print(f"error {e} contacting {url}")
-            if w:
-                w['status']="KO"
+def push_transactions_to_willexecutor(strtxs,url):
+    print(url,strtxs)
+    try:
+        req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
+        req.add_header('Content-Type', 'text/plain')
+        with urllib.request.urlopen(req) as response:
+            response_data = response.read().decode('utf-8')
+            if response.status != 200:
+                print(f"error{response.status} pushing txs to: {url}")
             else:
-                willexecutor['status'] = "KO"
+                return True
+            
+    except Exception as e:
+        print(f"error contacting {url} for pushing txs",e)
+
+def ping_servers(willexecutors):
+    for url,we in willexecutors.items():
+        willexecutors[url]=get_info_task(url,we)
+
+
+
+def get_info_task(url,willexecutor):
+    w=None
+    try:
+        print("GETINFO_WILLEXECUTOR")
+        print(url)
+        req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info",  method='GET')
+        with urllib.request.urlopen(req,timeout=10) as response:
+            response_data=response.read().decode('utf-8')
+
+            w = json.loads(response_data)
+            print("response_data", w['address'])
+            w['status']=response.status
+            w['selected']=is_selected(willexecutor)
+            w['url']=url
+            if response.status != 200:
+                print(f"error{response.status} pushing txs to: {url}")
+    except Exception as e:
+        print(f"error {e} contacting {url}")
         if w:
-            willexecutor=w
-        willexecutor['last_update'] = datetime.now().timestamp()
-        return willexecutor
+            w['status']="KO"
+        else:
+            willexecutor['status'] = "KO"
+    if w:
+        willexecutor=w
+    willexecutor['last_update'] = datetime.now().timestamp()
+    return willexecutor
 
-    def initialize_willexecutor(willexecutor,url,status=None,selected=None):
-        willexecutor['url']=url
-        if not status is None:
-            willexecutor['status'] = status
-        willexecutor['selected'] = Willexecutors.is_selected(willexecutor,selected)
+def initialize_willexecutor(willexecutor,url,status=None,selected=None):
+    willexecutor['url']=url
+    if not status is None:
+        willexecutor['status'] = status
+    willexecutor['selected'] = is_selected(willexecutor,selected)
 
-    def get_willexecutors_list_from_json(bal_plugin):
-        try:
-            with open("willexecutors.json") as f:
-                willexecutors = json.load(f)
-                for w in willexecutors:
-                    willexecutor=willexecutors[w]
-                    willexecutors.initialize_willexecutor(willexecutor,w,'New',False)
-                bal_plugin.config.set_key(bal_plugin.WILLEXECUTORS,willexecutors,save=True)
-                return h
-        except Exception as e:
-            print("errore aprendo willexecutors.json:",e)
-            return {}
+def get_willexecutors_list_from_json(bal_plugin):
+    try:
+        with open("willexecutors.json") as f:
+            willexecutors = json.load(f)
+            for w in willexecutors:
+                willexecutor=willexecutors[w]
+                willexecutors.initialize_willexecutor(willexecutor,w,'New',False)
+            bal_plugin.config.set_key(bal_plugin.WILLEXECUTORS,willexecutors,save=True)
+            return h
+    except Exception as e:
+        print("errore aprendo willexecutors.json:",e)
+        return {}
 
 

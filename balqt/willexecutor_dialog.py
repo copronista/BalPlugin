@@ -37,8 +37,9 @@ import json
 import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
-from ..util import Util
-from ..willexecutors import Willexecutors
+from .. import util as Util
+from .. import willexecutors as Willexecutors
+from .baldialog import BalDialog
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -210,9 +211,9 @@ class WillExecutorList(MyTreeView):
 
 
 
-class WillExecutorDialog(QDialog,MessageBoxMixin):
+class WillExecutorDialog(BalDialog,MessageBoxMixin):
     def __init__(self, bal_window):
-        QDialog.__init__(self)
+        BalDialog.__init__(self,bal_window.window)
         self.bal_plugin = bal_window.bal_plugin
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config

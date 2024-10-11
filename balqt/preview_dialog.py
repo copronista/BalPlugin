@@ -34,14 +34,14 @@ from electrum.i18n import _
 from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin,BlockingWaitingDialog,WaitingDialog,WindowModalDialog)
 from electrum.util import write_json_file,read_json_file,FileImportFailed
 from electrum.gui.qt.my_treeview import MyTreeView
-from electrum.gui.qt.transaction_dialog import show_transaction
 import json
 import urllib.request
 import urllib.parse
 from ..bal import BalPlugin
-from ..willexecutors import Willexecutors
-from ..util import Util 
-from ..will import Will
+from .. import willexecutors as Willexecutors
+from .. import util as Util 
+from .. import will as  Will
+from .baldialog import BalDialog
 from electrum.transaction import tx_from_any
 from electrum.network import Network
 from functools import partial
@@ -137,7 +137,7 @@ class PreviewList(MyTreeView):
         
     def show_transaction(self,selected_keys):
         for key in selected_keys:
-            self.bal_window.window.show_transaction(self.will[key]['tx'])
+            self.bal_window.show_transaction(self.will[key]['tx'])
             #self.show_transaction(self.will[key]['tx'], parent=self.bal_window.window.top_level_window())
 
         self.update()
@@ -366,10 +366,10 @@ class PreviewList(MyTreeView):
         self.bal_window.invalidate_will()
         self.update()
 
-class PreviewDialog(WindowModalDialog,MessageBoxMixin):
+class PreviewDialog(BalDialog,MessageBoxMixin):
     def __init__(self, bal_window, will):
         self.parent = bal_window.window
-        WindowModalDialog.__init__(self,parent=self.parent)
+        BalDialog.__init__(self,bal_window = bal_window)
         self.bal_plugin = bal_window.bal_plugin
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config

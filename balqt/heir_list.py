@@ -38,7 +38,7 @@ from electrum.plugin import run_hook
 from electrum.gui.qt.util import webopen, MessageBoxMixin,HelpButton
 from electrum.gui.qt.my_treeview import MyTreeView
 from datetime import datetime
-from ..util import Util
+from .. import util as Util
 from .locktimeedit import HeirsLockTimeEdit
 if TYPE_CHECKING:
     from electrum.gui.qt.main_window import ElectrumWindow

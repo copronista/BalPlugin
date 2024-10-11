@@ -8,8 +8,8 @@ from electrum.util import to_bytes, bfh
 from electrum import json_db
 from electrum.transaction import tx_from_any
 
-from .util import Util
-from .willexecutors import Willexecutors
+from . import util as Util
+from . import willexecutors as Willexecutors
 import os
 json_db.register_dict('heirs', tuple, None)
 json_db.register_dict('will', lambda x: get_will(x), None)
