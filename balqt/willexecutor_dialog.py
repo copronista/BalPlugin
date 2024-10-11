@@ -220,7 +220,7 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
         self.window = bal_window.window
         self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin)
         
-        self.setWindowTitle(_('WillExecutor Service List'))
+        self.setWindowTitle(_('Will-Executor Service List'))
         self.setMinimumSize(800, 200)
         self.size_label = QLabel()
         self.willexecutor_list = WillExecutorList(self)

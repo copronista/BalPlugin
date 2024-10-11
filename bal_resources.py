@@ -1,12 +1,15 @@
 import os
 
-plugin_dir = os.path.split(os.path.realpath(__file__))[0]
+PLUGIN_DIR = os.path.split(os.path.realpath(__file__))[0]
+DEFAULT_ICON = 'bal32x32.png'
+DEFAULT_ICON_PATH = 'icons'
 
-def icon_path(icon_basename: str):
-    path = resource_path('icons',icon_basename)
+
+def icon_path(icon_basename: str = DEFAULT_ICON):
+    path = resource_path(DEFAULT_ICON_PATH,icon_basename)
     return path
 
 def resource_path(*parts):
-    return os.path.join(plugin_dir, *parts)
+    return os.path.join(PLUGIN_DIR, *parts)
 
 

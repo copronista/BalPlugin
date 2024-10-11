@@ -615,13 +615,13 @@ def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,che
         for url,we in willexecutors.items():
             if Willexecutors.is_selected(we):
                 if not url in willexecutors_found:
-                    print(f"willexecutor: {url} not fount")
+                    print(f"will-executor: {url} not fount")
                     raise WillExecutorNotPresent(url)
     elif self_willexecutor and no_willexecutor==0 and len(heirs_found)>0:
-        print("no willexecutor selected but not present")
+        print("no will-executor selected but not present")
         print(self_willexecutor,no_willexecutor)
         raise NoWillExecutorNotPresent("Backup tx")
-    print("will is coherent with heirs and willexecutors")
+    print("will is coherent with heirs and will-executors")
     return True
 
 STATUS_NEW = 'New'

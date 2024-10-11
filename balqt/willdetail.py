@@ -95,11 +95,14 @@ class WillDetailDialog(BalDialog):
         self.scrollbox = QScrollArea()
         viewport = QWidget(self.scrollbox)
         self.willlayout = QVBoxLayout(viewport)
+        print("here")
         self.detailsWidget = WillWidget(parent=self)
+        print("there")
         self.willlayout.addWidget(self.detailsWidget)
 
         self.scrollbox.setWidget(viewport)
         viewport.setLayout(self.willlayout)
+        print("done")
     def ask_password_and_sign_transactions(self):
         self.bal_window.ask_password_and_sign_transactions(callback=self.update)
         self.update()

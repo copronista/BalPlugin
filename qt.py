@@ -282,7 +282,7 @@ class BalWindow():
                     self.will[w]['tx'].get_info_from_wallet(self.wallet)
                 except:
                     self.disable_plugin=True
-                    self.window.show_warning(_('Please restart Electrum to activate the BAL plugin'), title=_('Success'))
+                    self.show_warning(_('Please restart Electrum to activate the BAL plugin'), title=_('Success'))
                     self.bal_plugin.on_close()
                     return
                 
@@ -367,7 +367,7 @@ class BalWindow():
                 self.set_heir(heir)
                 break
             except Exception as e:
-                self.window.show_error(str(e))
+                self.show_error(str(e))
 
     def export_inheritance_handler(self,path):
         txs = self.build_inheritance_transaction(ignore_duplicate=True, keep_original=False)
@@ -403,7 +403,7 @@ class BalWindow():
     def prepare_will(self, ignore_duplicate = False, keep_original = False):
         will = self.build_inheritance_transaction(ignore_duplicate = ignore_duplicate, keep_original=keep_original)
         if not (will and len(will) > 0 and Will.is_new(will)):
-            self.window.show_message(_('no tx to be created'))
+            self.show_message(_('no tx to be created'))
         return will
     def will_not_replaced_nor_invalidated(self):
         for k,v in self.will.items():
@@ -436,11 +436,11 @@ class BalWindow():
             raise e
     #def invalidate_will(self):
     #    tx = Will.invalidate_will(self.will,self.wallet,self.will_settings['tx_fees']))
-    #    self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
+    #    self.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
     #    if tx:
     #        self.show_transaction(tx)
     #    else:
-    #        self.window.show_message(_("no inputs to be invalidate"))
+    #        self.show_message(_("no inputs to be invalidate"))
     def update_will(self,will):
         print("SELF.UPDATE WILL")
         Will.update_will(self.will,will)
@@ -504,10 +504,10 @@ class BalWindow():
                 #    tx = Will.invalidate_will(self.will)
                 #    #self.window.show_transaction(self.will[key]['tx'])
 
-                #    self.window.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
+                #    self.show_message(_("Current Will have to be invalidated a transaction have to be signed and broadcasted to the bitcoin network"))
                 #    self.bal_window.window.show_transaction(tx)
                 #except NotCompleteWillException as e:
-                #    self.window.show_message(_("Will is not complete some utxo was not included for unknown reasons"))
+                #    self.show_message(_("Will is not complete some utxo was not included for unknown reasons"))
 
 
                 
@@ -518,12 +518,20 @@ class BalWindow():
             raise e
             pass
             #print(e)
-            #self.window.show_message(e)
+            #self.show_message(e)
             #raise e
         return self.will 
 
     def check_will(self):
         return Will.is_will_valid(self.will, self.block_to_check, self.date_to_check, self.will_settings['tx_fees'],self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=self.willexecutors ,self_willexecutor=self.no_willexecutor,callback_not_valid_tx=self.delete_not_valid)
+    def show_message(self,text):
+        self.window.show_message(text)
+    def show_warning(self,text):
+        self.window.show_warning(text)
+    def show_error(self,text):
+        self.window.show_error(text)
+    def show_critical(self,text):
+        self.window.show_critical(text)
 
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
@@ -581,16 +589,18 @@ class BalWindow():
                     message = "txfees are changed"
                 elif isinstance(e,Will.HeirNotFoundException):
                     message = "heir not found"
-                self.window.show_message(f"{_(message)}: {e} {_('will have to be rebuilt')}")
+                self.show_message(f"{_(message)}: {e} {_('will have to be rebuilt')}")
                 print("build will")
                 self.build_will(ignore_duplicate,keep_original)
 
                 try:
                     self.check_will()
+                    for wid,w in self.will.items():
+                        self.wallet.set_label(wid,"BAL Transaction")
                 except Will.WillExpiredException as e:
                     self.invalidate_will()
                 except Will.NotCompleteWillException as e:
-                    self.window.show_error("Error:{}\n {}".format(str(e),_("Please, check your heirs, locktime and threshold!")))
+                    self.show_error("Error:{}\n {}".format(str(e),_("Please, check your heirs, locktime and threshold!")))
 
                 self.window.history_list.update()
                 self.window.utxo_list.update()
@@ -645,18 +655,18 @@ class BalWindow():
     def invalidate_will(self):
         def on_success(result):
             if result:
-                self.window.show_message(_("Please sign and broadcast this transaction to invalidate current will"))
+                self.show_message(_("Please sign and broadcast this transaction to invalidate current will"))
                 a=self.show_transaction(result)
             else:
-                self.window.show_message(_("No transactions to invalidate"))
+                self.show_message(_("No transactions to invalidate"))
         def on_failure(exec_info):
-            self.window.show_error(f"ERROR:{exec_info}")
+            self.show_error(f"ERROR:{exec_info}")
             Util.print_var(exec_info)
         #txs = Will.invalidate_will(self.will)
         fee_per_byte=self.will_settings.get('tx_fees',1)
         task = partial(Will.invalidate_will,self.will,self.wallet,fee_per_byte)
         msg = _("Calculating Transactions")
-        self.waiting_dialog = WaitingDialog(self.window, msg, task, on_success, on_failure)
+        self.waiting_dialog = BalWaitingDialog(self.window, msg, task, on_success, on_failure)
 
     def ask_password_and_sign_transactions(self,callback=None):
         def on_success(txs):
@@ -673,7 +683,7 @@ class BalWindow():
                     print("CALLLBACK")
                     callback()
                 except Exception as e:
-                    print("failed to update willlist")
+                    print("failed to CALLBACK")
                     raise e
                     pass
 
@@ -693,13 +703,16 @@ class BalWindow():
     def broadcast_transactions(self,force=False):
         def on_success(sulcess):
             print("OK, sulcess transaction was sent")
-            self.will_list.update_will(self.will)
+            self.show_message(_("All transactions are broadcasted to respective Will-Executors"))
+            self.will_list.update()
             pass
         def on_failure(err):
             print(err)
-       
-        self.broadcasting_dialog = WaitingDialog(self.window,"selecting willexecutors",partial(self.push_transactions_to_willexecutors,force),on_success,on_failure)
-        self.will_list.update()
+
+        task = partial(self.push_transactions_to_willexecutors,force)
+        msg = _('Selecting Will-Executors')
+        self.broadcasting_dialog = BalWaitingDialog(self.window,msg,task,on_success,on_failure)
+        #self.will_list.update()
 
     def push_transactions_to_willexecutors(self,force=False):
         willexecutors ={}
@@ -723,7 +736,7 @@ class BalWindow():
         if not willexecutors:
             return
         def getMsg(willexecutors):
-            msg = "Pushing Transactions to willexecutors:\n"
+            msg = "Pushing Transactions to Will-Executors:\n"
             for url in willexecutors:
                 msg += f"{url}:\t{willexecutors[url]['broadcast_status']}\n"
             return msg
@@ -741,7 +754,6 @@ class BalWindow():
                     else:
                         willexecutors[url]['broadcast_stauts'] = _("Failed")
                     del willexecutor['txs']
-        self.window.show_message("All transactions are broadcasted to respective willexecutors")
 
     def push_transactions_to_willexecutor(self,strtxs,url):
         print(url,strtxs)
@@ -766,7 +778,7 @@ class BalWindow():
         try:
             Util.export_meta_gui(self.window, _('will.json'), self.export_json_file)
         except Exception as e:
-            self.window.show_error(str(e))
+            self.show_error(str(e))
             raise e
         
     def import_will(self):
