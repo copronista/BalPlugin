@@ -39,7 +39,7 @@ import urllib.parse
 from ..bal import BalPlugin
 from .. import util as Util
 from .. import willexecutors as Willexecutors
-from .baldialog import BalDialog
+from .baldialog import BalDialog,BalBlockingWaitingDialog
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -218,7 +218,8 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config
         self.window = bal_window.window
-        self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin)
+        self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin, update = True, window = self.window)
+
         
         self.setWindowTitle(_('Will-Executor Service List'))
         self.setMinimumSize(800, 200)

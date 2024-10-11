@@ -150,7 +150,7 @@ def check_anticipate(ow:'WillItem',nw:'WillItem'):
             if nw.we and ow.we:
                 if ow.we['url'] == nw.we['url']:
                     print("same url")
-                    if ow.we['base_fee']>nw.we['base_fee']:
+                    if int(ow.we['base_fee'])>int(nw.we['base_fee']):
                         print("fee are lowered")
                         return anticipate
                     else:
