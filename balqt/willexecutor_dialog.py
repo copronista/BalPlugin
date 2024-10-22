@@ -64,7 +64,7 @@ class WillExecutorList(MyTreeView):
     def __init__(self, parent: 'WillExecutorDialog'):
         super().__init__(
             parent=parent,
-            stretch_column=self.Columns.URL,
+            stretch_column=self.Columns.ADDRESS,
             editable_columns=[self.Columns.URL,self.Columns.BASE_FEE,self.Columns.ADDRESS,self.Columns.INFO],
 
         )
@@ -218,7 +218,7 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
         self.gui_object = self.bal_plugin.gui_object
         self.config = self.bal_plugin.config
         self.window = bal_window.window
-        self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin, update = True, window = self.window)
+        self.bal_window = bal_window
 
         
         self.setWindowTitle(_('Will-Executor Service List'))
@@ -230,6 +230,10 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
         vbox.addWidget(self.size_label)
         vbox.addWidget(self.willexecutor_list)
         buttonbox = QHBoxLayout()
+
+        b = QPushButton(_('Update'))
+        b.clicked.connect(self.update_willexecutors)
+        buttonbox.addWidget(b)
 
         b = QPushButton(_('Import'))
         b.clicked.connect(self.import_file)
@@ -264,7 +268,11 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
     def export_json_file(self,path):
         write_json_file(path, self.willexecutors_list)
 
+    def update_willexecutors(self):
+        self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin, update = True, bal_window = self.bal_window,force=True)
+        self.willexecutors_list.update()
 
+        
     def import_json_file(self, path):
         data = read_json_file(path)
         data = self._validate(data)

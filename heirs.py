@@ -458,6 +458,7 @@ class Heirs(dict, Logger):
         alltxs = {}
         #print(willexecutorsitems)
         while True:
+            print("j",j)
             j+=1
             if j >= willexecutorslen:
                 #print("j> willexecutorslen")
@@ -469,6 +470,7 @@ class Heirs(dict, Logger):
                     continue
             elif j == -1:
                 if not no_willexecutors:
+                    print("no willexecutors",no_willexecutors)
                     continue
                 url = willexecutor = False
             else:
@@ -486,7 +488,7 @@ class Heirs(dict, Logger):
                 #print("total_fees",total_fees)
                 newbalance = balance 
                 locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor, from_locktime)
-                #print("locktimes",locktimes)
+                print("locktimes",locktimes)
                 print("fees",fees)
                 try:
                     txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)

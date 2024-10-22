@@ -7,10 +7,12 @@ from electrum import constants
 from electrum.gui.qt.util import WaitingDialog
 from functools import partial
 from electrum.i18n import _
+from .balqt.baldialog import BalWaitingDialog
 
 
 
-def get_willexecutors(bal_plugin, update = False,window=False):
+
+def get_willexecutors(bal_plugin, update = False,bal_window=False,force=False):
     willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
     for w in willexecutors:
         initialize_willexecutor(willexecutors[w],w)
@@ -25,13 +27,14 @@ def get_willexecutors(bal_plugin, update = False,window=False):
         for url,we in willexecutors.items():
             if is_selected(we):
                 found = True
-        if found:
-            if bal_plugin.config_get(bal_plugin.PING_WILLEXECUTORS):
+        if found or force:
+            if bal_plugin.config_get(bal_plugin.PING_WILLEXECUTORS) or force:
                 ping_willexecutors = True
-                if bal_plugin.config_get(bal_plugin.ASK_PING_WILLEXECUTORS):
-                    ping_willexecutors = window.question(_("Contact willexecutors servers to update payment informations?"))
+                if bal_plugin.config_get(bal_plugin.ASK_PING_WILLEXECUTORS) and not force:
+                    print(type(bal_window))
+                    ping_willexecutors = bal_window.window.question(_("Contact willexecutors servers to update payment informations?"))
                 if ping_willexecutors:
-                    ping_servers(willexecutors)
+                    bal_window.ping_willexecutors(willexecutors)
 
     return willexecutors
 
@@ -93,7 +96,6 @@ def push_transactions_to_willexecutor(strtxs,url):
 def ping_servers(willexecutors):
     for url,we in willexecutors.items():
         willexecutors[url]=get_info_task(url,we)
-
 
 
 def get_info_task(url,willexecutor):

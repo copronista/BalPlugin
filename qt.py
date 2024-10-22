@@ -461,7 +461,7 @@ class BalWindow():
         willtodelete=[]
         willtoappend={}
         try:
-            self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=True, window=self.window) 
+            self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=True, bal_window=self) 
 
             #print(willexecutors)
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,self.date_to_check)
@@ -556,7 +556,7 @@ class BalWindow():
                 #        self.will[txid]['status']+=BalPlugin.STATUS_REPLACED
                 #    else:
                 #        willtodelete.append((None,txid))
-                self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=False,window=self.window) 
+                self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=False,bal_window=self) 
             except Exception as e:
                 raise e
                 return
@@ -656,6 +656,7 @@ class BalWindow():
         def on_success(result):
             if result:
                 self.show_message(_("Please sign and broadcast this transaction to invalidate current will"))
+                self.wallet.set_label(result.txid(),"BAL Invalidate")
                 a=self.show_transaction(result)
             else:
                 self.show_message(_("No transactions to invalidate"))
@@ -844,6 +845,42 @@ class BalWindow():
 
 
 
+    def ping_willexecutors_task(self,wes):
+        print("ping willexecutots task")
+        pinged = []
+        failed = []
+        def get_title():
+            msg = _('Ping Will-Executors')
+            msg += "\n"
+            for url in wes:
+                msg += f"{url}: "
+                if url in pinged:
+                    msg += "Ok"
+                elif url in failed:
+                    msg +="Ko"
+                else:
+                    msg += "-"
+                msg+="\n"
+            return msg 
+        for url,we in wes.items():
+            print(f"ping {url}")
+            self.pingwaiting_dialog.update(get_title())
+            wes[url]=Willexecutors.get_info_task(url,we)
+            if wes[url]['status']=='KO':
+                failed.append(url)
+            else:
+                pinged.append(url)
+            
+    def ping_willexecutors(self,wes):
+        def on_success(result):
+            pass
+        def on_failure(e):
+            print(e)
+            pass
+        print("ping willexecutors")
+        task = partial(self.ping_willexecutors_task,wes)
+        msg = _('Ping Will-Executors')
+        self.pingwaiting_dialog = BalWaitingDialog(self.window,msg,task,on_success,on_failure)
 
     def preview_modal_dialog(self):
         self.dw=WillDetailDialog(self)
