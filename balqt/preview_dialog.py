@@ -249,7 +249,7 @@ class PreviewList(MyTreeView):
         prepareButton.clicked.connect(self.build_transactions)
         signButton = QPushButton("Sign")
         signButton.clicked.connect(self.ask_password_and_sign_transactions)
-        pushButton = QPushButton("Push")
+        pushButton = QPushButton("Broadcast")
         pushButton.clicked.connect(self.broadcast)
         displayButton = QPushButton("Display")
         displayButton.clicked.connect(self.bal_window.preview_modal_dialog)

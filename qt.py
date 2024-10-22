@@ -844,23 +844,26 @@ class BalWindow():
 
 
 
-
     def ping_willexecutors_task(self,wes):
         print("ping willexecutots task")
         pinged = []
         failed = []
         def get_title():
-            msg = _('Ping Will-Executors')
-            msg += "\n"
+            msg = _('Ping Will-Executors:')
+            msg += "\n\n"
             for url in wes:
-                msg += f"{url}: "
+                urlstr = "{:<50}: ".format(url[:50])
                 if url in pinged:
-                    msg += "Ok"
+                    urlstr += "Ok"
                 elif url in failed:
-                    msg +="Ko"
+                    urlstr +="Ko"
                 else:
-                    msg += "-"
-                msg+="\n"
+                    urlstr += "--"
+                urlstr+="\n"
+                print(len(urlstr))
+                print(urlstr)
+                msg+=urlstr
+
             return msg 
         for url,we in wes.items():
             print(f"ping {url}")
@@ -873,6 +876,7 @@ class BalWindow():
             
     def ping_willexecutors(self,wes):
         def on_success(result):
+            del self.pingwaiting_dialog
             pass
         def on_failure(e):
             print(e)

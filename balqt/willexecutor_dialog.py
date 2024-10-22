@@ -40,6 +40,7 @@ from ..bal import BalPlugin
 from .. import util as Util
 from .. import willexecutors as Willexecutors
 from .baldialog import BalDialog,BalBlockingWaitingDialog
+
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -95,15 +96,23 @@ class WillExecutorList(MyTreeView):
                 menu.addAction(_("deselect").format(column_title), lambda: self.deselect(selected_keys))
             else:
                 menu.addAction(_("select").format(column_title), lambda: self.select(selected_keys))
-            menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
             if column in self.editable_columns:
                 item = self.model().itemFromIndex(idx)
                 if item.isEditable():
                     persistent = QPersistentModelIndex(idx)
                     menu.addAction(_("Edit {}").format(column_title), lambda p=persistent: self.edit(QModelIndex(p)))
 
+            menu.addAction(_("Ping").format(column_title), lambda: self.ping_willexecutors(selected_keys))
+            menu.addSeparator()
+            menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
+
         menu.exec_(self.viewport().mapToGlobal(position))
 
+    def ping_willexecutors(self,selected_keys):
+        wout={}
+        for k in selected_keys:
+            wout[k]=self.parent.willexecutors_list[k]
+        self.parent.update_willexecutors(wout)
     def get_edit_key_from_coordinate(self, row, col):
         print("get edit key",row,col,self.ROLE_HEIR_KEY+col)
         a= self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col)
@@ -219,8 +228,8 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
         self.config = self.bal_plugin.config
         self.window = bal_window.window
         self.bal_window = bal_window
+        self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin)
 
-        
         self.setWindowTitle(_('Will-Executor Service List'))
         self.setMinimumSize(800, 200)
         self.size_label = QLabel()
@@ -231,7 +240,7 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
         vbox.addWidget(self.willexecutor_list)
         buttonbox = QHBoxLayout()
 
-        b = QPushButton(_('Update'))
+        b = QPushButton(_('Ping'))
         b.clicked.connect(self.update_willexecutors)
         buttonbox.addWidget(b)
 
@@ -268,8 +277,11 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
     def export_json_file(self,path):
         write_json_file(path, self.willexecutors_list)
 
-    def update_willexecutors(self):
-        self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin, update = True, bal_window = self.bal_window,force=True)
+    def update_willexecutors(self,wes=None):
+        if not wes:
+            self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin, update = True, bal_window = self.bal_window,force=True)
+        else:
+            self.bal_window.ping_willexecutors(wes)
         self.willexecutors_list.update()
 
         
