@@ -154,7 +154,7 @@ def check_anticipate(ow:'WillItem',nw:'WillItem'):
                         print("fee are lowered")
                         return anticipate
                     else:
-                        print("old fees are not lower than new fees so replace with the same locktime",ow.we['base_fee'],nw.we['base_fee'],ow.we['base_fee']>nw.we['base_fee'])
+                        print("old fees are not lower than new fees so replace with the same locktime",ow.we['base_fee'],nw.we['base_fee'],int(ow.we['base_fee'])>int(nw.we['base_fee']))
                         ow.tx.locktime
                 else:
                     print("those fucking shit have different urls")
@@ -766,8 +766,6 @@ class WillItem:
             self.valid = False
             return True
 
-            
-
 class WillExpiredException(Exception):
     pass
 class NotCompleteWillException(Exception):
@@ -786,3 +784,4 @@ class WillExecutorNotPresent(NotCompleteWillException):
     pass
 class NoHeirsException(Exception):
     pass
+

@@ -81,12 +81,15 @@ class BalPlugin(BasePlugin):
     STATUS_COMPLETE = 'Signed'
     STATUS_BROADCASTED = 'Broadcasted'
     STATUS_PUSHED = 'Pushed'
+    STATUS_NOT_PUSHED = 'Push Failed'
     STATUS_EXPORTED = 'Exported'
     STATUS_REPLACED = 'Replaced'
     STATUS_INVALIDATED = 'Invalidated' 
     STATUS_ANTICIPATED = 'Anticipated'
     STATUS_RESTORED = 'Restored'
     STATUS_VALID = 'Valid'
+    STATUS_CHECKED = 'Checked'
+    STATUS_NOT_CHECKED = 'Check Failed'
 
     LATEST_VERSION = '1'
     KNOWN_VERSIONS = ('0', '1')

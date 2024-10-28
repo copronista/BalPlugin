@@ -374,7 +374,7 @@ class BalWindow():
         with open(path,"w") as f:
             for tx in txs:
                 #Util.print_var(tx)
-                tx['status']+=BalPlugin.STATUS_EXPORTED
+                tx['status']+="."+BalPlugin.STATUS_EXPORTED
                 f.write(str(tx['tx']))
                 f.write('\n')
  
@@ -461,7 +461,7 @@ class BalWindow():
         willtodelete=[]
         willtoappend={}
         try:
-            self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=True, bal_window=self) 
+            self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=False, bal_window=self) 
 
             #print(willexecutors)
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,self.date_to_check)
@@ -703,10 +703,14 @@ class BalWindow():
 
     def broadcast_transactions(self,force=False):
         def on_success(sulcess):
+            self.will_list.update()
+            if sulcess:
+                print("error, some transaction was not sent");
+                self.show_warning(_("Some transaction was not broadcasted"))
+                return
             print("OK, sulcess transaction was sent")
             self.show_message(_("All transactions are broadcasted to respective Will-Executors"))
-            self.will_list.update()
-            pass
+
         def on_failure(err):
             print(err)
 
@@ -737,39 +741,30 @@ class BalWindow():
         if not willexecutors:
             return
         def getMsg(willexecutors):
-            msg = "Pushing Transactions to Will-Executors:\n"
+            msg = "Broadcasting Transactions to Will-Executors:\n"
             for url in willexecutors:
                 msg += f"{url}:\t{willexecutors[url]['broadcast_status']}\n"
             return msg
+        error=False
         for url in willexecutors:
             willexecutor = willexecutors[url]
             if Willexecutors.is_selected(willexecutor):
                 print("msg:",getMsg(willexecutors))
                 self.broadcasting_dialog.update(getMsg(willexecutors))
                 if 'txs' in willexecutor:
-                    if self.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
+                    if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
                         for wid in willexecutors[url]['txsids']:
                             self.will[wid][BalPlugin.STATUS_PUSHED]=True
                             self.will[wid]['status']+="."+ BalPlugin.STATUS_PUSHED
                         willexecutors[url]['broadcast_stauts'] = _("Success")
                     else:
+                        for wid in willexecutors[url]['txsids']:
+                            self.will[wid]['status']+="."+ BalPlugin.STATUS_NOT_PUSHED
+                            error = True
                         willexecutors[url]['broadcast_stauts'] = _("Failed")
                     del willexecutor['txs']
-
-    def push_transactions_to_willexecutor(self,strtxs,url):
-        print(url,strtxs)
-        try:
-            req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
-            req.add_header('Content-Type', 'text/plain')
-            with urllib.request.urlopen(req) as response:
-                response_data = response.read().decode('utf-8')
-                if response.status != 200:
-                    print(f"error{response.status} pushing txs to: {url}")
-                else:
-                    return True
-                
-        except Exception as e:
-            print(f"error contacting {url} for pushing txs",e)
+        if error:
+            return True
 
 
     def export_json_file(self,path):
@@ -843,6 +838,31 @@ class BalWindow():
         return txs
 
 
+    def check_transactions_task(self,will):
+        for wid,w in will.items():
+            self.pingwaiting_dialog.update(wid)
+            resp = Willexecutors.check_transaction(wid,w['willexecutor']['url'])
+            if not resp:
+                w['status']+="." + BalPlugin.STATUS_NOT_CHECKED
+                w[BalPlugin.STATUS_PUSHED] = False
+            else:
+                w['status']+="." + BalPlugin.STATUS_CHECKED
+                w[BalPlugin.STATUS_PUSHED] = True
+
+
+    def check_transactions(self,will):
+        def on_success(result):
+            del self.pingwaiting_dialog
+            self.update_all()
+            pass
+        def on_failure(e):
+            print(e)
+            pass
+        print("check Transaction")
+        task = partial(self.check_transactions_task,will)
+        msg = _('Check Transaction')
+        self.pingwaiting_dialog = BalWaitingDialog(self.window,msg,task,on_success,on_failure)
+        
 
     def ping_willexecutors_task(self,wes):
         print("ping willexecutots task")

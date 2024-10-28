@@ -144,4 +144,20 @@ def get_willexecutors_list_from_json(bal_plugin):
         print("errore aprendo willexecutors.json:",e)
         return {}
 
+def check_transaction(txid,url):
+    print(f"url:txid")
+    try:
+        req = urllib.request.Request(url+"/searchtx", data=txid.encode('ascii'), method='POST')
+        req.add_header('Content-Type', 'text/plain')
+        with urllib.request.urlopen(req) as response:
+            if response.status != 200:
+                print(f"error{response.status} checking txs to: {url}")
+            else:
+                response_data=response.read().decode('utf-8')
+                print("response data",response_data)
+                w = json.loads(response_data)
 
+                return w
+            
+    except Exception as e:
+        print(f"error contacting {url} for checking txs",e)

@@ -117,6 +117,8 @@ class PreviewList(MyTreeView):
             """    
             #menu.addAction(_("select").format(column_title), lambda: self.select(selected_keys))
             menu.addAction(_("details").format(column_title), lambda: self.show_transaction(selected_keys)).setEnabled(len(selected_keys)<2)
+            if len(selected_keys)==1:
+                menu.addAction(_("check ").format(column_title), lambda: self.check_transactions(selected_keys))
 
             menu.addSeparator()
             menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
@@ -134,7 +136,15 @@ class PreviewList(MyTreeView):
         for key in selected_keys:
             del self.will[key]
         self.update()
-        
+
+    def check_transactions(self,selected_keys):
+        wout = {}
+        for k in selected_keys:
+            wout[k] = self.will[k]
+        if wout:
+            self.bal_window.check_transactions(wout)
+        self.update()
+
     def show_transaction(self,selected_keys):
         for key in selected_keys:
             self.bal_window.show_transaction(self.will[key]['tx'])
