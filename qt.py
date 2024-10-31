@@ -840,7 +840,7 @@ class BalWindow():
 
     def check_transactions_task(self,will):
         for wid,w in will.items():
-            self.pingwaiting_dialog.update(wid)
+            self.pingwaiting_dialog.update("checking transaction: {}\n willexecutor: {}",wid,w['willexecutor']['url'])
             resp = Willexecutors.check_transaction(wid,w['willexecutor']['url'])
             if not resp:
                 w['status']+="." + BalPlugin.STATUS_NOT_CHECKED

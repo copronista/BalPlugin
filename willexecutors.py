@@ -11,7 +11,7 @@ from .balqt.baldialog import BalWaitingDialog
 
 
 
-
+DEFAULT_TIMEOUT = 5
 def get_willexecutors(bal_plugin, update = False,bal_window=False,force=False):
     willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
     for w in willexecutors:
@@ -83,7 +83,7 @@ def push_transactions_to_willexecutor(strtxs,url):
     try:
         req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
         req.add_header('Content-Type', 'text/plain')
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout = DEFAULT_TIMEOUT) as response:
             response_data = response.read().decode('utf-8')
             if response.status != 200:
                 print(f"error{response.status} pushing txs to: {url}")
@@ -104,7 +104,7 @@ def get_info_task(url,willexecutor):
         print("GETINFO_WILLEXECUTOR")
         print(url)
         req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info",  method='GET')
-        with urllib.request.urlopen(req,timeout=10) as response:
+        with urllib.request.urlopen(req,timeout=DEFAULT_TIMEOUT) as response:
             response_data=response.read().decode('utf-8')
 
             w = json.loads(response_data)
@@ -149,7 +149,7 @@ def check_transaction(txid,url):
     try:
         req = urllib.request.Request(url+"/searchtx", data=txid.encode('ascii'), method='POST')
         req.add_header('Content-Type', 'text/plain')
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout = DEFAULT_TIMEOUT) as response:
             if response.status != 200:
                 print(f"error{response.status} checking txs to: {url}")
             else:
