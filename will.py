@@ -428,13 +428,15 @@ def invalidate_will(will,wallet,fees_per_byte):
     filtered_inputs = []
     prevout_to_spend = []
     for prevout_str,ws in inputs.items(): 
+        print("prevout str:",prevout_str)
         for w in ws:
-            print("wid = ",w[0])
+            print("wid = ",w[0], prevout_str, w[0] in filtered_inputs)
             if not w[0] in filtered_inputs: 
+                print("filtered wid")
                 filtered_inputs.append(w[0])
                 if not prevout_str in prevout_to_spend:
+                    print("prevout to spend:",prevout_str)
                     prevout_to_spend.append(prevout_str)
-                break
     print("prevout to spends")
     print(prevout_to_spend)
     balance = 0

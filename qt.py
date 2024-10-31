@@ -641,7 +641,6 @@ class BalWindow():
             return d
 
     def show_transaction(self,tx=None,txid=None,parent = None):
-        print("parent:",parent)
         if not parent:
             parent = self.window
         if txid !=None and txid in self.will:
