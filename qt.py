@@ -250,7 +250,7 @@ class BalWindow():
         add_optional_tab(self.window.tabs, self.heirs_tab, qt_resources.read_QIcon("heir.png"), _("&Heirs"))
         add_optional_tab(self.window.tabs, self.will_tab, qt_resources.read_QIcon("will.png"), _("&Will"))
         tools_menu.addSeparator()
-        self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will-Executors"), self.willexecutor_dialog)
+        self.tools_menu.willexecutors_action = tools_menu.addAction(_("&Will-Executors"), self.show_willexecutor_dialog)
     def erease_will(self):
         to_delete = []
         for w in self.will:
@@ -296,9 +296,9 @@ class BalWindow():
     def get_window_title(self,title):
         return _('BAL - ') + _(title) 
 
-    def willexecutor_dialog(self):
-        h = WillExecutorDialog(self)
-        h.show()
+    def show_willexecutor_dialog(self):
+        self.willexecutor_dialog = WillExecutorDialog(self)
+        self.willexecutor_dialog.show()
 
     def create_heirs_tab(self):
         self.heir_list = l = HeirList(self)
@@ -897,6 +897,7 @@ class BalWindow():
     def ping_willexecutors(self,wes):
         def on_success(result):
             del self.pingwaiting_dialog
+            self.willexecutor_dialog.willexecutor_list.update()
             pass
         def on_failure(e):
             print(e)

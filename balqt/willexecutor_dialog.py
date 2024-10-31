@@ -113,6 +113,7 @@ class WillExecutorList(MyTreeView):
         for k in selected_keys:
             wout[k]=self.parent.willexecutors_list[k]
         self.parent.update_willexecutors(wout)
+        self.update()
     def get_edit_key_from_coordinate(self, row, col):
         print("get edit key",row,col,self.ROLE_HEIR_KEY+col)
         a= self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col)
@@ -161,8 +162,10 @@ class WillExecutorList(MyTreeView):
 
     def update(self):
         if self.parent.willexecutors_list is None:
+            print("why it is none?",self.parent.willexecutors_list)
+            print("why it is none?",self.willexecutors)
             return
-
+        
         current_key = self.get_role_data_for_current_item(col=self.Columns.URL, role=self.ROLE_HEIR_KEY)
         self.model().clear()
         self.update_headers(self.__class__.headers)
@@ -282,7 +285,8 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
             self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin, update = True, bal_window = self.bal_window,force=True)
         else:
             self.bal_window.ping_willexecutors(wes)
-        self.willexecutors_list.update()
+            self.willexecutors_list.update(wes)
+            self.willexecutor_list.update()
 
         
     def import_json_file(self, path):
