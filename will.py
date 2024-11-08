@@ -526,6 +526,18 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
                 will[wid]['status']+=".{}".format(STATUS_CONFIRMED)
 
     all_inputs=get_all_inputs(will,only_valid = True)
+    #check all input spent are in wallet or valid txs 
+    for inp,ws in all_inputs.items():
+        if not Util.in_utxo(inp,all_utxos):
+            for w in ws:
+                if w[1][STATUS_VALID]:
+                    prevout_id = w[2].prevout.txid.hex()
+                    parentwill = will.get(prevout_id,False)
+                    if not parentwill or not parentwill[STATUS_VALID]:
+                        w[1][STATUS_INVALIDATED]=True
+                        w[1][STATUS_VALID]=False
+                        w[1]['status']+=".{}".format(STATUS_INVALIDATED)
+     
     all_inputs_min_locktime = get_all_inputs_min_locktime(all_inputs)
     search_rai(all_inputs,all_utxos,will,wallet,callback_not_valid_tx= callback_not_valid_tx)
 
@@ -553,17 +565,8 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
                         print(all_inputs.keys())
                         raise NotCompleteWillException("Some utxo in the wallet is not included")
 
-        #check all input spent are in wallet or valid txs 
-        for inp,ws in all_inputs.items():
-            for w in ws:
-                if w[1][STATUS_VALID]:
-                    if not Util.in_utxo(inp,all_utxos):
-                        prevout_id = w[2].prevout.txid.hex()
-                        parentwill = will.get(prevout_id,False)
-                        if not parentwill or not parentwill[STATUS_VALID]:
-                            w[1][STATUS_INVALIDATED]=True
-                            w[1][STATUS_VALID]=False
-                            #callback_not_valid_tx(w[0],w[2])
+                           #callback_not_valid_tx(w[0],w[2])
+
 
                 #return False
     print('tutto ok')

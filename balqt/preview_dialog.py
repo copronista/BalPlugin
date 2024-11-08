@@ -211,7 +211,10 @@ class PreviewList(MyTreeView):
             labels[self.Columns.TXID] = txid
             #labels[self.Columns.DESCRIPTION] = bal_tx.get('description','')
             #labels[self.Columns.VALUE] = Util.decode_amount(bal_tx.get('heirsvalue',0),self.config.get_decimal_point())
-            labels[self.Columns.STATUS] = bal_tx.get('status','None')
+            status = bal_tx.get('status','None')
+            if len(status) > 53:
+                status = "...{}".format(status[-50:])
+            labels[self.Columns.STATUS] = status
             
             
             
