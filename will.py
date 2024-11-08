@@ -251,17 +251,6 @@ def get_all_inputs_min_locktime(all_inputs):
 
     return all_inputs_min_locktime
 
-def set_status(w,new_status):
-    if new_status == STATUS_VALID:
-        w['status']+=_(STATUS_VALID)
-        w[STATUS_VALID] = True
-    elif new_status == STATUS_REPLACED:
-        w['status'] +=STATUS_REPLACED
-        w[STATUS_REPLACED]=True
-        w[STATUS_REPLACED]=False
-    elif new_status == STATUS_INVALIDATED:
-        w['status']+=STATUS_INVALIDATED
-        w[STATUS_VALID]=True
 
 
 
@@ -394,18 +383,6 @@ def update_will(old_will,new_will):
                         old_will[oid][STATUS_VALID] = False
         """
 
-def reset_status(w):
-                #w['status'] = STATUS_NEW
-                w[STATUS_NEW] = True
-                w[STATUS_VALID] = True
-                w[STATUS_REPLACED] = False
-                w[STATUS_INVALIDATED] = False
-                w[STATUS_EXPORTED] = False
-                w[STATUS_BROADCASTED] = False
-                w[STATUS_RESTORED] = False
-                w[STATUS_COMPLETE] = False
-                w[STATUS_PUSHED] = False
-                w[STATUS_ANTICIPATED] = False
 
 def get_higher_input_for_tx(will):
     out = {}
@@ -476,60 +453,97 @@ def is_new(will):
             return True
 
 #_transactions_replaced_anticipated_invalidated(all_inputs,all_utxos):
-def search_rai (all_inputs,all_utxos,will,callback_not_valid_tx=None):
+def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
+    print("SEARCH RAI")
     will_only_valid = only_valid_or_replaced_list(will)
     for inp,ws in all_inputs.items():
+        inutxo = Util.in_utxo(inp,all_utxos)
+        print(inp)
         for w in ws:
+            print("WWWW")
             wi=WillItem(w[1])
-            if wi.valid:
-                if not Util.in_utxo(inp,all_utxos):
-                    prevout_id=w[2].prevout.txid.hex()
+            if wi.valid or wi.confirmed:
+                prevout_id=w[2].prevout.txid.hex()
+                if not inutxo:
                     if prevout_id in will:
                         wo=WillItem(will[prevout_id])
                         print("willitem will be replaced or invalidated:",wo._id,wo.replaced,wo.invalidated)
                         if wo.replaced:
                             wi.set_status_replaced()
                             will[wi._id]=wi.to_dict()
+                            print("set replaced")
                         if wo.invalidated:
                             wi.set_status_invalidated()
                             will[wi._id]=wi.to_dict()
+                            print("set invalidated")
                         
                     else:
-                        wi.set_status_invalidated()
+                        if wallet.db.get_transaction(wi._id):
+                            print("wi have to be confirmed",wi._id,wi.replaced,wi.invalidated,wi.confirmed)
+                            wi.set_status_confirmed()
+                        else:
+                            print("wi have to be invalidated",wi._id,wi.replaced,wi.invalidated,wi.confirmed)
+                            wi.set_status_invalidated()
                         will[wi._id]=wi.to_dict()
                         #print("utxo was replaced")
                         #wi.set_status_replaced()
                         #will[wi._id]=wi.to_dict()
-
+                else:
+                    print("inp not utxo",prevout_id)
+                    if prevout_id in will:
+                        wo = WillItem(will[prevout_id])
+                        ttx= wallet.db.get_transaction(prevout_id)
+                        if ttx:
+                            print("prevout have to be confirmed",prevout_id)
+                            wo.set_status_confirmed()
+                        else:
+                            print("prevout have to be invalidated",prevout_id)
+                            wo.set_status_invalidated()
+                        will[wo._id]=wo.to_dict()
+    
                 for child in wi.search(all_inputs):
                     if child.tx.locktime < wi.tx.locktime:
                         print(f"trying to replace {w[0]}")
                         if wi.set_status_replaced():
                             will[wi._id]=wi.to_dict()
+            else:
+                print("wi not valid nor confirmed")
+                Util.print_var(w,"W1.")
+                    
 
 
 
-
-
-def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,heirs={},willexecutors={},self_willexecutor=False, callback_not_valid_tx=None):
+def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,heirs={},willexecutors={},self_willexecutor=False, wallet=False, callback_not_valid_tx=None):
     spent_utxos = []
     spent_utxos_tx = []
+    #check transaction in bitcoin network:
+    for wid, w in will.items():
+        if not w[STATUS_CONFIRMED]:
+            tt=wallet.db.get_transaction(wid)
+            if tt:
+                will[wid][STATUS_CONFIRMED]=True
+                will[wid][STATUS_VALID]=False
+                will[wid]['status']+=".{}".format(STATUS_CONFIRMED)
+
     all_inputs=get_all_inputs(will,only_valid = True)
     all_inputs_min_locktime = get_all_inputs_min_locktime(all_inputs)
-    search_rai(all_inputs,all_utxos,will,callback_not_valid_tx= callback_not_valid_tx)
+    search_rai(all_inputs,all_utxos,will,wallet,callback_not_valid_tx= callback_not_valid_tx)
+
     if heirs:
         if not check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
             raise NotCompleteWillException("not complete")
     else:
         print("not heirs")
         return
-    #check that all utxo in wallet ar e spent
+
+    #check if some transaction is expired
     for prevout_str, wid in all_inputs_min_locktime.items():
         for w in wid: 
             if w[1][STATUS_VALID]:
                 locktime = wid[0][1]['tx'].locktime
                 if int(locktime) < int(timestamp_to_check):
                     raise WillExpiredException(f"Will Expired {wid[0][0]}: {locktime}<{timestamp_to_check}")
+
     print('check all utxo in wallet are spent')
     if all_inputs:
         for utxo in all_utxos:
@@ -538,20 +552,20 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
                         print("utxo is not spent",utxo.to_json())
                         print(all_inputs.keys())
                         raise NotCompleteWillException("Some utxo in the wallet is not included")
-    """
-    #check that all spent uxtos are in wallet
-    print('check all spent utxos are in wallet')
-    for inp,ws in all_inputs.items():
-        for w in ws:
-            print(w)
-            if w[1][STATUS_VALID]:
-                if not w[2].prevout.txid.hex() in only_valid_list(will):
+
+        #check all input spent are in wallet or valid txs 
+        for inp,ws in all_inputs.items():
+            for w in ws:
+                if w[1][STATUS_VALID]:
                     if not Util.in_utxo(inp,all_utxos):
-                        if callback_not_valid_tx:
-                            print(f"trying to invalidate {w[0]}")
-                            callback_not_valid_tx(w[0],w[2])
+                        prevout_id = w[2].prevout.txid.hex()
+                        parentwill = will.get(prevout_id,False)
+                        if not parentwill or not parentwill[STATUS_VALID]:
+                            w[1][STATUS_INVALIDATED]=True
+                            w[1][STATUS_VALID]=False
+                            #callback_not_valid_tx(w[0],w[2])
+
                 #return False
-    """
     print('tutto ok')
     return True
 
@@ -636,6 +650,8 @@ STATUS_INVALIDATED = 'Invalidated'
 STATUS_ANTICIPATED = 'Anticipated'
 STATUS_RESTORED = 'Restored'
 STATUS_VALID = 'Valid'
+STATUS_CONFIRMED = 'Confirmed'
+
 
 class WillItem: 
     def __init__(self,w,_id=None): 
@@ -660,6 +676,7 @@ class WillItem:
             self.exported = w.get(STATUS_EXPORTED,False) 
             self.complete = w.get(STATUS_COMPLETE,False) 
             self.pushed = w.get(STATUS_PUSHED,False) 
+            self.confirmed = w.get(STATUS_CONFIRMED,False) 
             if not _id:
                 self._id = self.tx.txid()
             else:
@@ -690,6 +707,7 @@ class WillItem:
             STATUS_BROADCASTED: self.broadcasted,
             STATUS_COMPLETE: self.complete,
             STATUS_PUSHED: self.pushed,
+            STATUS_CONFIRMED: self.confirmed
         }
 
     def print(self):
@@ -760,6 +778,15 @@ class WillItem:
             self.valid = False
             return True
 
+    def set_status_confirmed(self):
+        print("actually confirmed")
+        if not self.confirmed:
+            self.status +="."+STATUS_CONFIRMED
+            self.invalidated = False
+            self.valid = False
+            self.confirmed = True
+            return True
+
     def set_status_replaced(self):
         print("actually_replaced")
         if not self.replaced:
@@ -786,4 +813,3 @@ class WillExecutorNotPresent(NotCompleteWillException):
     pass
 class NoHeirsException(Exception):
     pass
-

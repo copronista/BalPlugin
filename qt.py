@@ -427,6 +427,7 @@ class BalWindow():
             self.del_old_will(new_old_will_to_delete)
     
     def delete_not_valid(self,txid,s_utxo):
+        raise(NotImplementedError)
         try:
             self.will[txid]['status']+=BalPlugin.STATUS_INVALIDATED
             self.will[txid][BalPlugin.STATUS_VALID]=False
@@ -523,7 +524,7 @@ class BalWindow():
         return self.will 
 
     def check_will(self):
-        return Will.is_will_valid(self.will, self.block_to_check, self.date_to_check, self.will_settings['tx_fees'],self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=self.willexecutors ,self_willexecutor=self.no_willexecutor,callback_not_valid_tx=self.delete_not_valid)
+        return Will.is_will_valid(self.will, self.block_to_check, self.date_to_check, self.will_settings['tx_fees'],self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=self.willexecutors ,self_willexecutor=self.no_willexecutor, wallet = self.wallet, callback_not_valid_tx=self.delete_not_valid)
     def show_message(self,text):
         self.window.show_message(text)
     def show_warning(self,text):
@@ -839,7 +840,7 @@ class BalWindow():
 
     def check_transactions_task(self,will):
         for wid,w in will.items():
-            self.pingwaiting_dialog.update("checking transaction: {}\n willexecutor: {}",wid,w['willexecutor']['url'])
+            self.pingwaiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w['willexecutor']['url']))
             resp = Willexecutors.check_transaction(wid,w['willexecutor']['url'])
             if not resp:
                 w['status']+="." + BalPlugin.STATUS_NOT_CHECKED

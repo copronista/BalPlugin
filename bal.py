@@ -90,6 +90,8 @@ class BalPlugin(BasePlugin):
     STATUS_VALID = 'Valid'
     STATUS_CHECKED = 'Checked'
     STATUS_NOT_CHECKED = 'Check Failed'
+    STATUS_CONFIRMED = 'Confirmed'
+  
 
     LATEST_VERSION = '1'
     KNOWN_VERSIONS = ('0', '1')

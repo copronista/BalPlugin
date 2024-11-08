@@ -191,6 +191,8 @@ class WillWidget(QWidget):
                     pal.setColor(QPalette.Background, QColor(255,0, 0))
                 elif self.will[w].get(BalPlugin.STATUS_REPLACED,False):
                     pal.setColor(QPalette.Background, QColor(255, 255, 0))
+                elif self.will[w].get(BalPlugin.STATUS_CONFIRMED,False):
+                    pal.setColor(QPalette.Background, QColor(255, 0, 255))
                 else:
                     pal.setColor(QPalette.Background, QColor("#57c7d4"))
                 detailw.setAutoFillBackground(True)
