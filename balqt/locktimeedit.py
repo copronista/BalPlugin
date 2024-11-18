@@ -6,9 +6,9 @@ import time
 from datetime import datetime
 from typing import Optional, Any
 
-from PyQt5.QtCore import Qt, QDateTime, pyqtSignal
-from PyQt5.QtGui import QPalette, QPainter
-from PyQt5.QtWidgets import (QWidget, QLineEdit, QStyle, QStyleOptionFrame, QComboBox,
+from PyQt6.QtCore import Qt, QDateTime, pyqtSignal
+from PyQt6.QtGui import QPalette, QPainter
+from PyQt6.QtWidgets import (QWidget, QLineEdit, QStyle, QStyleOptionFrame, QComboBox,
                              QHBoxLayout, QDateTimeEdit)
 
 from electrum.i18n import _

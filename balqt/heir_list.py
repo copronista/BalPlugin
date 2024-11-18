@@ -26,9 +26,9 @@
 import enum
 from typing import TYPE_CHECKING
 
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtCore import Qt, QPersistentModelIndex, QModelIndex
-from PyQt5.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox,QPushButton)
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtCore import Qt, QPersistentModelIndex, QModelIndex
+from PyQt6.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox,QPushButton)
 
 from electrum.i18n import _
 from electrum.bitcoin import is_address
@@ -36,7 +36,7 @@ from electrum.util import block_explorer_URL
 from electrum.plugin import run_hook
 
 from electrum.gui.qt.util import webopen, MessageBoxMixin,HelpButton
-from electrum.gui.qt.my_treeview import MyTreeView
+from electrum.gui.qt.my_treeview import MyTreeView, MySortModel
 from datetime import datetime
 from .. import util as Util
 from .locktimeedit import HeirsLockTimeEdit
@@ -59,7 +59,9 @@ class HeirList(MyTreeView,MessageBoxMixin):
     }
     filter_columns = [Columns.NAME, Columns.ADDRESS]
 
-    ROLE_HEIR_KEY = Qt.UserRole + 2000
+    ROLE_SORT_ORDER = Qt.ItemDataRole.UserRole + 1000
+
+    ROLE_HEIR_KEY = Qt.ItemDataRole.UserRole + 1001
     key_role = ROLE_HEIR_KEY
 
     def __init__(self, bal_window: 'BalWindow'):
@@ -71,24 +73,23 @@ class HeirList(MyTreeView,MessageBoxMixin):
         )
         self.decimal_point = bal_window.bal_plugin.config.get_decimal_point()
         self.bal_window = bal_window
+
         self.setModel(QStandardItemModel(self))
-        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.setSortingEnabled(True)
         self.std_model = self.model()
+
+
+        self.sortByColumn(self.Columns.NAME, Qt.SortOrder.AscendingOrder)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setSortingEnabled(True)
         self.update()
+    
 
     def on_edited(self, idx, edit_key, *, text):
-        print("self",self)
-        print("idx",idx)
-        print("edit key",edit_key)
-        print("text",text)
-       
         original = prior_name = self.bal_window.heirs.get(edit_key)
-        print("prior_name",prior_name,text)
         if not prior_name:
             return
         col = idx.column()
-        #print("column",col,self.Columns.LOCKTIME)
         try:
             #if col == 3:
             #    try:
@@ -105,21 +106,22 @@ class HeirList(MyTreeView,MessageBoxMixin):
             prior_name.insert(0,edit_key)
             prior_name = tuple(prior_name)
         except Exception as e:
-            print("eccezione tupla",e)
+            #print("eccezione tupla",e)
             prior_name = (edit_key,)+prior_name[:col-1]+(text,)+prior_name[col:]
-        print("prior_name",prior_name,original)
+        #print("prior_name",prior_name,original)
        
         try:
             self.bal_window.set_heir(prior_name)
-            print("setheir")
+            #print("setheir")
         except Exception as e:
+            pass
 
-            print("heir non valido ripristino l'originale",e)
+            #print("heir non valido ripristino l'originale",e)
             try:
-                print("setup_original",(edit_key,)+original)
+                #print("setup_original",(edit_key,)+original)
                 self.bal_window.set_heir((edit_key,)+original)
             except Exception as e:
-                print("errore nellimpostare original",e,original)
+                #print("errore nellimpostare original",e,original)
                 self.update()
 
     def create_menu(self, position):
@@ -143,11 +145,6 @@ class HeirList(MyTreeView,MessageBoxMixin):
                     persistent = QPersistentModelIndex(idx)
                     menu.addAction(_("Edit {}").format(column_title), lambda p=persistent: self.edit(QModelIndex(p)))
             menu.addAction(_("Delete"), lambda: self.bal_window.delete_heirs(selected_keys))
-            URLs = [block_explorer_URL(self.config, 'addr', key) for key in filter(is_address, selected_keys)]
-            if URLs:
-                menu.addAction(_("View on block explorer"), lambda: [webopen(u) for u in URLs])
-
-        run_hook('create_heir_menu', menu, selected_keys, self.bal_window)
         menu.exec_(self.viewport().mapToGlobal(position))
 
     def update(self):
@@ -174,14 +171,14 @@ class HeirList(MyTreeView,MessageBoxMixin):
             items[self.Columns.ADDRESS].setData(key, self.ROLE_HEIR_KEY+2)
             items[self.Columns.AMOUNT].setData(key, self.ROLE_HEIR_KEY+3)
             #items[self.Columns.LOCKTIME].setData(key, self.ROLE_HEIR_KEY+4)
-            row_count = self.model().rowCount()
-            self.model().insertRow(row_count, items)
+
+            self.model().insertRow(self.model().rowCount(), items)
+
             if key == current_key:
                 idx = self.model().index(row_count, self.Columns.NAME)
                 set_current = QPersistentModelIndex(idx)
         self.set_current_idx(set_current)
         # FIXME refresh loses sort order; so set "default" here:
-        self.sortByColumn(self.Columns.NAME, Qt.AscendingOrder)
         self.filter()
         run_hook('update_heirs_tab', self)
 
@@ -202,13 +199,13 @@ class HeirList(MyTreeView,MessageBoxMixin):
         menu.addAction(_("Export"), lambda: self.bal_window.export_heirs())
         #menu.addAction(_("Build Traonsactions"), self.build_transactions)
 
-        self.heir_locktime = HeirsLockTimeEdit(self.bal_window.window,0)
+        self.heir_locktime = HeirsLockTimeEdit(self.window(),0)
         def on_heir_locktime():
             self.bal_window.will_settings['locktime'] = self.heir_locktime.get_locktime()
             #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
         self.heir_locktime.valueEdited.connect(on_heir_locktime)
 
-        self.heir_threshold = HeirsLockTimeEdit(self.bal_window.window,0)
+        self.heir_threshold = HeirsLockTimeEdit(self,0)
         def on_heir_threshold():
             self.bal_window.will_settings['threshold'] = self.heir_threshold.get_locktime()
             #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
@@ -227,30 +224,32 @@ class HeirList(MyTreeView,MessageBoxMixin):
         layout = QHBoxLayout()
         self.heirs_widget.setLayout(layout)
         
-        layout.addWidget(QLabel(_("Locktime:")))
+        layout.addWidget(QLabel(_("Delivery Time:")))
         layout.addWidget(self.heir_locktime)
-        layout.addWidget(HelpButton("Locktime to be used in the transaction\n"
+        layout.addWidget(HelpButton(_("Locktime* to be used in the transaction\n"
                                     +"if you choose Raw, you can insert various options based on suffix:\n"
                                     #+" - b: number of blocks after current block(ex: 144b means tomorrow)\n"
                                     +" - d: number of days after current day(ex: 1d means tomorrow)\n"
-                                    +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n"))
+                                    +" - y: number of years after currrent day(ex: 1y means one year from today)\n"
+                                    +"* locktime can be anticipated to update will\n")))
 
         layout.addWidget(QLabel(" "))
-        layout.addWidget(QLabel(_("Threshold:")))
+        layout.addWidget(QLabel(_("Check Alive:")))
         layout.addWidget(self.heir_threshold)
-        layout.addWidget(HelpButton("Threshold to ask for invalidation\n"
-                                    +"When less then this time is missing, ask to invalidate\n"
+        layout.addWidget(HelpButton(_("Check  to ask for invalidation.\n"
+                                    +"When less then this time is missing, ask to invalidate.\n"
+                                    +"If you fail to invalidate during this time, your transactions will be delivered to your heirs.\n"
                                     +"if you choose Raw, you can insert various options based on suffix:\n"
                                     #+" - b: number of blocks after current block(ex: 144b means tomorrow)\n"
-                                    +" - d: number of days after current day(ex: 1d means tomorrow)\n"
-                                    +" - y: number of years after currrent day(ex: 1y means one year from today)\n\n"))
+                                    +" - d: number of days after current day(ex: 1d means tomorrow).\n"
+                                    +" - y: number of years after currrent day(ex: 1y means one year from today).\n\n")))
         layout.addWidget(QLabel(" "))
         layout.addWidget(QLabel(_("Fees:")))
         layout.addWidget(self.heir_tx_fees)
-        layout.addWidget(HelpButton("Fee to be used in the transaction"))
+        layout.addWidget(HelpButton(_("Fee to be used in the transaction")))
         layout.addWidget(QLabel("sats/vbyte"))
         layout.addWidget(QLabel(" "))
-        newHeirButton = QPushButton("New Heir")
+        newHeirButton = QPushButton(_("New Heir"))
         newHeirButton.clicked.connect(self.bal_window.new_heir_dialog)
         layout.addWidget(newHeirButton)
 

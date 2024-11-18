@@ -3,9 +3,9 @@
 from typing import Union
 from decimal import Decimal
 
-from PyQt5.QtWidgets import (QLineEdit, QStyle, QStyleOptionFrame, QSizePolicy)
-from PyQt5.QtGui import QPalette, QPainter
-from PyQt5.QtCore import pyqtSignal, Qt, QSize
+from PyQt6.QtWidgets import (QLineEdit, QStyle, QStyleOptionFrame, QSizePolicy)
+from PyQt6.QtGui import QPalette, QPainter
+from PyQt6.QtCore import pyqtSignal, Qt, QSize
 
 from electrum.util import (format_satoshis_plain, decimal_point_to_base_unit_name,
                            FEERATE_PRECISION, quantize_feerate, DECIMAL_POINT, UI_UNIT_NAME_FEERATE_SAT_PER_VBYTE)
@@ -73,10 +73,10 @@ class PercAmountEdit(BTCAmountEdit):
         if self.base_unit:
             panel = QStyleOptionFrame()
             self.initStyleOption(panel)
-            textRect = self.style().subElementRect(QStyle.SE_LineEditContents, panel, self)
+            textRect = self.style().subElementRect(QStyle.SubElement.SE_LineEditContents, panel, self)
             textRect.adjust(2, 0, -10, 0)
             painter = QPainter(self)
             painter.setPen(ColorScheme.GRAY.as_color())
             if len(self.text())==0:
-                painter.drawText(textRect, int(Qt.AlignRight | Qt.AlignVCenter), self.base_unit() + " or perc value")
+                painter.drawText(textRect, int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter), self.base_unit() + " or perc value")
 

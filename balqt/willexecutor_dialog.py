@@ -25,9 +25,9 @@
 
 import enum
 
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu)
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtCore import Qt,QPersistentModelIndex, QModelIndex
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu)
 
 from electrum.i18n import _
 from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin)
@@ -40,7 +40,7 @@ from ..bal import BalPlugin
 from .. import util as Util
 from .. import willexecutors as Willexecutors
 from .baldialog import BalDialog,BalBlockingWaitingDialog
-
+from electrum.logging import Logger
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -59,7 +59,7 @@ class WillExecutorList(MyTreeView):
         Columns.STATUS: _('S'),
     }
 
-    ROLE_HEIR_KEY = Qt.UserRole + 2000
+    ROLE_HEIR_KEY = Qt.ItemDataRole.UserRole + 2000
     key_role = ROLE_HEIR_KEY
 
     def __init__(self, parent: 'WillExecutorDialog'):
@@ -115,9 +115,7 @@ class WillExecutorList(MyTreeView):
         self.parent.update_willexecutors(wout)
         self.update()
     def get_edit_key_from_coordinate(self, row, col):
-        print("get edit key",row,col,self.ROLE_HEIR_KEY+col)
         a= self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col)
-        print(a) 
         #return self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col+1)
         return a
 
@@ -140,12 +138,8 @@ class WillExecutorList(MyTreeView):
 
     def on_edited(self, idx, edit_key, *, text):
         prior_name = self.parent.willexecutors_list[edit_key]
-        print("prior_name",prior_name)
-        print("idx",idx)
-        print("edit_key",edit_key)
 
         col = idx.column()
-        print("col",col)
         try:
             if col == self.Columns.URL:
                 self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
@@ -158,12 +152,13 @@ class WillExecutorList(MyTreeView):
                 self.parent.willexecutors_list[edit_key]["info"] = text
             self.update()
         except Exception as e:
-            print("error saving willexecutor:",e)
+            #print("error saving willexecutor:",e)
+            pass
 
     def update(self):
         if self.parent.willexecutors_list is None:
-            print("why it is none?",self.parent.willexecutors_list)
-            print("why it is none?",self.willexecutors)
+            #print("why it is none?",self.parent.willexecutors_list)
+            #print("why it is none?",self.willexecutors)
             return
         
         current_key = self.get_role_data_for_current_item(col=self.Columns.URL, role=self.ROLE_HEIR_KEY)
@@ -177,7 +172,7 @@ class WillExecutorList(MyTreeView):
 
         for url, value in self.parent.willexecutors_list.items():
             #self.ping_server(url)
-            print("new value",url,value)
+            #print("new value",url,value)
             labels = [""] * len(self.Columns)
             labels[self.Columns.URL] = url 
             if Willexecutors.is_selected(value):
@@ -198,7 +193,8 @@ class WillExecutorList(MyTreeView):
                     try:
                         items.append(QStandardItem(*e))
                     except Exception as e:
-                        print("Errore grave",e)
+                        #print("Errore grave",e)
+                        pass
                 else:
                     items.append(QStandardItem(e))
             items[self.Columns.SELECTED].setEditable(False)
@@ -314,7 +310,7 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
 
     def closeEvent(self, event):
         event.accept()
+
     def save_willexecutors(self):
-        print(self.willexecutors_list)
         self.bal_plugin.config.set_key(self.bal_plugin.WILLEXECUTORS,self.willexecutors_list,save=True)
     

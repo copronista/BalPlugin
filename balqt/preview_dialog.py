@@ -26,12 +26,12 @@
 import enum
 import copy
 
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtCore import Qt,QPersistentModelIndex, QModelIndex
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
 
 from electrum.i18n import _
-from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin,BlockingWaitingDialog,WaitingDialog,WindowModalDialog)
+from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin)
 from electrum.util import write_json_file,read_json_file,FileImportFailed
 from electrum.gui.qt.my_treeview import MyTreeView
 import json
@@ -63,7 +63,7 @@ class PreviewList(MyTreeView):
         Columns.STATUS: _('Status'),
     }
 
-    ROLE_HEIR_KEY = Qt.UserRole + 2000
+    ROLE_HEIR_KEY = Qt.ItemDataRole.UserRole + 2000
     key_role = ROLE_HEIR_KEY
 
     def __init__(self, parent: 'BalWindow',will):
@@ -75,10 +75,9 @@ class PreviewList(MyTreeView):
         )
         self.decimal_point=parent.bal_plugin.config.get_decimal_point
         self.setModel(QStandardItemModel(self))
-        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
     
 
-        #print("will",will)
         if not will is None:
             self.will = will
         else:
@@ -123,7 +122,7 @@ class PreviewList(MyTreeView):
             menu.addSeparator()
             menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
 
-        menu.exec_(self.viewport().mapToGlobal(position))
+        menu.exec(self.viewport().mapToGlobal(position))
     """
     def get_edit_key_from_coordinate(self, row, col):
         print("get edit key",row,col,self.ROLE_HEIR_KEY+col)
@@ -165,11 +164,9 @@ class PreviewList(MyTreeView):
     """
     def on_edited(self, idx, edit_key, *, text):
         prior_name = self.parent.willexecutors_list[edit_key]
-        print("prior_name",prior_name)
         aarint("edit_key",edit_key)
 
         col = idx.column()
-        print("col",col)
         if col == self.Columns.URL:
             self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
             del self.parent.willexecutors_list[edit_key]
@@ -184,7 +181,6 @@ class PreviewList(MyTreeView):
         self.update()
 
     def update(self):
-        #print("update will")
         if self.will is None:
             return
 
@@ -206,7 +202,6 @@ class PreviewList(MyTreeView):
             #self.ping_server(url)
             tx=bal_tx['tx']
             labels = [""] * len(self.Columns)
-            #print("willlocktime",tx.locktime)
             labels[self.Columns.LOCKTIME] = Util.locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
             #labels[self.Columns.DESCRIPTION] = bal_tx.get('description','')
@@ -224,9 +219,8 @@ class PreviewList(MyTreeView):
                     try:
                         items.append(QStandardItem(*e))
                     except Exception as e:
-                        print("e cazzo",e)
+                        pass
                 else:
-                    #print(labels)
                     items.append(QStandardItem(str(e)))
             """
             items[self.Columns.SELECTED].setEditable(False)
@@ -313,7 +307,6 @@ class PreviewList(MyTreeView):
             willitem = self.will[txid]
             tx = copy.deepcopy(willitem['tx'])
             if willitem[BalPlugin.STATUS_COMPLETE]:
-                print("altready signed",txid)
                 txs[txid]=tx
                 continue 
             tosign=txid
@@ -331,7 +324,6 @@ class PreviewList(MyTreeView):
                     txin._TxInput__address=change.address
                     txin._TxInput__scriptpubkey = change.scriptpubkey
                     txin._TxInput__value_sats = change.value
-                print(">>>>>>>>",txin.spent_txid)
          
 
             self.wallet.sign_transaction(tx, password,ignore_warnings=True)
@@ -341,7 +333,6 @@ class PreviewList(MyTreeView):
                 is_complete=True
                 willitem['status'] += BalPlugin.STATUS_COMPLETE
                 willitem[BalPlugin.STATUS_COMPLETE]=True
-            print("tx: {} is complete:{}".format(txid, tx.is_complete()))
             txs[txid]=tx
         return txs
 
@@ -353,7 +344,6 @@ class PreviewList(MyTreeView):
 
 
     def export_inheritance_handler(self,path):
-        print(path)
         with open(path,"w") as f:
             for txid,willitem in self.will.items():
                 self.will[txid]['status']+=BalPlugin.STATUS_EXPORTED

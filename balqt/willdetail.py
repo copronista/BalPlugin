@@ -6,8 +6,8 @@ from electrum.util import decimal_point_to_base_unit_name
 from electrum.i18n import _
 
 
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QWidget,QScrollArea)
-from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QWidget,QScrollArea)
+from PyQt6.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
                          QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
 
 
@@ -27,7 +27,6 @@ class WillDetailDialog(BalDialog):
         self.threshold = Util.parse_locktime_string(bal_window.will_settings['threshold'])
         self.bal_window = bal_window 
         Will.add_willtree(self.will)
-        print(self.will)
         super().__init__(bal_window.window)
         self.config = bal_window.window.config
         self.wallet = bal_window.wallet
@@ -38,7 +37,7 @@ class WillDetailDialog(BalDialog):
         self.format_fee_rate = bal_window.window.format_fee_rate
         self.decimal_point = bal_window.bal_plugin.config.get_decimal_point()
         self.base_unit_name = decimal_point_to_base_unit_name(self.decimal_point)
-        self.setWindowTitle(_('Will details'))
+        self.setWindowTitle(_('Will Details'))
         self.setMinimumSize(670,700)
         self.vlayout= QVBoxLayout()
         w=QWidget()
@@ -82,7 +81,6 @@ class WillDetailDialog(BalDialog):
         self.vlayout.addWidget(self.scrollbox)
         w=QWidget()
         hlayout = QHBoxLayout(w)
-        print(Will.only_valid_list(self.will))
         hlayout.addWidget(QLabel(_("Valid Txs:")+ str(len(Will.only_valid_list(self.will)))))
         hlayout.addWidget(QLabel(_("Total Txs:")+ str(len(self.will))))
         self.vlayout.addWidget(w)
@@ -110,22 +108,21 @@ class WillDetailDialog(BalDialog):
         self.bal_window.export_will()
     def toggle_replaced(self):
         self.bal_window.bal_plugin.hide_replaced()
-        toggle = "Hide"
+        toggle = _("Hide")
         if self.bal_window.bal_plugin._hide_replaced:
-            toggle = "Unhide"
-        self.toggle_replace_button.setText(_(f"{toggle} replaced"))
+            toggle = _("Unhide")
+        self.toggle_replace_button.setText(f"{toggle} {_('replaced')}")
         self.update()
 
     def toggle_invalidated(self):
         self.bal_window.bal_plugin.hide_invalidated()
-        toggle = "Hide"
+        toggle = _("Hide")
         if self.bal_window.bal_plugin._hide_invalidated:
-            toggle = "Unhide"
-        self.toggle_invalidate_button.setText(_(f"{toggle} invalidated"))
+            toggle = _("Unhide")
+        self.toggle_invalidate_button.setText(_(f"{toggle} {_('invalidated')}"))
         self.update()
 
     def update(self):
-        print("update")
         self.will = self.bal_window.will
         pos = self.vlayout.indexOf(self.scrollbox)
         self.vlayout.removeWidget(self.scrollbox)
@@ -168,13 +165,13 @@ class WillWidget(QWidget):
                 detaillayout.addWidget(qlabel("Locktime",locktime))
                 detaillayout.addWidget(qlabel("Creation Time",creation))
                 total_fees = self.will[w]['tx'].input_value() - self.will[w]['tx'].output_value()
-                decoded_fees = Util.decode_amount(total_fees,self.parent.decimal_point)
+                decoded_fees = total_fees #Util.decode_amount(total_fees,self.parent.decimal_point)
                 fee_per_byte = round(total_fees/self.will[w]['tx'].estimated_size(),3)
                 fees_str = str(decoded_fees) + " ("+  str(fee_per_byte) + " sats/vbyte)"
-                detaillayout.addWidget(qlabel("Transaction fees",fees_str))
-                detaillayout.addWidget(qlabel("Status",self.will[w]['status']))
+                detaillayout.addWidget(qlabel("Transaction fees:",fees_str))
+                detaillayout.addWidget(qlabel("Status:",self.will[w]['status']))
                 detaillayout.addWidget(QLabel(""))
-                detaillayout.addWidget(QLabel(_("<b>Heirs:</b>")))
+                detaillayout.addWidget(QLabel("<b>Heirs:</b>"))
                 for heir in self.will[w]['heirs']:
                     if "w!ll3x3c\"" not in heir:
                         decoded_amount = Util.decode_amount(self.will[w]['heirs'][heir][3],self.parent.decimal_point)
@@ -188,13 +185,13 @@ class WillWidget(QWidget):
                 detaillayout.addStretch()
                 pal = QPalette()
                 if self.will[w].get(BalPlugin.STATUS_INVALIDATED,False):
-                    pal.setColor(QPalette.Background, QColor(255,0, 0))
+                    pal.setColor(QPalette.ColorRole.Window, QColor(255,0, 0))
                 elif self.will[w].get(BalPlugin.STATUS_REPLACED,False):
-                    pal.setColor(QPalette.Background, QColor(255, 255, 0))
+                    pal.setColor(QPalette.ColorRole.Window, QColor(255, 255, 0))
                 elif self.will[w].get(BalPlugin.STATUS_CONFIRMED,False):
-                    pal.setColor(QPalette.Background, QColor(255, 0, 255))
+                    pal.setColor(QPalette.ColorRole.Window, QColor(255, 0, 255))
                 else:
-                    pal.setColor(QPalette.Background, QColor("#57c7d4"))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#57c7d4"))
                 detailw.setAutoFillBackground(True)
                 detailw.setPalette(pal)
 

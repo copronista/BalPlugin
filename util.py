@@ -16,7 +16,7 @@ def locktime_to_str(locktime):
             return dt
 
     except Exception as e:
-        print(e)
+        #print(e)
         pass
     return str(locktime)
 
@@ -26,7 +26,8 @@ def str_to_locktime(locktime):
           return locktime
         else: return int(locktime)
     except Exception as e:
-        print(e)
+        pass
+        #print(e)
     dt_object = datetime.fromisoformat(locktime)
     timestamp = dt_object.timestamp()
     return int(timestamp)
@@ -52,7 +53,7 @@ def parse_locktime_string(locktime,w=None):
             locktime+=int(height) 
         return int(locktime) 
     except Exception as e: 
-        print("parse_locktime_string",e) 
+        #print("parse_locktime_string",e) 
         raise e
 
 
@@ -107,7 +108,7 @@ def cmp_willexecutor(willexecutora,willexecutorb):
     return False
 
 def search_heir_by_values(heirs,heir,values):
-    print()
+    #print()
     for h,v in heirs.items():
         found = False
         for val in values:
@@ -132,7 +133,7 @@ def cmp_heirs_by_values(heirsa,heirsb,values,exclude_willexecutors=False,reverse
                 if cmp_heir_by_values(heirsa[heira],heirsb[heirb],values):
                     found=True
             if not found:
-                print(f"not_found {heira}--{heirsa[heira]}")
+                #print(f"not_found {heira}--{heirsa[heira]}")
                 return False
     if reverse:
         return cmp_heirs_by_values(heirsb,heirsa,values,exclude_willexecutors=exclude_willexecutors,reverse=False)
@@ -194,9 +195,11 @@ def get_value_amount(txa,txb):
         if same_amount and same_address:
             value_amount+=outa.value
         if same_amount:
-            print("same amount")
+            pass
+            #print("same amount")
         if same_address:
-            print("same address")
+            pass
+            #print("same address")
 
     return value_amount
     #not needed
@@ -262,7 +265,7 @@ def get_lowest_locktimes(locktimes):
     sorted_timestamp=[]
     sorted_block=[]
     for l in locktimes:
-        print("locktime:",parse_locktime_string(l))
+        #print("locktime:",parse_locktime_string(l))
         l=parse_locktime_string(l)
         if l < LOCKTIME_THRESHOLD:
             bisect.insort(sorted_block,l)
@@ -339,10 +342,11 @@ def din_output(out,outputs):
         if int(out.value) == int(s_o.value):
             same_amount.append(s_o)
             if out.address==s_o.address:
-                print("SAME_:",out.address,s_o.address)
+                #print("SAME_:",out.address,s_o.address)
                 return True, True
             else:
-                print("NOT  SAME_:",out.address,s_o.address)
+                pass
+                #print("NOT  SAME_:",out.address,s_o.address)
 
     if len(same_amount)>0:
         return True, False

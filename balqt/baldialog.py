@@ -1,6 +1,6 @@
 from typing import Callable,Any
 
-from PyQt5.QtWidgets import QLabel,QVBoxLayout
+from PyQt6.QtWidgets import QLabel,QVBoxLayout
 
 from electrum.gui.qt.util import WindowModalDialog, TaskThread
 from electrum.i18n import _

@@ -3,10 +3,12 @@ from . import util as Util
 from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTransaction,PartialTxOutput,Transaction
 from electrum.util import bfh, decimal_point_to_base_unit_name
 from electrum.util import write_json_file,read_json_file,FileImportFailed
+from electrum.logging import get_logger,Logger
 import copy
 
 MIN_LOCKTIME = 1
 MIN_BLOCK = 1
+_logger = get_logger(__name__)
 #return an array with the list of children
 def get_children(will,willid):
     out = []
@@ -50,12 +52,12 @@ def search_equal_tx(will,tx,wid):
 
 def get_tx_from_any(x):
     try:
-        print(x['tx'])
+        #print(x['tx'])
         a=str(x['tx'])
         return tx_from_any(str(x['tx']))
         
     except Exception as e:
-        Util.print_var(x)
+        #Util.print_var(x)
         raise e
 
     return x['tx']
@@ -79,7 +81,7 @@ def add_info_from_will(will,wid,wallet):
             txin._TxInput__scriptpubkey = change.scriptpubkey
             txin._TxInput__value_sats = change.value
             txin._trusted_value_sats = change.value
-            print(txin.to_json())
+            #print(txin.to_json())
 
             
 
@@ -94,17 +96,17 @@ def normalize_will(will,wallet = None,others_inputs = {}):
 
         txid = will[wid]['tx'].txid()
         if txid is None:
-            print("##########")
-            print(wid)
-            print(will[wid])
-            print(will[wid]['tx'].to_json())
-            print("txid is none")
+            #print("##########")
+            #print(wid)
+            #print(will[wid])
+            #print(will[wid]['tx'].to_json())
+            #print("txid is none")
             will[wid]['status']+="ERROR!"
             errors[wid]=will[wid]
             continue
             #raise Exception("txid is none should not")
         if txid != wid:
-            print(f"{txid} is different than {wid}")
+            #print(f"{txid} is different than {wid}")
             outputs = will[wid]['tx'].outputs()
             ow=WillItem(will[wid])
             ow.normalize_locktime(others_inputs)
@@ -117,16 +119,16 @@ def normalize_will(will,wallet = None,others_inputs = {}):
             to_add[ow.tx.txid()]=ow.to_dict()
     for eid,err in errors.items():
         new_txid = err['tx'].txid()
-        print("ERROR:",eid,new_txid)
+        #print("ERROR:",eid,new_txid)
 
     for k,w in to_add.items():
-        print(f"to be addedd in normalize:{k}")
+        #print(f"to be addedd in normalize:{k}")
         will[k] = w
         #reset_status(will[warr[0]])
     for wid in to_delete:
         if wid in will:
-            print(f"delete will {wid}")
-            WillItem(will[wid]).print()
+            #print(f"delete will {wid}")
+            #WillItem(will[wid]).print()
             del will[wid]
 
 def new_input(txid,idx,change):
@@ -141,40 +143,39 @@ def new_input(txid,idx,change):
 
 def check_anticipate(ow:'WillItem',nw:'WillItem'):
     anticipate = Util.anticipate_locktime(ow.tx.locktime,days=1)
-    print(nw.tx.locktime,ow.tx.locktime,anticipate)
+    #print(nw.tx.locktime,ow.tx.locktime,anticipate)
     if int(nw.tx.locktime) >= int(anticipate):
-        print("ntx locktime >anticipate")
+        #print("ntx locktime >anticipate")
         #nw.tx.locktime = min(ow.tx.locktime,nw.tx.locktime)
         if Util.cmp_heirs_by_values(ow.heirs,nw.heirs,[0,1],exclude_willexecutors = True):
-            print("same heirs")
+            #print("same heirs")
             if nw.we and ow.we:
                 if ow.we['url'] == nw.we['url']:
-                    print("same url")
+                    #print("same url")
                     if int(ow.we['base_fee'])>int(nw.we['base_fee']):
-                        print("fee are lowered")
+                        #print("fee are lowered")
                         return anticipate
                     else:
-                        print("old fees are not lower than new fees so replace with the same locktime",ow.we['base_fee'],nw.we['base_fee'],int(ow.we['base_fee'])>int(nw.we['base_fee']))
+                        #print("old fees are not lower than new fees so replace with the same locktime",ow.we['base_fee'],nw.we['base_fee'],int(ow.we['base_fee'])>int(nw.we['base_fee']))
                         ow.tx.locktime
                 else:
-                    print("those fucking shit have different urls")
+                    #print("those fucking shit have different urls")
                     ow.tx.locktime
             else:
-                print("some fucking willexecutor is none",nw.we,ow.we)
+                #print("some fucking willexecutor is none",nw.we,ow.we)
                 if nw.we == ow.we:
                     if not Util.cmp_heirs_by_values(ow.heirs,nw.heirs,[0,3]):
-                        print("heirs have a different calculated amount so I have to anticipate")
+                        #print("heirs have a different calculated amount so I have to anticipate")
                         return anticipate
                     else:
-                        print("fuck you")
-                        print(ow.heirs,nw.heirs)
-                        print(ow.we,nw.we)
+                        #print(ow.heirs,nw.heirs)
+                        #print(ow.we,nw.we)
                         return ow.tx.locktime
                 else:
-                    print("only the last willexecutor is none")
+                    #print("only the last willexecutor is none")
                     return ow.tx.locktime
         else:
-            print("heirs are different:", anticipate)
+            #print("heirs are different:", anticipate)
             return anticipate
     return  4294967295+1
 
@@ -192,9 +193,9 @@ def change_input(will, otxid, idx, change,others_inputs,to_delete,to_append):
             ntx = None
             for i in range(0,len(inputs)):
                 if inputs[i].prevout.txid.hex() == otxid and inputs[i].prevout.out_idx == idx:
-                    print(f"{otxid}:{idx} output to be changed found: {old_txid}, {ntxid}")
+                    #print(f"{otxid}:{idx} output to be changed found: {old_txid}, {ntxid}")
                     if isinstance(w.tx,Transaction):
-                        print("NEW TRANSACTION")
+                        #print("NEW TRANSACTION")
                         will[wid]['tx']=PartialTransaction.from_tx(w.tx)
                         will[wid]['tx'].set_rbf(True)
                     will[wid]['tx']._inputs[i]=new_input(wid,idx,change)
@@ -213,7 +214,7 @@ def change_input(will, otxid, idx, change,others_inputs,to_delete,to_append):
                 to_append[new_txid]=will[wid]
                 outputs = will[wid]['tx'].outputs()
                 for i in range(0,len(outputs)):
-                    print("chANGE INPUT:",wid, "-", old_txid)
+                    #print("chANGE INPUT:",wid, "-", old_txid)
                     #change_input(will,old_txid, i, outputs[i],others_inputs)
                     change_input(will, wid, i, outputs[i],others_inputs,to_delete,to_append)
                     
@@ -279,19 +280,19 @@ def same_input_same_locktime(will,all_inputs_min_locktime=None):
                     new_will[wid]['tx'].locktime = nws_locktime
 
 def search_anticipate_rec(will,old_inputs):
-    print("SEARC_ANTICIPATE_REC")
+    #print("SEARC_ANTICIPATE_REC")
     redo = False
     to_delete = []
     to_append = {}
     new_inputs = get_all_inputs(will)
     for nid,nw in will.items():
-        print("***************************NEW************")
-        print(F"NID:{nid}")
+        #print("***************************NEW************")
+        #print(F"NID:{nid}")
         nwi = WillItem(nw)
-        nwi.print()
+        #nwi.print()
         if nwi.search_anticipate(new_inputs) or nwi.search_anticipate(old_inputs):
             if nid != nwi.tx.txid():
-                print(f"{nid} e' differente da:{nwi.tx.txid()}")
+                #print(f"{nid} e' differente da:{nwi.tx.txid()}")
                 redo = True
                 to_delete.append(nid)
                 to_append[nwi.tx.txid()] = nwi.to_dict()
@@ -301,16 +302,17 @@ def search_anticipate_rec(will,old_inputs):
                     
 
     for w in to_delete:
-        print(f"I'm going to delete this transaction {w}")
+        #print(f"I'm going to delete this transaction {w}")
         try:
             del will[w]
         except:
-            print("already gone")
+            pass
+            #print("already gone")
     for k,w in to_append.items():
-        print(f"I'm going to append this transaction{k}")
+        #print(f"I'm going to append this transaction{k}")
         will[k]=w
     if redo:
-        print("REDOOOOO")
+        #print("REDOOOOO")
         search_anticipate_rec(will,old_inputs)
 
 
@@ -320,13 +322,13 @@ def update_will(old_will,new_will):
     all_old_inputs = get_all_inputs(old_will)
     all_inputs_min_locktime = get_all_inputs_min_locktime(all_old_inputs)
     all_new_inputs = get_all_inputs(new_will)
-    print("\n\n\n\n")
-    print("_______________UPDATE WILL______________") 
+    #print("\n\n\n\n")
+    #print("_______________UPDATE WILL______________") 
     #check if the new input is already spent by other transaction
     #if it is use the same locktime, or anticipate.
     search_anticipate_rec(new_will,all_old_inputs)
 
-    print()
+    #print()
    # print("looking if a transaction with the same input has a lower locktime")
    # all_new_inputs=get_all_inputs(new_will)
    # for wid,w in new_will.items():
@@ -342,7 +344,7 @@ def update_will(old_will,new_will):
                         
 
     for oid in only_valid(old_will):
-        print("update old will:",oid)
+        #print("update old will:",oid)
         if oid in new_will:
             new_heirs = new_will[oid]['heirs']
             new_we = new_will[oid]['willexecutor']
@@ -405,17 +407,17 @@ def invalidate_will(will,wallet,fees_per_byte):
     filtered_inputs = []
     prevout_to_spend = []
     for prevout_str,ws in inputs.items(): 
-        print("prevout str:",prevout_str)
+        #print("prevout str:",prevout_str)
         for w in ws:
-            print("wid = ",w[0], prevout_str, w[0] in filtered_inputs)
+            #print("wid = ",w[0], prevout_str, w[0] in filtered_inputs)
             if not w[0] in filtered_inputs: 
-                print("filtered wid")
+                #print("filtered wid")
                 filtered_inputs.append(w[0])
                 if not prevout_str in prevout_to_spend:
-                    print("prevout to spend:",prevout_str)
+                    #print("prevout to spend:",prevout_str)
                     prevout_to_spend.append(prevout_str)
-    print("prevout to spends")
-    print(prevout_to_spend)
+    #print("prevout to spends")
+    #print(prevout_to_spend)
     balance = 0
     utxo_to_spend = []
     for utxo in utxos:
@@ -442,9 +444,11 @@ def invalidate_will(will,wallet,fees_per_byte):
             return tx
 
         else:
-            print("balance - fee:",balance - fee)
+            pass
+            #print("balance - fee:",balance - fee)
     else:
-        print("no input")
+        pass
+        #print("no input")
 
 
 def is_new(will):
@@ -454,61 +458,50 @@ def is_new(will):
 
 #_transactions_replaced_anticipated_invalidated(all_inputs,all_utxos):
 def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
-    print("SEARCH RAI")
     will_only_valid = only_valid_or_replaced_list(will)
     for inp,ws in all_inputs.items():
         inutxo = Util.in_utxo(inp,all_utxos)
-        print(inp)
         for w in ws:
-            print("WWWW")
             wi=WillItem(w[1])
             if wi.valid or wi.confirmed:
                 prevout_id=w[2].prevout.txid.hex()
                 if not inutxo:
                     if prevout_id in will:
                         wo=WillItem(will[prevout_id])
-                        print("willitem will be replaced or invalidated:",wo._id,wo.replaced,wo.invalidated)
                         if wo.replaced:
                             wi.set_status_replaced()
                             will[wi._id]=wi.to_dict()
-                            print("set replaced")
                         if wo.invalidated:
                             wi.set_status_invalidated()
                             will[wi._id]=wi.to_dict()
-                            print("set invalidated")
                         
                     else:
                         if wallet.db.get_transaction(wi._id):
-                            print("wi have to be confirmed",wi._id,wi.replaced,wi.invalidated,wi.confirmed)
                             wi.set_status_confirmed()
                         else:
-                            print("wi have to be invalidated",wi._id,wi.replaced,wi.invalidated,wi.confirmed)
                             wi.set_status_invalidated()
                         will[wi._id]=wi.to_dict()
                         #print("utxo was replaced")
                         #wi.set_status_replaced()
                         #will[wi._id]=wi.to_dict()
                 else:
-                    print("inp not utxo",prevout_id)
                     if prevout_id in will:
                         wo = WillItem(will[prevout_id])
                         ttx= wallet.db.get_transaction(prevout_id)
                         if ttx:
-                            print("prevout have to be confirmed",prevout_id)
                             wo.set_status_confirmed()
                         else:
-                            print("prevout have to be invalidated",prevout_id)
                             wo.set_status_invalidated()
                         will[wo._id]=wo.to_dict()
     
                 for child in wi.search(all_inputs):
                     if child.tx.locktime < wi.tx.locktime:
-                        print(f"trying to replace {w[0]}")
                         if wi.set_status_replaced():
                             will[wi._id]=wi.to_dict()
             else:
-                print("wi not valid nor confirmed")
-                Util.print_var(w,"W1.")
+                pass
+                #print("wi not valid nor confirmed")
+                #Util.print_var(w,"W1.")
                     
 
 
@@ -517,8 +510,9 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
     spent_utxos = []
     spent_utxos_tx = []
     #check transaction in bitcoin network:
+    _logger.info("check transaction in bitcoin network")
     for wid, w in will.items():
-        if not w[STATUS_CONFIRMED]:
+        if not w.get(STATUS_CONFIRMED,False):
             tt=wallet.db.get_transaction(wid)
             if tt:
                 will[wid][STATUS_CONFIRMED]=True
@@ -527,6 +521,7 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
 
     all_inputs=get_all_inputs(will,only_valid = True)
     #check all input spent are in wallet or valid txs 
+    _logger.info("check all input spent are in wallet or valid txs")
     for inp,ws in all_inputs.items():
         if not Util.in_utxo(inp,all_utxos):
             for w in ws:
@@ -545,10 +540,10 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
         if not check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
             raise NotCompleteWillException("not complete")
     else:
-        print("not heirs")
         return
 
     #check if some transaction is expired
+    _logger.info("check if some transaction is expired")
     for prevout_str, wid in all_inputs_min_locktime.items():
         for w in wid: 
             if w[1][STATUS_VALID]:
@@ -556,20 +551,20 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
                 if int(locktime) < int(timestamp_to_check):
                     raise WillExpiredException(f"Will Expired {wid[0][0]}: {locktime}<{timestamp_to_check}")
 
-    print('check all utxo in wallet are spent')
+    _logger.info('check all utxo in wallet are spent')
     if all_inputs:
         for utxo in all_utxos:
             if utxo.value_sats() > 68 * tx_fees: 
                 if not Util.in_utxo(utxo,all_inputs.keys()):
-                        print("utxo is not spent",utxo.to_json())
-                        print(all_inputs.keys())
+                        _logger.info("utxo is not spent",utxo.to_json())
+                        _logger.debug(all_inputs.keys())
                         raise NotCompleteWillException("Some utxo in the wallet is not included")
 
                            #callback_not_valid_tx(w[0],w[2])
 
 
                 #return False
-    print('tutto ok')
+    _logger.info('will ok')
     return True
 
 def only_valid_list(will):
@@ -588,7 +583,7 @@ def only_valid_or_replaced_list(will):
     return out
 
 def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,check_date,tx_fees):
-    print("check willexecutors heirs")
+    _logger.debug("check willexecutors heirs")
     no_willexecutor = 0
     willexecutors_found = {}
     heirs_found = {}
@@ -598,9 +593,9 @@ def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,che
     for wid in only_valid_list(will):
         w = will[wid]
         if w.get('tx_fees',0)!=tx_fees:
-            print("TXFEESSSSSSSSS",w.get('tx_fees',0))
-            wi=WillItem(will[wid])
-            wi.print()
+            #print("TXFEESSSSSSSSS",w.get('tx_fees',0))
+            #wi=WillItem(will[wid])
+            #wi.print()
             raise TxFeesChangedException(f"{tx_fees}:",w.get('tx_fees',0))
         for wheir in w['heirs']:
             if not 'w!ll3x3c"' == wheir[:9]:
@@ -612,7 +607,7 @@ def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,che
                         count = heirs_found.get(wheir,0)
                         heirs_found[wheir]=count + 1
                 else:
-                    print("heir not present transaction is not valid:",wid,w)
+                    _logger.debug("heir not present transaction is not valid:",wid,w)
                     continue
         if willexecutor := w.get("willexecutor",None):
             count = willexecutors_found.get(willexecutor['url'],0)
@@ -626,7 +621,7 @@ def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,che
         if Util.parse_locktime_string(heirs[h][2])>=check_date:
             count_heirs +=1
             if not h in heirs_found:
-                print(f"heir: {h} not found")
+                _logger.debug(f"heir: {h} not found")
                 raise HeirNotFoundException(h)
     if not count_heirs:
         raise NoHeirsException("there are not valid heirs")
@@ -634,13 +629,13 @@ def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,che
         for url,we in willexecutors.items():
             if Willexecutors.is_selected(we):
                 if not url in willexecutors_found:
-                    print(f"will-executor: {url} not fount")
+                    _logger.debug(f"will-executor: {url} not fount")
                     raise WillExecutorNotPresent(url)
     elif self_willexecutor and no_willexecutor==0 and len(heirs_found)>0:
-        print("no will-executor selected but not present")
-        print(self_willexecutor,no_willexecutor)
+        _logger.debug("no will-executor selected but not present")
+        #print(self_willexecutor,no_willexecutor)
         raise NoWillExecutorNotPresent("Backup tx")
-    print("will is coherent with heirs and will-executors")
+    _logger.info("will is coherent with heirs and will-executors")
     return True
 
 STATUS_NEW = 'New'
@@ -656,7 +651,7 @@ STATUS_VALID = 'Valid'
 STATUS_CONFIRMED = 'Confirmed'
 
 
-class WillItem: 
+class WillItem(Logger): 
     def __init__(self,w,_id=None): 
         if isinstance(w,WillItem,):
             self = w
@@ -714,7 +709,7 @@ class WillItem:
         }
 
     def print(self):
-        print("Tem:",self.tx.txid())
+        print("Item:",self.tx.txid())
         print("Locktime:",Util.locktime_to_str(self.tx.locktime),self.tx.locktime)
         print("tx_fees:",self.tx_fees)
         print("Heirs:")
@@ -728,11 +723,11 @@ class WillItem:
     def set_anticipate(self, ow:'WillItem'):
         nl = min(ow.tx.locktime,check_anticipate(ow,self))
         if int(nl) < self.tx.locktime:
-            print("actually anticipating")
+            _logger.debug("actually anticipating")
             self.tx.locktime = int(nl)
             return True
         else:
-            print("keeping the same locktime")
+            _logger.debug("keeping the same locktime")
             return False
             #self.status += STATUS_ANTICIPATED
             #self.anticipated = True
@@ -759,22 +754,22 @@ class WillItem:
         outputs = self.tx.outputs()
         for idx in range(0,len(outputs)):
             inps = all_inputs.get(f"{self._id}:{idx}",[])
-            print("****check locktime***")
-            print(inps)
+            _logger.debug("****check locktime***")
+            #print(inps)
             for inp in inps:
                 if inp[0]!= self._id:
                     iw = WillItem(inp[1])
                     self.set_anticipate(iw)
 
     def set_status_anticipated(self):
-        print("actually anticipated")
+        _logger.debug("actually anticipated")
         if not self.anticipated:
             self.status +="."+STATUS_ANTICIPATED
             self.anticipated = True
             return True
 
     def set_status_invalidated(self):
-        print("actually invalidated")
+        _logger.debug("actually invalidated")
         if not self.invalidated:
             self.status +="."+STATUS_INVALIDATED
             self.invalidated = True
@@ -782,7 +777,7 @@ class WillItem:
             return True
 
     def set_status_confirmed(self):
-        print("actually confirmed")
+        _logger.debug("actually confirmed")
         if not self.confirmed:
             self.status +="."+STATUS_CONFIRMED
             self.invalidated = False
@@ -791,7 +786,7 @@ class WillItem:
             return True
 
     def set_status_replaced(self):
-        print("actually_replaced")
+        _logger.debug("actually_replaced")
         if not self.replaced:
             self.status += "."+STATUS_REPLACED
             self.replaced = True
