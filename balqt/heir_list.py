@@ -25,19 +25,25 @@
 
 import enum
 from typing import TYPE_CHECKING
+from datetime import datetime
 
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
-from PyQt6.QtCore import Qt, QPersistentModelIndex, QModelIndex
-from PyQt6.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox,QPushButton)
+from . import qt_resources
+if qt_resources.QT_VERSION == 5:
+    from PyQt5.QtGui import QStandardItemModel, QStandardItem
+    from PyQt5.QtCore import Qt, QPersistentModelIndex, QModelIndex
+    from PyQt5.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox,QPushButton)
+else:
+    from PyQt6.QtGui import QStandardItemModel, QStandardItem
+    from PyQt6.QtCore import Qt, QPersistentModelIndex, QModelIndex
+    from PyQt6.QtWidgets import (QAbstractItemView, QMenu,QWidget,QHBoxLayout,QLabel,QSpinBox,QPushButton)
 
 from electrum.i18n import _
 from electrum.bitcoin import is_address
-from electrum.util import block_explorer_URL
+from electrum.util import block_explorer_URL 
 from electrum.plugin import run_hook
-
 from electrum.gui.qt.util import webopen, MessageBoxMixin,HelpButton
 from electrum.gui.qt.my_treeview import MyTreeView, MySortModel
-from datetime import datetime
+
 from .. import util as Util
 from .locktimeedit import HeirsLockTimeEdit
 if TYPE_CHECKING:
@@ -74,14 +80,18 @@ class HeirList(MyTreeView,MessageBoxMixin):
         self.decimal_point = bal_window.bal_plugin.config.get_decimal_point()
         self.bal_window = bal_window
 
-        self.setModel(QStandardItemModel(self))
+        try:
+            self.setModel(QStandardItemModel(self))
+            self.sortByColumn(self.Columns.NAME, Qt.SortOrder.AscendingOrder)
+            self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        except:
+            pass
+            #self.sortByColumn(self.Columns.NAME, Qt.SortOrder.AscendingOrder)
+            #self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+
         self.setSortingEnabled(True)
         self.std_model = self.model()
 
-
-        self.sortByColumn(self.Columns.NAME, Qt.SortOrder.AscendingOrder)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.setSortingEnabled(True)
         self.update()
     
 
@@ -145,7 +155,7 @@ class HeirList(MyTreeView,MessageBoxMixin):
                     persistent = QPersistentModelIndex(idx)
                     menu.addAction(_("Edit {}").format(column_title), lambda p=persistent: self.edit(QModelIndex(p)))
             menu.addAction(_("Delete"), lambda: self.bal_window.delete_heirs(selected_keys))
-        menu.exec_(self.viewport().mapToGlobal(position))
+        menu.exec(self.viewport().mapToGlobal(position))
 
     def update(self):
         if self.maybe_defer_update():

@@ -3,9 +3,16 @@
 from typing import Union
 from decimal import Decimal
 
-from PyQt6.QtWidgets import (QLineEdit, QStyle, QStyleOptionFrame, QSizePolicy)
-from PyQt6.QtGui import QPalette, QPainter
-from PyQt6.QtCore import pyqtSignal, Qt, QSize
+from . import qt_resources
+if qt_resources.QT_VERSION == 5:
+    from PyQt5.QtWidgets import (QLineEdit, QStyle, QStyleOptionFrame, QSizePolicy)
+    from PyQt5.QtGui import QPalette, QPainter
+    from PyQt5.QtCore import pyqtSignal, Qt, QSize
+else:
+    from PyQt6.QtWidgets import (QLineEdit, QStyle, QStyleOptionFrame, QSizePolicy)
+    from PyQt6.QtGui import QPalette, QPainter
+    from PyQt6.QtCore import pyqtSignal, Qt, QSize
+
 
 from electrum.util import (format_satoshis_plain, decimal_point_to_base_unit_name,
                            FEERATE_PRECISION, quantize_feerate, DECIMAL_POINT, UI_UNIT_NAME_FEERATE_SAT_PER_VBYTE)

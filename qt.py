@@ -14,12 +14,7 @@ from functools import partial
 import sys
 import copy
 
-from PyQt6.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
-from PyQt6.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,QIcon,
-                         QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
-
-from PyQt6.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
-                             QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit,QScrollArea,QWidget,QSpacerItem,QSizePolicy)
+import sys
 
 from electrum.plugin import hook
 from electrum.i18n import _
@@ -56,9 +51,23 @@ import datetime
 import urllib.parse
 import urllib.request
 from typing import TYPE_CHECKING, Callable, Optional, List, Union, Tuple, Mapping
-from .balqt.baldialog import BalDialog,BalWaitingDialog,BalBlockingWaitingDialog
+from .balqt.baldialog import BalDialog,BalWaitingDialog,BalBlockingWaitingDialog,bal_checkbox
 
 from electrum.logging import Logger
+if qt_resources.QT_VERSION == 5:
+    from PyQt5.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
+    from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,QIcon,
+                     QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
+
+    from PyQt5.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
+                     QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit,QScrollArea,QWidget,QSpacerItem,QSizePolicy)
+else:
+    from PyQt6.QtCore import Qt, QRectF, QRect, QSizeF, QUrl, QPoint, QSize
+    from PyQt6.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,QIcon,
+                     QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
+
+    from PyQt6.QtWidgets import (QGridLayout, QVBoxLayout, QHBoxLayout, QLabel,
+                     QPushButton, QLineEdit,QCheckBox,QSpinBox,QMenuBar,QMenu,QLineEdit,QScrollArea,QWidget,QSpacerItem,QSizePolicy)
 
 class Plugin(BalPlugin,Logger):
 
@@ -208,6 +217,7 @@ class shown_cv():
         self.value=value
 class BalWindow(Logger):
     def __init__(self,bal_plugin: 'BalPlugin',window: 'ElectrumWindow'):
+        print("init")
         Logger.__init__(self)
         self.logger.info("loggo tutto")
         self.bal_plugin = bal_plugin
@@ -762,6 +772,9 @@ class BalWindow(Logger):
 
 
     def export_json_file(self,path):
+        for wid in self.will:
+            self.will[wid]["status"]+=".{}".format(BalPlugin.STATUS_EXPORTED)
+            self.will[wid][BalPlugin.STATUS_EXPORTED]=True
         write_json_file(path, self.will)
 
     def export_will(self):
@@ -1022,48 +1035,6 @@ class BalWindow(Logger):
     def add_info_from_will(self,tx):
         for input in tx.inputs():
             pass
-
-
-class bal_checkbox(QCheckBox):
-    def __init__(self, plugin,variable,window=None):
-        QCheckBox.__init__(self)
-        self.setChecked(plugin.config_get(variable))
-        window=window
-        def on_check(v):
-            plugin.config.set_key(variable, v == Qt.Checked, save=True)
-            if window:
-                plugin._hide_invalidated= plugin.config_get(plugin.HIDE_INVALIDATED)
-                plugin._hide_replaced= plugin.config_get(plugin.HIDE_REPLACED)
-
-                window.update_all()
-        self.stateChanged.connect(on_check)
-
-    #TODO IMPLEMENT PREVIEW DIALOG
-    #tx list display txid, willexecutor, qrcode, button to sign
-    #   :def preview_dialog(self, txs):
-    def preview_dialog(self, txs):
-        w=PreviewDialog(self,txs)
-        w.exec()
-        return w
-    def add_info_from_will(self,tx):
-        for input in tx.inputs():
-            pass
-
-
-class bal_checkbox(QCheckBox):
-    def __init__(self, plugin,variable,window=None):
-        QCheckBox.__init__(self)
-        self.setChecked(plugin.config_get(variable))
-        window=window
-        def on_check(v):
-            #print("checked")
-            plugin.config.set_key(variable, v == Qt.Checked, save=True)
-            if window:
-                plugin._hide_invalidated= plugin.config_get(plugin.HIDE_INVALIDATED)
-                plugin._hide_replaced= plugin.config_get(plugin.HIDE_REPLACED)
-
-                window.update_all()
-        self.stateChanged.connect(on_check)
 
 
 def add_widget(grid,label,widget,row,help_):

@@ -1,11 +1,16 @@
 from typing import Callable,Any
 
-from PyQt6.QtWidgets import QLabel,QVBoxLayout
+from . import qt_resources
+if qt_resources.QT_VERSION == 5:
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import QLabel, QVBoxLayout, QCheckBox
+else:
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QLabel, QVBoxLayout, QCheckBox
 
 from electrum.gui.qt.util import WindowModalDialog, TaskThread
 from electrum.i18n import _
 
-from . import qt_resources
 class BalDialog(WindowModalDialog):
 
     def __init__(self,parent,title=None, icon = 'bal32x32.png'):
@@ -58,7 +63,28 @@ class BalBlockingWaitingDialog(BalDialog):
             # close popup
             self.accept()
 
+class bal_checkbox(QCheckBox):
+    def __init__(self, plugin,variable,window=None):
+        QCheckBox.__init__(self)
+        self.setChecked(plugin.config_get(variable))
+        window=window
+        def on_check(v):
+            plugin.config.set_key(variable, v == Qt.CheckState.Checked, save=True)
+            if window:
+                plugin._hide_invalidated= plugin.config_get(plugin.HIDE_INVALIDATED)
+                plugin._hide_replaced= plugin.config_get(plugin.HIDE_REPLACED)
 
+                window.update_all()
+        self.stateChanged.connect(on_check)
 
-
+    #TODO IMPLEMENT PREVIEW DIALOG
+    #tx list display txid, willexecutor, qrcode, button to sign
+    #   :def preview_dialog(self, txs):
+    def preview_dialog(self, txs):
+        w=PreviewDialog(self,txs)
+        w.exec()
+        return w
+    def add_info_from_will(self,tx):
+        for input in tx.inputs():
+            pass
 

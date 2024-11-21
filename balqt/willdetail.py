@@ -1,17 +1,23 @@
+from functools import partial
+
+from . import qt_resources
+if qt_resources.QT_VERSION == 5:
+    from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QWidget,QScrollArea)
+    from PyQt5.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
+                     QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
+else:
+    from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QWidget,QScrollArea)
+    from PyQt6.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
+                     QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
+
+
+from electrum.util import decimal_point_to_base_unit_name
+from electrum.i18n import _
+
 from ..bal import BalPlugin
 from .. import will as Will
 from .. import util as Util
 from .baldialog import BalDialog
-from electrum.util import decimal_point_to_base_unit_name
-from electrum.i18n import _
-
-
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QWidget,QScrollArea)
-from PyQt6.QtGui import (QPixmap, QImage, QBitmap, QPainter, QFontDatabase, QPen, QFont,
-                         QColor, QDesktopServices, qRgba, QPainterPath,QPalette)
-
-
-from functools import partial
 
 
 
@@ -190,6 +196,13 @@ class WillWidget(QWidget):
                     pal.setColor(QPalette.ColorRole.Window, QColor(255, 255, 0))
                 elif self.will[w].get(BalPlugin.STATUS_CONFIRMED,False):
                     pal.setColor(QPalette.ColorRole.Window, QColor(255, 0, 255))
+                elif self.will[w].get(BalPlugin.STATUS_CHECKED,False):
+                    pal.setColor(QPalette.ColorRole.Window, QColor(0, 255, 255))
+                elif self.will[w].get(BalPlugin.STATUS_PUSHED,False):
+                    pal.setColor(QPalette.ColorRole.Window, QColor(0, 200, 0))
+                elif self.will[w].get(BalPlugin.STATUS_EXPORTED,False):
+                    pal.setColor(QPalette.ColorRole.Window, QColor(0, 200, 200))
+                
                 else:
                     pal.setColor(QPalette.ColorRole.Window, QColor("#57c7d4"))
                 detailw.setAutoFillBackground(True)

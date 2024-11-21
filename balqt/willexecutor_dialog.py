@@ -24,23 +24,32 @@
 # SOFTWARE.
 
 import enum
+import json
+import urllib.request
+import urllib.parse
 
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
-from PyQt6.QtCore import Qt,QPersistentModelIndex, QModelIndex
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu)
+from . import qt_resources
+if qt_resources.QT_VERSION == 5:
+    from PyQt5.QtGui import QStandardItemModel, QStandardItem
+    from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
+    from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu)
+else:
+    from PyQt6.QtGui import QStandardItemModel, QStandardItem
+    from PyQt6.QtCore import Qt,QPersistentModelIndex, QModelIndex
+    from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu)
+
 
 from electrum.i18n import _
 from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin)
 from electrum.util import write_json_file,read_json_file
 from electrum.gui.qt.my_treeview import MyTreeView
-import json
-import urllib.request
-import urllib.parse
+from electrum.logging import Logger
+
 from ..bal import BalPlugin
 from .. import util as Util
 from .. import willexecutors as Willexecutors
 from .baldialog import BalDialog,BalBlockingWaitingDialog
-from electrum.logging import Logger
+
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()

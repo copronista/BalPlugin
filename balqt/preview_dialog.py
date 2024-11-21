@@ -25,27 +25,34 @@
 
 import enum
 import copy
+import json
+import urllib.request
+import urllib.parse
+from functools import partial
 
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
-from PyQt6.QtCore import Qt,QPersistentModelIndex, QModelIndex
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
+from . import qt_resources
+if qt_resources.QT_VERSION == 5:
+    from PyQt5.QtGui import QStandardItemModel, QStandardItem
+    from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
+    from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
+else:
+    from PyQt6.QtGui import QStandardItemModel, QStandardItem
+    from PyQt6.QtCore import Qt,QPersistentModelIndex, QModelIndex
+    from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
 
 from electrum.i18n import _
 from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin)
 from electrum.util import write_json_file,read_json_file,FileImportFailed
 from electrum.gui.qt.my_treeview import MyTreeView
-import json
-import urllib.request
-import urllib.parse
+from electrum.transaction import tx_from_any
+from electrum.network import Network
+
+
 from ..bal import BalPlugin
 from .. import willexecutors as Willexecutors
 from .. import util as Util 
 from .. import will as  Will
 from .baldialog import BalDialog
-from electrum.transaction import tx_from_any
-from electrum.network import Network
-from functools import partial
-import json
 
 class PreviewList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
