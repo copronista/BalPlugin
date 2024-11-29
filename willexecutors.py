@@ -13,6 +13,7 @@ from electrum.logging import get_logger
 
 DEFAULT_TIMEOUT = 5
 _logger = get_logger(__name__)
+
 def get_willexecutors(bal_plugin, update = False,bal_window=False,force=False,task=True):
     willexecutors = bal_plugin.config_get(bal_plugin.WILLEXECUTORS)
     for w in willexecutors:
@@ -91,7 +92,7 @@ def push_transactions_to_willexecutor(strtxs,url):
                 return True
             
     except Exception as e:
-        _logger.error(f"error contacting {url} for pushing txs",e)
+        _logger.error(f"error contacting {url} for pushing txs {str(e)}")
 
 def ping_servers(willexecutors):
     for url,we in willexecutors.items():

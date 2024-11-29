@@ -72,7 +72,6 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
     locktime=locktime[0]
 
     heirs = locktimes[locktime]
-    #for locktime,heirs in locktimes.items():
     vero=True
     while vero:
         vero=False
@@ -92,9 +91,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
                     outputs.append(PartialTxOutput.from_address_and_value(heir[HEIR_ADDRESS], real_amount))
                 else:
                     pass
-                    #print(f"{name} real amount not present so not including")
             except Exception as e:
-                #print("ERROR, PREPARE TRANSACTIONS",e,name,heir)
                 pass
 
         in_amount = 0.0
@@ -110,17 +107,11 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         except IndexError:
             pass
         if int(in_amount) < int(out_amount):
-            #print(f"in_amount{in_amount}<out_amount{out_amount}")
             break
         heirsvalue=out_amount
-        
-
-
         change = get_change_output(wallet, in_amount, out_amount, fee)
         if change:
             outputs.append(change)
-
-        #reduce_outputs(in_amount,out_amount,fees[locktime],outputs)
 
         tx = PartialTransaction.from_io(used_utxos, outputs, locktime=Util.parse_locktime_string(locktime,wallet), version=2)
         if len(description)>0: tx.description = description[:-1]
@@ -128,7 +119,6 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
         tx.heirsvalue = heirsvalue
         tx.set_rbf(True) 
         tx.remove_signatures()
-        #wallet.sign_transaction(tx, "a" )
         txid = tx.txid()
         if txid is None:
             raise Exception("txid is none",tx)
@@ -149,7 +139,6 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
             txin._TxInput__value_sats = change.value
             txin.utxo = tx
             available_utxos.append(txin)
-            #to_be_exploded.append(txin)
         txsout[txid].available_utxos = available_utxos[:]
     return txsout
 
@@ -197,14 +186,6 @@ def invalidate_inheritance_transactions(wallet):
                 invalidated.append(tx.txid())
                 remaining[key] = value
 
-def completed_willitem(will):
-    for txid,willitem in will.items():
-        if willitem['tx'].is_complete():
-            yield willitem
-        else:
-            #print(f"tx:{txid} is not complete")
-            pass
-
 def print_transaction(heirs,tx,locktimes,tx_fees):
     jtx=tx.to_json()
     print(f"TX: {tx.txid()}\t-\tLocktime: {jtx['locktime']}")
@@ -248,14 +229,8 @@ class Heirs(dict, Logger):
         try:
             self.update(d)
         except e as Exception:
-            #print("exception init heirs",e)
             return
-        # backward compatibility
-        #for k, v in self.items():
-        #    _type, n = v
-        #    if _type == 'address' and bitcoin.is_address(n):
-        #        self.pop(k)
-        #        self[n] = ('address', k)
+
     def invalidate_transactions(self,wallet):
         invalidate_inheritance_transactions(wallet)
 
@@ -299,14 +274,12 @@ class Heirs(dict, Logger):
                 column = HEIR_AMOUNT
                 if  real: column = HEIR_REAL_AMOUNT
                 value = int(math.floor(total_balance/relative_balance*self.amount_to_float(v[column])))
-                #print(f"{total_balance}/{relative_balance}*{self.amount_to_float(v[HEIR_AMOUNT])} = {value}")
                 if value > wallet.dust_threshold():
                     heir_list[key].insert(HEIR_REAL_AMOUNT, value)
                     amount += value
 
             except Exception as e:
                 raise e
-                #print("error getting heirs",e,key,heir_list[key],total_balance,relative_balance)
         return amount
 
     def amount_to_float(self,amount):
@@ -316,7 +289,6 @@ class Heirs(dict, Logger):
             try:
                 return float(amount[:-1])
             except:
-                #print("error parsing amount",amount)
                 return 0.0
 
 
@@ -330,7 +302,6 @@ class Heirs(dict, Logger):
         heir_list = {}
         onlyfixed = False
         newbalance = balance - total_fees
-        #print(f"inizio: balance: {balance}\tnewbalance: {newbalance}\ttotal_fees:{total_fees}")
         locktimes = self.get_locktimes(from_locktime);
         if willexecutor:
             for locktime in locktimes:
@@ -345,74 +316,52 @@ class Heirs(dict, Logger):
                         h[HEIR_ADDRESS] = willexecutor['address']
                         willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
                     except Exception as e:
-                        #print(willexecutor)
-                        #print("error willexecutor:",e)
                         return [],False
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
-        #print(f"after we: balance: {balance}\tnewbalance: {newbalance}\ttotal_fees:{total_fees}")
         for key in self.keys():
-            #print(key)
             try:
                 if not Util.parse_locktime_string(self[key][HEIR_LOCKTIME]) > from_locktime:
-                    #print("excluded heir",self[key])
                     continue
                 else:
                     pass
-                    #print("todo bien")
                 if Util.is_perc(self[key][HEIR_AMOUNT]):
-                    #print("is perc")
                     percent_amount += float(self[key][HEIR_AMOUNT][:-1])
                     percent_heirs[key] =list(self[key])
                 else:
-                    #print("is fixed",float(self[key][HEIR_AMOUNT]))
                     heir_amount = int(math.floor(float(self[key][HEIR_AMOUNT])))
                     if heir_amount>wallet.dust_threshold():
-                        #print("good",fixed_amount,heir_amount)
                         fixed_amount += heir_amount
-                        #print("fixed_amount:", fixed_amount)
                         fixed_heirs[key] = list(self[key])
                         fixed_heirs[key].insert(HEIR_REAL_AMOUNT,heir_amount)
-                        #find_regex += self[key]
                     else:
                         pass
-                        #print(f"heir({key}) amount({heir_amount})<dust threshold({wallet.dust_threshold()})",) 
             except Exception as e: 
                 pass
-                #print("Error getting heir info",e)
         if fixed_amount > newbalance:
-            #print(f"warning fixed_amount({fixed_amount}) > balance-fee({newbalance})")
             fixed_amount = self.normalize_perc(fixed_heirs,newbalance,fixed_amount,wallet)
-
             onlyfixed = True
 
         heir_list.update(fixed_heirs)
         
         newbalance -= fixed_amount
-        #print(f"after fixed balance: {balance}\tnewbalance: {newbalance}\ttotal_fees:{total_fees}")
-        #print("newbalance",newbalance)   
+
         if newbalance > 0:
-            #print("calculate_percentage_amount")
             perc_amount = self.normalize_perc(percent_heirs,newbalance,percent_amount,wallet)
             newbalance -= perc_amount
             heir_list.update(percent_heirs)
 
-        #print(f"after perc balance: {balance}\tnewbalance: {newbalance}\ttotal_fees:{total_fees}")
         if newbalance > 0:
-            #print("percentage amount not enought to fill all utxos, retrying with fixed heirs:",newbalance)
             newbalance += fixed_amount
             fixed_amount = self.normalize_perc(fixed_heirs,newbalance,fixed_amount,wallet,real=True)
             newbalance -= fixed_amount
-            #print(fixed_heirs)
             heir_list.update(fixed_heirs)
-        #print(f"after fixed22 balance: {balance}\tnewbalance: {newbalance}\ttotal_fees:{total_fees}")
         
         heir_list = sorted(heir_list.items(), key = lambda item: Util.parse_locktime_string(item[1][HEIR_LOCKTIME],wallet))
     
 
         locktimes = {}
         for key, value in heir_list:
-            #print("heir keyvalue:",key,value)
             locktime=Util.parse_locktime_string(value[HEIR_LOCKTIME])
             if not locktime in  locktimes: locktimes[locktime]={key:value}
             else: locktimes[locktime][key]=value
@@ -422,7 +371,6 @@ class Heirs(dict, Logger):
         return Util.is_perc(self[key][HEIR_AMOUNT])
 
     def buildTransactions(self,bal_plugin,wallet,tx_fees = None, utxos=None,from_locktime=0):
-        #print("------FROM LOCKTIME",from_locktime)
         Heirs._validate(self)
         if len(self)<=0:
             return
@@ -432,8 +380,6 @@ class Heirs(dict, Logger):
         if not utxos:
             utxos = wallet.get_utxos()
         willexecutors = Willexecutors.get_willexecutors(bal_plugin) or {}
-        #tx_fees = bal_plugin.config_get(BalPlugin.TX_FEES)
-        #print("txFEES:",tx_fees)
         self.decimal_point=bal_plugin.config.get_decimal_point()
         no_willexecutors = bal_plugin.config_get(BalPlugin.NO_WILLEXECUTOR)
         for utxo in utxos:
@@ -441,28 +387,21 @@ class Heirs(dict, Logger):
                 balance += utxo.value_sats()
                 len_utxo_set += 1
                 available_utxos.append(utxo)
-        #print("len utxos",len(utxos))
-        #print("len available utxos",len(available_utxos))
         if len_utxo_set==0: return
         j=-2
         willexecutorsitems = list(willexecutors.items())
         willexecutorslen = len(willexecutorsitems)
         alltxs = {}
-        #print(willexecutorsitems)
         while True:
-            #print("j",j)
             j+=1
             if j >= willexecutorslen:
-                #print("j> willexecutorslen")
                 break
             elif 0 <= j:
-                #print("hello",j,willexecutorslen,willexecutorsitems[j])
                 url, willexecutor = willexecutorsitems[j]
                 if not Willexecutors.is_selected(willexecutor):
                     continue
             elif j == -1:
                 if not no_willexecutors:
-                    #print("no willexecutors",no_willexecutors)
                     continue
                 url = willexecutor = False
             else:
@@ -476,21 +415,14 @@ class Heirs(dict, Logger):
                 total_fees=0
                 for fee in fees:
                     total_fees += int(fees[fee])
-                    #print("total_feesaaaaa:",total_fees)
-                #print("total_fees",total_fees)
                 newbalance = balance 
                 locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor, from_locktime)
-                #print("locktimes",locktimes)
-                #print("fees",fees)
                 try:
                     txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)
                     if not txs:
                         return {}
-                    #for tx in txsfirs:
-                    #    if reusable_input
                 except Exception as e:
                     try:
-                        #print(e,e.heirname,url)
                         if "w!ll3x3c" in e.heirname:
                             Willexecutors.is_selected(willexecutors[w],False)
                             break
@@ -499,9 +431,7 @@ class Heirs(dict, Logger):
                 total_fees = 0
                 total_fees_real = 0
                 total_in = 0
-                #print("produced TXS",len(txs))
                 for txid,tx in txs.items():
-                    #print(txid,tx.to_json())
                     tx.willexecutor = willexecutor
                     fee = tx.estimated_size() * tx_fees    
                     txs[txid].tx_fees= tx_fees
@@ -510,14 +440,12 @@ class Heirs(dict, Logger):
                     total_in += tx.input_value()
                     rfee= tx.input_value()-tx.output_value()
                     if rfee < fee or rfee > fee + wallet.dust_threshold():
-                        #print("tx_fees",tx_fees,"rfee",rfee,"fee",fee,"dust",wallet.dust_threshold())
                         redo = True
                     oldfees= fees.get(tx.my_locktime,0)
                     fees[tx.my_locktime]=fee
 
 
                 if  balance - total_in > wallet.dust_threshold():
-                    #print("some utxo was not used",balance - total_in) 
                     redo = True
                 if not redo:
                     break
@@ -527,14 +455,11 @@ class Heirs(dict, Logger):
             
         return alltxs
     def get_transactions(self,bal_plugin,wallet,tx_fees,utxos=None,from_locktime=0):
-        #print("get_transactions")
         txs=self.buildTransactions(bal_plugin,wallet,tx_fees,utxos,from_locktime)
         if txs:
             temp_txs = {}
             for txid in txs:
                 if txs[txid].available_utxos:
-                    #print("change:",txs[txid].available_utxos)
-                    #Util.print_var(txs[txid].available_utxos)
                     temp_txs.update(self.get_transactions(bal_plugin,wallet,tx_fees,txs[txid].available_utxos,txs[txid].locktime))
             txs.update(temp_txs)
         return txs
@@ -658,11 +583,9 @@ class Heirs(dict, Logger):
         for k, v in list(data.items()):
             if k == 'heirs':
                 return Heirs._validate(v)
-                       #data.pop(k)
             try:
                 Heirs.validate_heir(k,v)
             except Exception as e:
-                #print(e)
                 data.pop(k)
         return data
 

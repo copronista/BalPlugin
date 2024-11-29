@@ -189,11 +189,11 @@ class LockTimeRawEdit(QLineEdit, _LockTimeEditor):
             out = max(out, self.min_allowed_value)
             out = min(out, self.max_allowed_value)
         self.setText(str(out))
-        try:
-            if self.time_edit and int(out)>self.time_edit.locktime_threshold and not force:
-                self.time_edit.set_index(1)
-        except:
-            pass
+        #try:
+        #    if self.time_edit and int(out)>self.time_edit.locktime_threshold and not force:
+        #        self.time_edit.set_index(1)
+        #except:
+        #    pass
 
 class LockTimeHeightEdit(LockTimeRawEdit):
     max_allowed_value = NLOCKTIME_BLOCKHEIGHT_MAX

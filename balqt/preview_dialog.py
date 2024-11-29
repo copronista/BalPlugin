@@ -1,27 +1,3 @@
-#!/usr/bin/env python
-#
-# Electrum - lightweight Bitcoin client
-# Copyright (C) 2012 thomasv@gitorious
-#
-# Permission is hereby granted, free of charge, to any person
-# obtaining a copy of this software and associated documentation files
-# (the "Software"), to deal in the Software without restriction,
-# including without limitation the rights to use, copy, modify, merge,
-# publish, distribute, sublicense, and/or sell copies of the Software,
-# and to permit persons to whom the Software is furnished to do so,
-# subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-# ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
 
 import enum
 import copy
@@ -58,15 +34,13 @@ class PreviewList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         LOCKTIME = enum.auto()
         TXID = enum.auto()
-        #DESCRIPTION = enum.auto()
-        #VALUE = enum.auto() 
+        WILLEXECUTOR = enum.auto()
         STATUS = enum.auto()
 
     headers = {
         Columns.LOCKTIME: _('Locktime'),
         Columns.TXID: _('Txid'),
-        #Columns.DESCRIPTION: _('Description'),
-        #Columns.VALUE: _('Value'),
+        Columns.WILLEXECUTOR: _('Will-Executor'),
         Columns.STATUS: _('Status'),
     }
 
@@ -77,8 +51,6 @@ class PreviewList(MyTreeView):
         super().__init__(
             parent=parent.window,
             stretch_column=self.Columns.TXID,
-            #editable_columns=[self.Columns.URL,self.Columns.BASE_FEE,self.Columns.ADDRESS],
-
         )
         self.decimal_point=parent.bal_plugin.config.get_decimal_point
         self.setModel(QStandardItemModel(self))
@@ -88,7 +60,8 @@ class PreviewList(MyTreeView):
         if not will is None:
             self.will = will
         else:
-            self.will = parent.will
+            self.will = parent.willitems
+
         self.bal_window = parent
         self.wallet=parent.window.wallet
         self.setModel(QStandardItemModel(self))
@@ -97,12 +70,7 @@ class PreviewList(MyTreeView):
         self.config = parent.bal_plugin.config
         self.bal_plugin=self.bal_window.bal_plugin
 
-        #self.selected = self.parent.bal_plugin.config_get(BalPlugin.SELECTED_WILLEXECUTORS)
-           
-
         self.update()
-
-
 
     def create_menu(self, position):
         menu = QMenu()
@@ -117,30 +85,26 @@ class PreviewList(MyTreeView):
             column_data = '\n'.join(self.model().itemFromIndex(s_idx).text()
                                     for s_idx in self.selected_in_column(column))
 
-            """if sel_key in self.selected:
-                menu.addAction(_("deselect").format(column_title), lambda: self.deselect(selected_keys))
-            else:
-            """    
-            #menu.addAction(_("select").format(column_title), lambda: self.select(selected_keys))
             menu.addAction(_("details").format(column_title), lambda: self.show_transaction(selected_keys)).setEnabled(len(selected_keys)<2)
-            if len(selected_keys)==1:
+            if len(selected_keys)==1 and self.will[selected_keys[0]].we:
                 menu.addAction(_("check ").format(column_title), lambda: self.check_transactions(selected_keys))
 
             menu.addSeparator()
             menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
 
         menu.exec(self.viewport().mapToGlobal(position))
-    """
-    def get_edit_key_from_coordinate(self, row, col):
-        print("get edit key",row,col,self.ROLE_HEIR_KEY+col)
-        a= self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col)
-        print(a) 
-        #return self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col+1)
-        return a
-    """
+
     def delete(self,selected_keys):
         for key in selected_keys:
             del self.will[key]
+            try:
+                del self.bal_window.willitems[key]
+            except:
+                pass
+            try:
+                del self.bal_window.will[key]
+            except:
+                pass
         self.update()
 
     def check_transactions(self,selected_keys):
@@ -153,36 +117,19 @@ class PreviewList(MyTreeView):
 
     def show_transaction(self,selected_keys):
         for key in selected_keys:
-            self.bal_window.show_transaction(self.will[key]['tx'])
-            #self.show_transaction(self.will[key]['tx'], parent=self.bal_window.window.top_level_window())
+            self.bal_window.show_transaction(self.will[key].tx)
 
         self.update()
 
     def select(self,selected_keys):
         self.selected += selected_keys
-        #self.parent.bal_plugin.config.set_key(BalPlugin.SELECTED_WILLEXECUTORS,self.selected,save=True)
         self.update()
 
     def deselect(self,selected_keys):
         for key in selected_keys:
             self.selected.remove(key)
-        #self.parent.bal_plugin.config.set_key(BalPlugin.SELECTED_WILLEXECUTORS,self.selected,save=True)
         self.update()
-    """
-    def on_edited(self, idx, edit_key, *, text):
-        prior_name = self.parent.willexecutors_list[edit_key]
-        aarint("edit_key",edit_key)
 
-        col = idx.column()
-        if col == self.Columns.URL:
-            self.parent.willexecutors_list[text]=self.parent.willexecutors_list[edit_key]
-            del self.parent.willexecutors_list[edit_key]
-        if col == self.Columns.BASE_FEE:
-            self.parent.willexecutors_list[edit_key]["base_fee"] = text
-        if col == self.Columns.ADDRESS:
-            self.parent.willexecutors_list[edit_key]["info"] = text
-        self.update()
-    """
     def update_will(self,will):
         self.will.update(will)
         self.update()
@@ -206,15 +153,16 @@ class PreviewList(MyTreeView):
                 continue
 
 
-            #self.ping_server(url)
-            tx=bal_tx['tx']
+            tx=bal_tx.tx
             labels = [""] * len(self.Columns)
             labels[self.Columns.LOCKTIME] = Util.locktime_to_str(tx.locktime)
             labels[self.Columns.TXID] = txid
-            #labels[self.Columns.DESCRIPTION] = bal_tx.get('description','')
-            #labels[self.Columns.VALUE] = Util.decode_amount(bal_tx.get('heirsvalue',0),self.config.get_decimal_point())
-            status = bal_tx.get('status','None')
-            if len(status) > 53:
+            we = 'None'
+            if bal_tx.we:
+                we = bal_tx.we['url']
+            labels[self.Columns.WILLEXECUTOR]=we
+            status = bal_tx.status
+            if len(bal_tx.status) > 53:
                 status = "...{}".format(status[-50:])
             labels[self.Columns.STATUS] = status
             
@@ -229,17 +177,6 @@ class PreviewList(MyTreeView):
                         pass
                 else:
                     items.append(QStandardItem(str(e)))
-            """
-            items[self.Columns.SELECTED].setEditable(False)
-            items[self.Columns.URL].setEditable(True)
-            items[self.Columns.ADDRESS].setEditable(True)
-            items[self.Columns.BASE_FEE].setEditable(True)
-            items[self.Columns.STATUS].setEditable(False)
-
-            items[self.Columns.URL].setData(url, self.ROLE_HEIR_KEY+1)
-            items[self.Columns.BASE_FEE].setData(url, self.ROLE_HEIR_KEY+2)
-            items[self.Columns.ADDRESS].setData(url, self.ROLE_HEIR_KEY+3)
-            """
 
             self.model().insertRow(self.model().rowCount(), items)
             if txid == current_key:
@@ -249,23 +186,20 @@ class PreviewList(MyTreeView):
 
     def create_toolbar(self, config): 
         toolbar, menu = self.create_toolbar_with_menu('') 
-        menu.addAction(_("Prepare Will"), self.build_transactions) 
-#        menu.addAction(_(f"Toggle Replaced"), self.hide_replaced) 
-#        menu.addAction(_(f"Toggle Invalidated"), self.hide_invalidated) 
-        menu.addAction(_("Display Will"), self.bal_window.preview_modal_dialog) 
-        menu.addAction(_("Sign Will"), self.ask_password_and_sign_transactions)
-        menu.addAction(_("Export Will"), self.export_will)
-        menu.addAction(_("Import Will"), self.import_will)
-        #menu.addAction(_("Export Transactions"), self.export_file)
+        menu.addAction(_("Prepare"), self.build_transactions) 
+        menu.addAction(_("Display"), self.bal_window.preview_modal_dialog) 
+        menu.addAction(_("Sign"), self.ask_password_and_sign_transactions)
+        menu.addAction(_("Export"), self.export_will)
+        menu.addAction(_("Import"), self.import_will)
         menu.addAction(_("Broadcast"), self.broadcast)
-        menu.addAction(_("Invalidate Will"), self.invalidate_will)
-        prepareButton = QPushButton("Prepare")
+        menu.addAction(_("Invalidate"), self.invalidate_will)
+        prepareButton = QPushButton(_("Prepare"))
         prepareButton.clicked.connect(self.build_transactions)
-        signButton = QPushButton("Sign")
+        signButton = QPushButton(_("Sign"))
         signButton.clicked.connect(self.ask_password_and_sign_transactions)
-        pushButton = QPushButton("Broadcast")
+        pushButton = QPushButton(_("Broadcast"))
         pushButton.clicked.connect(self.broadcast)
-        displayButton = QPushButton("Display")
+        displayButton = QPushButton(_("Display"))
         displayButton.clicked.connect(self.bal_window.preview_modal_dialog)
         hlayout = QHBoxLayout()
         widget = QWidget()
@@ -281,10 +215,10 @@ class PreviewList(MyTreeView):
     def hide_replaced(self):
         self.bal_window.bal_plugin.hide_replaced()
         self.update()
+
     def hide_invalidated(self):
         self.bal_window.bal_plugin.hide_invalidated()
         self.update()
-
 
     def build_transactions(self):
         will = self.bal_window.prepare_will()
@@ -301,73 +235,9 @@ class PreviewList(MyTreeView):
     def import_will(self):
         self.bal_window.import_will()
 
-    def sign_transactions(self,password):
-        txs={}
-        signed = None
-        tosign = None
-        def get_message():
-            msg = ""
-            if signed:
-                msg=_(f"signed: {signed}\n")
-            return msg + _(f"signing: {tosign}")
-        for txid in Will.only_valid(self.will):
-            willitem = self.will[txid]
-            tx = copy.deepcopy(willitem['tx'])
-            if willitem[BalPlugin.STATUS_COMPLETE]:
-                txs[txid]=tx
-                continue 
-            tosign=txid
-            self.waiting_dialog.update(get_message())
-            for txin in tx.inputs():
-                prevout = txin.prevout.to_json()
-                if prevout[0] in self.will:
-                    change = self.will[prevout[0]]['tx'].outputs()[prevout[1]]
-                    txin._trusted_value_sats = change.value
-                    try:
-                        txin.script_descriptor = change.script_descriptor
-                    except:
-                        pass
-                    txin.is_mine=True
-                    txin._TxInput__address=change.address
-                    txin._TxInput__scriptpubkey = change.scriptpubkey
-                    txin._TxInput__value_sats = change.value
-         
-
-            self.wallet.sign_transaction(tx, password,ignore_warnings=True)
-            signed=tosign
-            is_complete=False
-            if tx.is_complete():
-                is_complete=True
-                willitem['status'] += BalPlugin.STATUS_COMPLETE
-                willitem[BalPlugin.STATUS_COMPLETE]=True
-            txs[txid]=tx
-        return txs
-
     def ask_password_and_sign_transactions(self):
-       self.bal_window.ask_password_and_sign_transactions(callback=self.update) 
+        self.bal_window.ask_password_and_sign_transactions(callback=self.update) 
                     
-
-
-
-
-    def export_inheritance_handler(self,path):
-        with open(path,"w") as f:
-            for txid,willitem in self.will.items():
-                self.will[txid]['status']+=BalPlugin.STATUS_EXPORTED
-                f.write(str(willitem['tx'])+"\n")
-        self.update()
-
-    def export_file(self):
-        try:
-            Util.export_meta_gui(self.bal_window.window, _('heirs_transactions'), self.export_inheritance_handler)
-        except Exception as e:
-            self.bal_window.window.show_error(str(e))
-            raise e
-        return
-    def import_file(self):
-        pass
-
-
     def broadcast(self):
         self.bal_window.broadcast_transactions()
         self.update
@@ -392,39 +262,25 @@ class PreviewDialog(BalDialog,MessageBoxMixin):
         self.format_fee_rate = bal_window.window.format_fee_rate
         self.show_address = bal_window.window.show_address
         if not will:
-            self.will = bal_window.will
+            self.will = bal_window.willitems
         else:
             self.will = will
         self.setWindowTitle(_('Transactions Preview'))
         self.setMinimumSize(1000, 200)
         self.size_label = QLabel()
-        self.transactions_list = PreviewList(self.bal_window,will)
+        self.transactions_list = PreviewList(self.bal_window,self.will)
         vbox = QVBoxLayout(self)
         vbox.addWidget(self.size_label)
         vbox.addWidget(self.transactions_list)
         buttonbox = QHBoxLayout()
 
-        #b = QPushButton(_('Write Will'))
-        #b.clicked.connect(self.transactions_list.export_file)
-        #buttonbox.addWidget(b)
-
         b = QPushButton(_('Sign'))
         b.clicked.connect(self.transactions_list.ask_password_and_sign_transactions)
         buttonbox.addWidget(b)
 
-
         b = QPushButton(_('Export Will'))
         b.clicked.connect(self.transactions_list.export_will)
         buttonbox.addWidget(b)
-
-        #b = QPushButton(_('Importt Will'))
-        #b.clicked.connect(self.transactions_list.export_file)
-        #buttonbox.addWidget(b)
-
-
-        #b = QPushButton(_('Export Transactions'))
-        #b.clicked.connect(self.transactions_list.export_file)
-        #buttonbox.addWidget(b)
 
         b = QPushButton(_('Broadcast'))
         b.clicked.connect(self.transactions_list.broadcast)
@@ -433,7 +289,6 @@ class PreviewDialog(BalDialog,MessageBoxMixin):
         b = QPushButton(_('Invalidate will'))
         b.clicked.connect(self.transactions_list.invalidate_will)
         buttonbox.addWidget(b)
- 
 
         vbox.addLayout(buttonbox)
 
@@ -463,5 +318,3 @@ class PreviewDialog(BalDialog,MessageBoxMixin):
 
     def closeEvent(self, event):
         event.accept()
-    
-

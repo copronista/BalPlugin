@@ -1,28 +1,3 @@
-#!/usr/bin/env python
-#
-# Electrum - lightweight Bitcoin client
-# Copyright (C) 2012 thomasv@gitorious
-#
-# Permission is hereby granted, free of charge, to any person
-# obtaining a copy of this software and associated documentation files
-# (the "Software"), to deal in the Software without restriction,
-# including without limitation the rights to use, copy, modify, merge,
-# publish, distribute, sublicense, and/or sell copies of the Software,
-# and to permit persons to whom the Software is furnished to do so,
-# subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-# ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
 import enum
 import json
 import urllib.request
@@ -123,9 +98,9 @@ class WillExecutorList(MyTreeView):
             wout[k]=self.parent.willexecutors_list[k]
         self.parent.update_willexecutors(wout)
         self.update()
+
     def get_edit_key_from_coordinate(self, row, col):
         a= self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col)
-        #return self.get_role_data_from_coordinate(row, col, role=self.ROLE_HEIR_KEY+col+1)
         return a
 
     def delete(self,selected_keys):
@@ -147,7 +122,6 @@ class WillExecutorList(MyTreeView):
 
     def on_edited(self, idx, edit_key, *, text):
         prior_name = self.parent.willexecutors_list[edit_key]
-
         col = idx.column()
         try:
             if col == self.Columns.URL:
@@ -161,27 +135,19 @@ class WillExecutorList(MyTreeView):
                 self.parent.willexecutors_list[edit_key]["info"] = text
             self.update()
         except Exception as e:
-            #print("error saving willexecutor:",e)
             pass
 
     def update(self):
         if self.parent.willexecutors_list is None:
-            #print("why it is none?",self.parent.willexecutors_list)
-            #print("why it is none?",self.willexecutors)
             return
         
         current_key = self.get_role_data_for_current_item(col=self.Columns.URL, role=self.ROLE_HEIR_KEY)
         self.model().clear()
         self.update_headers(self.__class__.headers)
 
-
-
-
         set_current = None
 
         for url, value in self.parent.willexecutors_list.items():
-            #self.ping_server(url)
-            #print("new value",url,value)
             labels = [""] * len(self.Columns)
             labels[self.Columns.URL] = url 
             if Willexecutors.is_selected(value):
@@ -202,7 +168,6 @@ class WillExecutorList(MyTreeView):
                     try:
                         items.append(QStandardItem(*e))
                     except Exception as e:
-                        #print("Errore grave",e)
                         pass
                 else:
                     items.append(QStandardItem(e))
@@ -225,8 +190,6 @@ class WillExecutorList(MyTreeView):
                 set_current = QPersistentModelIndex(idx)
             self.set_current_idx(set_current)
         self.parent.save_willexecutors()
-
-
 
 class WillExecutorDialog(BalDialog,MessageBoxMixin):
     def __init__(self, bal_window):

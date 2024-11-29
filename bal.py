@@ -77,22 +77,6 @@ class BalPlugin(BasePlugin):
         },
     }
 
-    STATUS_NEW = 'New'
-    STATUS_COMPLETE = 'Signed'
-    STATUS_BROADCASTED = 'Broadcasted'
-    STATUS_PUSHED = 'Pushed'
-    STATUS_NOT_PUSHED = 'Push Failed'
-    STATUS_EXPORTED = 'Exported'
-    STATUS_REPLACED = 'Replaced'
-    STATUS_INVALIDATED = 'Invalidated' 
-    STATUS_ANTICIPATED = 'Anticipated'
-    STATUS_RESTORED = 'Restored'
-    STATUS_VALID = 'Valid'
-    STATUS_CHECKED = 'Checked'
-    STATUS_NOT_CHECKED = 'Check Failed'
-    STATUS_CONFIRMED = 'Confirmed'
-  
-
     LATEST_VERSION = '1'
     KNOWN_VERSIONS = ('0', '1')
     assert LATEST_VERSION in KNOWN_VERSIONS
@@ -101,18 +85,6 @@ class BalPlugin(BasePlugin):
 
     def __init__(self, parent, config, name):
         self.logger= get_logger(__name__)
-        """
-        print("registered_dicts:",json_db.registered_dicts)
-        print("registered_names:",json_db.registered_names)
-        if not "heirs" in json_db.registered_dicts:
-            print("heir NOT registered")
-            json_db.register_dict('heirs', tuple, None)
-
-        if not "will" in json_db.registered_dicts:
-            print("will NOT registered")
-            json_db.register_dict('will', lambda x: get_will(x), None)
-            json_db.register_name('will', lambda x: get_will(x))
-        """
         BasePlugin.__init__(self, parent, config, name)
         self.base_dir = os.path.join(config.electrum_path(), 'bal')
         self.logger.info(self.base_dir)
@@ -121,16 +93,10 @@ class BalPlugin(BasePlugin):
         self.name = name
         self._hide_invalidated= self.config_get(self.HIDE_INVALIDATED)
         self._hide_replaced= self.config_get(self.HIDE_REPLACED)
-
         self.plugin_dir = os.path.split(os.path.realpath(__file__))[0]
-
-        #self.willexecutors = Willexecutors.get_willexecutors(self)
-
-        #self.selected_willexecutors = self.get_config(self.SELECTED_WILLEXECUTORS)
 
     def resource_path(self,*parts):
         return os.path.join(self.plugin_dir, *parts)
-
 
     def config_get(self,key):
         v = self.config.get(key,None)

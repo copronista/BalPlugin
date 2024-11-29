@@ -29,7 +29,7 @@ class WillDetailDialog(BalDialog):
 
     def __init__(self, bal_window):
 
-        self.will = bal_window.will
+        self.will = bal_window.willitems
         self.threshold = Util.parse_locktime_string(bal_window.will_settings['threshold'])
         self.bal_window = bal_window 
         Will.add_willtree(self.will)
@@ -129,7 +129,7 @@ class WillDetailDialog(BalDialog):
         self.update()
 
     def update(self):
-        self.will = self.bal_window.will
+        self.will = self.bal_window.willitems
         pos = self.vlayout.indexOf(self.scrollbox)
         self.vlayout.removeWidget(self.scrollbox)
         self.paint_scroll_area()
@@ -141,14 +141,14 @@ class WillWidget(QWidget):
         super().__init__()
         vlayout = QVBoxLayout()
         self.setLayout(vlayout)
-        self.will = parent.bal_window.will
+        self.will = parent.bal_window.willitems
         self.parent = parent
         for w in self.will:
-            if self.will[w][BalPlugin.STATUS_REPLACED] and self.parent.bal_window.bal_plugin._hide_replaced:
+            if self.will[w].get_status('REPLACED') and self.parent.bal_window.bal_plugin._hide_replaced:
                 continue
-            if self.will[w][BalPlugin.STATUS_INVALIDATED] and self.parent.bal_window.bal_plugin._hide_invalidated:
+            if self.will[w].get_status('INVALIDATED') and self.parent.bal_window.bal_plugin._hide_invalidated:
                 continue
-            f = self.will[w].get("father",None)
+            f = self.will[w].father
             if father == f:
                 qwidget = QWidget()
                 childWidget = QWidget()
@@ -163,44 +163,44 @@ class WillWidget(QWidget):
 
                 willpushbutton.clicked.connect(partial(self.parent.bal_window.show_transaction,txid=w))
                 detaillayout.addWidget(willpushbutton)
-                locktime = Util.locktime_to_str(self.will[w]['tx'].locktime)
-                creation = Util.locktime_to_str(self.will[w]['time'])
+                locktime = Util.locktime_to_str(self.will[w].tx.locktime)
+                creation = Util.locktime_to_str(self.will[w].time)
                 def qlabel(title,value):
                     label = "<b>"+_(str(title)) + f":</b>\t{str(value)}"
                     return QLabel(label)
                 detaillayout.addWidget(qlabel("Locktime",locktime))
                 detaillayout.addWidget(qlabel("Creation Time",creation))
-                total_fees = self.will[w]['tx'].input_value() - self.will[w]['tx'].output_value()
+                total_fees = self.will[w].tx.input_value() - self.will[w].tx.output_value()
                 decoded_fees = total_fees #Util.decode_amount(total_fees,self.parent.decimal_point)
-                fee_per_byte = round(total_fees/self.will[w]['tx'].estimated_size(),3)
+                fee_per_byte = round(total_fees/self.will[w].tx.estimated_size(),3)
                 fees_str = str(decoded_fees) + " ("+  str(fee_per_byte) + " sats/vbyte)"
                 detaillayout.addWidget(qlabel("Transaction fees:",fees_str))
-                detaillayout.addWidget(qlabel("Status:",self.will[w]['status']))
+                detaillayout.addWidget(qlabel("Status:",self.will[w].status))
                 detaillayout.addWidget(QLabel(""))
                 detaillayout.addWidget(QLabel("<b>Heirs:</b>"))
-                for heir in self.will[w]['heirs']:
+                for heir in self.will[w].heirs:
                     if "w!ll3x3c\"" not in heir:
-                        decoded_amount = Util.decode_amount(self.will[w]['heirs'][heir][3],self.parent.decimal_point)
+                        decoded_amount = Util.decode_amount(self.will[w].heirs[heir][3],self.parent.decimal_point)
                         detaillayout.addWidget(qlabel(heir,f"{decoded_amount} {self.parent.base_unit_name}"))
-                if self.will[w]['willexecutor']:
+                if self.will[w].we:
                     detaillayout.addWidget(QLabel(""))
                     detaillayout.addWidget(QLabel(_("<b>Willexecutor:</b:")))
-                    decoded_amount = Util.decode_amount(self.will[w]['willexecutor']['base_fee'],self.parent.decimal_point)
+                    decoded_amount = Util.decode_amount(self.will[w].we['base_fee'],self.parent.decimal_point)
 
-                    detaillayout.addWidget(qlabel(self.will[w]['willexecutor']['url'],f"{decoded_amount} {self.parent.base_unit_name}"))
+                    detaillayout.addWidget(qlabel(self.will[w].we['url'],f"{decoded_amount} {self.parent.base_unit_name}"))
                 detaillayout.addStretch()
                 pal = QPalette()
-                if self.will[w].get(BalPlugin.STATUS_INVALIDATED,False):
+                if self.will[w].get_status('INVALIDATED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor(255,0, 0))
-                elif self.will[w].get(BalPlugin.STATUS_REPLACED,False):
+                elif self.will[w].get_status('REPLACED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor(255, 255, 0))
-                elif self.will[w].get(BalPlugin.STATUS_CONFIRMED,False):
+                elif self.will[w].get_status('CONFIRMED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor(255, 0, 255))
-                elif self.will[w].get(BalPlugin.STATUS_CHECKED,False):
+                elif self.will[w].get_status('CHECKED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor(0, 255, 255))
-                elif self.will[w].get(BalPlugin.STATUS_PUSHED,False):
+                elif self.will[w].get_status('PUSHED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor(0, 200, 0))
-                elif self.will[w].get(BalPlugin.STATUS_EXPORTED,False):
+                elif self.will[w].get_status('EXPORTED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor(0, 200, 200))
                 
                 else:
