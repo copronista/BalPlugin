@@ -190,7 +190,7 @@ class PreviewList(MyTreeView):
         menu.addAction(_("Display"), self.bal_window.preview_modal_dialog) 
         menu.addAction(_("Sign"), self.ask_password_and_sign_transactions)
         menu.addAction(_("Export"), self.export_will)
-        menu.addAction(_("Import"), self.import_will)
+        #menu.addAction(_("Import"), self.import_will)
         menu.addAction(_("Broadcast"), self.broadcast)
         menu.addAction(_("Invalidate"), self.invalidate_will)
         prepareButton = QPushButton(_("Prepare"))

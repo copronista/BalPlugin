@@ -386,7 +386,7 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
                     prevout_id = w[2].prevout.txid.hex()
                     parentwill = will.get(prevout_id,False)
                     if not parentwill or not parentwill.get_status('VALID'):
-                        w[1].set_status('INVALIDATED')
+                        w[1].set_status('INVALIDATED',True)
      
     all_inputs_min_locktime = get_all_inputs_min_locktime(all_inputs)
     search_rai(all_inputs,all_utxos,will,wallet,callback_not_valid_tx= callback_not_valid_tx)
@@ -501,8 +501,8 @@ class WillItem(Logger):
         'EXPIRED':['Expired',False],
         'ERROR':['Error',False]
     }
-    def set_status(self,status,value):
-        if self.get_status(status) == bool(value):
+    def set_status(self,status,value=True):
+        if self.STATUS[status] == bool(value):
             return None
         _logger.debug(f"set status {self._id}: {status} {value}")
         self.status += "." +("NOT " if not value else "" +  self.STATUS[status][0])
