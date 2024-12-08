@@ -407,7 +407,7 @@ class BalWindow(Logger):
         try:
             self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=False, bal_window=self) 
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,self.date_to_check)
-            print(txs)
+            print("txs:",txs)
             self.logger.info(txs)
             creation_time = time()
             if txs:

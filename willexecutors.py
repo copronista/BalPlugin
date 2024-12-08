@@ -1,14 +1,15 @@
-import urllib.parse
-import urllib.request
 import json
 from datetime import datetime
-
-from electrum import constants
-from electrum.gui.qt.util import WaitingDialog
 from functools import partial
-from electrum.i18n import _
-from .balqt.baldialog import BalWaitingDialog
+from aiohttp import ClientResponse
+
+from electrum.network import Network
+from electrum import constants
 from electrum.logging import get_logger
+from electrum.gui.qt.util import WaitingDialog
+from electrum.i18n import _
+
+from .balqt.baldialog import BalWaitingDialog
 
 
 DEFAULT_TIMEOUT = 5
@@ -80,19 +81,56 @@ def push_transactions_to_willexecutors(will):
                         will[wid]['status']+='.Pushed'
                 del willexecutor['txs']
 
+def send_request(method, url, data=None, *, timeout=10):
+    network = Network.get_instance()
+    if not network:
+        raise ErrorConnectingServer('You are offline.')
+    _logger.debug(f'<-- {method} {url} {data}')
+    headers = {}
+    headers['user-agent'] = 'BalPlugin'
+    headers['Content-Type']='text/plain'
+
+    try:
+        if method == 'get':
+            response = Network.send_http_on_proxy(method, url,
+                                                  params=data,
+                                                  headers=headers,
+                                                  on_finish=handle_response,
+                                                  timeout=timeout)
+        elif method == 'post':
+            print(url)
+            response = Network.send_http_on_proxy(method, url,
+                                                  body=data,
+                                                  headers=headers,
+                                                  on_finish=handle_response,
+                                                  timeout=timeout)
+        else:
+            raise Exception(f"unexpected {method=!r}")
+    except Exception as e:
+        raise e
+    else:
+        _logger.debug(f'--> {response}')
+        return response
+
+async def handle_response(resp:ClientResponse):
+    print("response")
+    r=await resp.text()
+    print("r",r)
+    try:
+        r=json.loads(r)
+        r['status'] = resp.status
+        r['selected']=is_selected(willexecutor)
+        r['url']=url
+    except:
+        pass    
+    return r
+
+
 def push_transactions_to_willexecutor(strtxs,url):
     try:
-        req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'), method='POST')
-        req.add_header('Content-Type', 'text/plain')
-        with urllib.request.urlopen(req, timeout = DEFAULT_TIMEOUT) as response:
-            response_data = response.read().decode('utf-8')
-            if response.status != 200:
-                _logger.error(f"error {response.status} pushing txs to: {url}")
-            else:
-                return True
-            
-    except Exception as e:
-        _logger.error(f"error contacting {url} for pushing txs {str(e)}")
+        return send_request('post', url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'))
+    except:
+        return False
 
 def ping_servers(willexecutors):
     for url,we in willexecutors.items():
@@ -104,17 +142,8 @@ def get_info_task(url,willexecutor):
     try:
         _logger.info("GETINFO_WILLEXECUTOR")
         _logger.debug(url)
-        req = urllib.request.Request(url+"/"+constants.net.NET_NAME+"/info",  method='GET')
-        with urllib.request.urlopen(req,timeout=DEFAULT_TIMEOUT) as response:
-            response_data=response.read().decode('utf-8')
-
-            w = json.loads(response_data)
-            _logger.debug(f"response_data {w['address']}")
-            w['status']=response.status
-            w['selected']=is_selected(willexecutor)
-            w['url']=url
-            if response.status != 200:
-                _logger.error(f"error{response.status} pushing txs to: {url}")
+        w = send_request('get',url+"/"+constants.net.NET_NAME+"/info")
+        _logger.debug(f"response_data {w['address']}")
     except Exception as e:
         _logger.error(f"error {e} contacting {url}")
         if w:
@@ -148,17 +177,8 @@ def get_willexecutors_list_from_json(bal_plugin):
 def check_transaction(txid,url):
     _logger.debug(f"{url}:{txid}")
     try:
-        req = urllib.request.Request(url+"/searchtx", data=txid.encode('ascii'), method='POST')
-        req.add_header('Content-Type', 'text/plain')
-        with urllib.request.urlopen(req, timeout = DEFAULT_TIMEOUT) as response:
-            if response.status != 200:
-                _logger.error(f"error{response.status} checking txs to: {url}")
-            else:
-                response_data=response.read().decode('utf-8')
-                _logger.info("response data",response_data)
-                w = json.loads(response_data)
-
-                return w
-            
+        w = send_request('post',url+"/searchtx",data=txid.encode('ascii'))
+        return w
     except Exception as e:
+        raise e
         _logger.error(f"error contacting {url} for checking txs {e}")
