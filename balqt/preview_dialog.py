@@ -147,9 +147,9 @@ class PreviewList(MyTreeView):
 
         set_current = None
         for txid,bal_tx in self.will.items():
-            if self.bal_window.bal_plugin._hide_replaced and bal_tx[BalPlugin.STATUS_REPLACED]:
+            if self.bal_window.bal_plugin._hide_replaced and bal_tx.get_status('REPLACED'):
                 continue
-            if self.bal_window.bal_plugin._hide_invalidated and bal_tx[BalPlugin.STATUS_INVALIDATED]:
+            if self.bal_window.bal_plugin._hide_invalidated and bal_tx.get_status('INVALIDATED'):
                 continue
 
 

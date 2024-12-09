@@ -10,7 +10,7 @@ from electrum.gui.qt.util import WaitingDialog
 from electrum.i18n import _
 
 from .balqt.baldialog import BalWaitingDialog
-
+from . import util as Util
 
 DEFAULT_TIMEOUT = 5
 _logger = get_logger(__name__)
@@ -143,15 +143,16 @@ def get_info_task(url,willexecutor):
         _logger.info("GETINFO_WILLEXECUTOR")
         _logger.debug(url)
         w = send_request('get',url+"/"+constants.net.NET_NAME+"/info")
+        willexecutor['status'] = w['status']
+        willexecutor['base_fee'] = w['base_fee']
+        willexecutor['address'] = w['address']
+        if not willexecutor['info']:
+            willexecutor['info'] = w['info']
         _logger.debug(f"response_data {w['address']}")
     except Exception as e:
-        _logger.error(f"error {e} contacting {url}")
-        if w:
-            w['status']="KO"
-        else:
-            willexecutor['status'] = "KO"
-    if w:
-        willexecutor=w
+        _logger.error(f"error {e} contacting {url}: {w}")
+        willexecutor['stauts']="KO"
+    
     willexecutor['last_update'] = datetime.now().timestamp()
     return willexecutor
 

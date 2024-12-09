@@ -112,3 +112,20 @@ class BalPlugin(BasePlugin):
     def hide_replaced(self):
         self._hide_replaced = not self._hide_replaced
         self.config.set_key(BalPlugin.HIDE_REPLACED,self.hide_invalidated,save=True)
+
+    def default_will_settings(self):
+        return {
+            'tx_fees':1, 
+            'threshold':'180d',
+            'locktime':'1y',
+        }
+    def validate_will_settings(self,will_settings):
+        print("validate will settings")
+        if int(will_settings['tx_fees'])<1:
+            will_settings['tx_fees']=1
+        if will_settings['threshold'] =='':
+            will_settings['threshold']='180d'
+        if will_settings['locktime']=='':
+            will_settings['locktime']='1y'
+        return will_settings
+

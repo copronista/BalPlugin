@@ -346,6 +346,7 @@ def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
                         
                     else:
                         if wallet.db.get_transaction(wi._id):
+                            print("wallet.db.get_transaction(wi._id)")
                             wi.set_status('CONFIRMED',True)
                         else:
                             wi.set_status('INVALIDATED',True)
@@ -354,7 +355,12 @@ def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
                         wo = will[prevout_id]
                         ttx= wallet.db.get_transaction(prevout_id)
                         if ttx:
-                            wi.set_status('CONFIRMED',True)
+                            pass
+                            #print("if ttx")
+                            #Util.print_var(ttx,"TTX")
+                            #Util.print_var(wallet,"WALLET")
+                        
+                            #wi.set_status('CONFIRMED',True)
                         else:
                             wi.set_status('INVALIDATED',True)
     
@@ -362,6 +368,7 @@ def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
                     if child.tx.locktime < wi.tx.locktime:
                         wi.set_status('REPLACED',True)
             else:
+                print("ELSE")
                 pass
 
 
@@ -374,6 +381,7 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
         if not w.get_status('CONFIRMED'):
             tt=wallet.db.get_transaction(wid)
             if tt:
+                Util.print_var(tt,"TT")
                 w.set_status('CONFIRMED',True)
 
     all_inputs=get_all_inputs(will,only_valid = True)

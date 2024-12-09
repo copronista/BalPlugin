@@ -280,9 +280,8 @@ class BalWindow(Logger):
             self.will_settings=self.wallet.db.get_dict("will_settings")
             self.logger.info("will_settings:",self.will_settings)
             if not self.will_settings:
-                self.will_settings['tx_fees']=100
-                self.will_settings['threshold']='180d'
-                self.will_settings['locktime']='1y'
+                self.will_settings = self.bal_plugin.default_will_settings()
+            self.bal_plugin.validate_will_settings(self.will_settings)
             self.heir_list.update_will_settings()
                 
     def get_window_title(self,title):
