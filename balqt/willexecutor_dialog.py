@@ -140,56 +140,59 @@ class WillExecutorList(MyTreeView):
     def update(self):
         if self.parent.willexecutors_list is None:
             return
-        
-        current_key = self.get_role_data_for_current_item(col=self.Columns.URL, role=self.ROLE_HEIR_KEY)
-        self.model().clear()
-        self.update_headers(self.__class__.headers)
+        try: 
+            current_key = self.get_role_data_for_current_item(col=self.Columns.URL, role=self.ROLE_HEIR_KEY)
+            self.model().clear()
+            self.update_headers(self.__class__.headers)
 
-        set_current = None
+            set_current = None
 
-        for url, value in self.parent.willexecutors_list.items():
-            labels = [""] * len(self.Columns)
-            labels[self.Columns.URL] = url 
-            if Willexecutors.is_selected(value):
-                labels[self.Columns.SELECTED] = [read_QIcon('confirmed.png'),'']
-            else:
-                labels[self.Columns.SELECTED] = ''
-            labels[self.Columns.BASE_FEE] = Util.decode_amount(value.get('base_fee',0),self.config.get_decimal_point())
-            if str(value.get('status',0)) == "200":
-                labels[self.Columns.STATUS] = [read_QIcon('status_connected.png'),'']
-            else:
-                labels[self.Columns.STATUS] = [read_QIcon('unconfirmed.png'),'']
-            labels[self.Columns.ADDRESS] = str(value.get('address',''))
-            labels[self.Columns.INFO] = str(value.get('info',''))
-            
-            items=[]
-            for e in labels:
-                if type(e)== list:
-                    try:
-                        items.append(QStandardItem(*e))
-                    except Exception as e:
-                        pass
+            for url, value in self.parent.willexecutors_list.items():
+                labels = [""] * len(self.Columns)
+                labels[self.Columns.URL] = url 
+                if Willexecutors.is_selected(value):
+                    labels[self.Columns.SELECTED] = [read_QIcon('confirmed.png'),'']
                 else:
-                    items.append(QStandardItem(e))
-            items[self.Columns.SELECTED].setEditable(False)
-            items[self.Columns.URL].setEditable(True)
-            items[self.Columns.ADDRESS].setEditable(True)
-            items[self.Columns.INFO].setEditable(True)
-            items[self.Columns.BASE_FEE].setEditable(True)
-            items[self.Columns.STATUS].setEditable(False)
+                    labels[self.Columns.SELECTED] = ''
+                labels[self.Columns.BASE_FEE] = Util.decode_amount(value.get('base_fee',0),self.config.get_decimal_point())
+                if str(value.get('status',0)) == "200":
+                    labels[self.Columns.STATUS] = [read_QIcon('status_connected.png'),'']
+                else:
+                    labels[self.Columns.STATUS] = [read_QIcon('unconfirmed.png'),'']
+                labels[self.Columns.ADDRESS] = str(value.get('address',''))
+                labels[self.Columns.INFO] = str(value.get('info',''))
+                
+                items=[]
+                for e in labels:
+                    if type(e)== list:
+                        try:
+                            items.append(QStandardItem(*e))
+                        except Exception as e:
+                            pass
+                    else:
+                        items.append(QStandardItem(e))
+                items[self.Columns.SELECTED].setEditable(False)
+                items[self.Columns.URL].setEditable(True)
+                items[self.Columns.ADDRESS].setEditable(True)
+                items[self.Columns.INFO].setEditable(True)
+                items[self.Columns.BASE_FEE].setEditable(True)
+                items[self.Columns.STATUS].setEditable(False)
 
-            items[self.Columns.URL].setData(url, self.ROLE_HEIR_KEY+1)
-            items[self.Columns.BASE_FEE].setData(url, self.ROLE_HEIR_KEY+2)
-            items[self.Columns.INFO].setData(url, self.ROLE_HEIR_KEY+3)
-            items[self.Columns.ADDRESS].setData(url, self.ROLE_HEIR_KEY+4)
+                items[self.Columns.URL].setData(url, self.ROLE_HEIR_KEY+1)
+                items[self.Columns.BASE_FEE].setData(url, self.ROLE_HEIR_KEY+2)
+                items[self.Columns.INFO].setData(url, self.ROLE_HEIR_KEY+3)
+                items[self.Columns.ADDRESS].setData(url, self.ROLE_HEIR_KEY+4)
 
 
-            self.model().insertRow(self.model().rowCount(), items)
-            if url == current_key:
-                idx = self.model().index(row_count, self.Columns.NAME)
-                set_current = QPersistentModelIndex(idx)
-            self.set_current_idx(set_current)
-        self.parent.save_willexecutors()
+                self.model().insertRow(self.model().rowCount(), items)
+                if url == current_key:
+                    idx = self.model().index(row_count, self.Columns.NAME)
+                    set_current = QPersistentModelIndex(idx)
+                self.set_current_idx(set_current)
+            self.parent.save_willexecutors()
+        except Exception as e:
+            print(e)
+
 
 class WillExecutorDialog(BalDialog,MessageBoxMixin):
     def __init__(self, bal_window):
@@ -202,7 +205,7 @@ class WillExecutorDialog(BalDialog,MessageBoxMixin):
         self.willexecutors_list = Willexecutors.get_willexecutors(self.bal_plugin)
 
         self.setWindowTitle(_('Will-Executor Service List'))
-        self.setMinimumSize(800, 200)
+        self.setMinimumSize(1000, 200)
         self.size_label = QLabel()
         self.willexecutor_list = WillExecutorList(self)
 

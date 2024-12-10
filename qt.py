@@ -399,14 +399,12 @@ class BalWindow(Logger):
         Will.normalize_will(self.willitems,self.wallet)
 
     def build_will(self, ignore_duplicate = True, keep_original = True ):
-        print("build_will")
         will = {}
         willtodelete=[]
         willtoappend={}
         try:
             self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=False, bal_window=self) 
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,self.date_to_check)
-            print("txs:",txs)
             self.logger.info(txs)
             creation_time = time()
             if txs:

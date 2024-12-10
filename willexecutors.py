@@ -98,7 +98,6 @@ def send_request(method, url, data=None, *, timeout=10):
                                                   on_finish=handle_response,
                                                   timeout=timeout)
         elif method == 'post':
-            print(url)
             response = Network.send_http_on_proxy(method, url,
                                                   body=data,
                                                   headers=headers,
@@ -113,9 +112,7 @@ def send_request(method, url, data=None, *, timeout=10):
         return response
 
 async def handle_response(resp:ClientResponse):
-    print("response")
     r=await resp.text()
-    print("r",r)
     try:
         r=json.loads(r)
         r['status'] = resp.status

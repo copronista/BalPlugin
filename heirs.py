@@ -373,7 +373,6 @@ class Heirs(dict, Logger):
     def buildTransactions(self,bal_plugin,wallet,tx_fees = None, utxos=None,from_locktime=0):
         Heirs._validate(self)
         if len(self)<=0:
-            print("NO HEIRS")
             return
         balance = 0.0
         len_utxo_set = 0
@@ -388,7 +387,6 @@ class Heirs(dict, Logger):
                 balance += utxo.value_sats()
                 len_utxo_set += 1
                 available_utxos.append(utxo)
-        print(available_utxos)
         if len_utxo_set==0: return
         j=-2
         willexecutorsitems = list(willexecutors.items())
@@ -411,7 +409,6 @@ class Heirs(dict, Logger):
             fees = {}
             i=0
             while True:
-                print(url)
                 txs = {}
                 redo = False
                 i+=1
