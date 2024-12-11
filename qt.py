@@ -44,7 +44,7 @@ from .balqt.willdetail import WillDetailDialog
 from .balqt import qt_resources
 from . import willexecutors as Willexecutors
 from electrum.transaction import tx_from_any
-from time import time
+import time
 from electrum import json_db
 from electrum.json_db import StoredDict
 import datetime
@@ -406,7 +406,7 @@ class BalWindow(Logger):
             self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=False, bal_window=self) 
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,self.date_to_check)
             self.logger.info(txs)
-            creation_time = time()
+            creation_time = time.time()
             if txs:
                 for txid in txs:
                     txtodelete=[]
@@ -734,7 +734,7 @@ class BalWindow(Logger):
             raise FileImportFailed(_("Invalid will file"))
 
     def check_transactions_task(self,will):
-        start = time()
+        start = time.time()
         for wid,w in will.items():
             try:
                 self.pingwaiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w.we['url']))
@@ -746,8 +746,8 @@ class BalWindow(Logger):
             except:
                 w.set_status('CHECK_FAIL',True)
 
-        if time()-start < 3:
-            time.sleep(3-(time()-start))
+        if time.time()-start < 3:
+            time.sleep(3-(time.time()-start))
 
     def check_transactions(self,will):
         def on_success(result):
