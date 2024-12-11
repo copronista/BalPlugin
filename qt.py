@@ -140,7 +140,7 @@ class Plugin(BalPlugin,Logger):
         w.prepare_will()
         password = None
         if w.wallet.has_keystore_encryption():
-            password = self.bal_plugin.password_dialog(parent=self.window)
+            password = w.window.password_dialog(parent=w.window,msg=_("Some inheritance transaction have to be signed"))
         try:
             w.sign_transactions(password)
             w.push_transactions_to_willexecutors(force=True)
