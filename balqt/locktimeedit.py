@@ -63,7 +63,7 @@ class HeirsLockTimeEdit(QWidget):
         hbox.addStretch(1)
 
         #self.locktime_height_e.textEdited.connect(self.valueEdited.emit)
-        self.locktime_raw_e.textEdited.connect(self.valueEdited.emit)
+        self.locktime_raw_e.editingFinished.connect(self.valueEdited.emit)
         self.locktime_date_e.dateTimeChanged.connect(self.valueEdited.emit)
         self.combo.currentIndexChanged.connect(self.valueEdited.emit)
 

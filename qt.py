@@ -130,7 +130,7 @@ class Plugin(BalPlugin,Logger):
         w.init_will()
         w.disable_plugin = False
         w.ok=True
-
+    
     @hook
     def on_close_window(self,window):
         self.logger.info("HOOK on close_window")
@@ -139,11 +139,8 @@ class Plugin(BalPlugin,Logger):
             return
         w.prepare_will()
         if Will.is_new(w.willitems):
-            password = None
-            if w.wallet.has_keystore_encryption():
-                password = w.window.password_dialog(parent=w.window,msg=_("Some inheritance transaction have to be signed"))
             try:
-                w.sign_transactions(password)
+                w.sign_transactions(w.get_wallet_password())
                 w.push_transactions_to_willexecutors()
             except Exception as e:
                 print("error signing transactions",e)
@@ -450,7 +447,6 @@ class BalWindow(Logger):
         self.window.show_error(text)
     def show_critical(self,text):
         self.window.show_critical(text)
-
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
             if self.disable_plugin:
@@ -629,30 +625,40 @@ class BalWindow(Logger):
             print(e)
             return None
         return txs
-
-    def ask_password_and_sign_transactions(self,callback=None):
-        def on_success(txs):
-            for txid,tx in txs.items():
-                self.willitems[txid].tx=copy.deepcopy(tx)
-                self.will[txid]=self.willitems[txid].to_dict()
-            try:
-                self.will_list.update()
-            except:
-                pass
-            if callback:
-                try:
-                    callback()
-                except Exception as e:
-                    raise e
-
-        def on_failure(exc_info):
-            self.logger.info("sign fail",exc_info)
-        
+    def get_wallet_password(self,message=None):
         password = None
         if self.wallet.has_keystore_encryption():
             password = self.bal_plugin.password_dialog(parent=self.window)
-        
-        task = partial(self.sign_transactions, password)
+            if password is None:
+                return
+            try:
+                self.wallet.check_password(password)
+            except Exception as e:
+                self.show_error(str(e))
+                self.get_wallet_password(message)
+        return password
+
+            
+    def ask_password_and_sign_transactions(self,callback=None):
+        def on_success(txs):
+            if txs:
+                for txid,tx in txs.items():
+                    self.willitems[txid].tx=copy.deepcopy(tx)
+                    self.will[txid]=self.willitems[txid].to_dict()
+                try:
+                    self.will_list.update()
+                except:
+                    pass
+                if callback:
+                    try:
+                        callback()
+                    except Exception as e:
+                        raise e
+
+        def on_failure(exc_info):
+            self.logger.info("sign fail",exc_info)
+        password= self.get_wallet_password() 
+        task = partial(self.sign_transactions,password)
         msg = _('Signing transactions...')
         self.waiting_dialog = BalWaitingDialog(self.window, msg, task, on_success, on_failure)
 

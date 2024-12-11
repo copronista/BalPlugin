@@ -120,7 +120,6 @@ class BalPlugin(BasePlugin):
             'locktime':'1y',
         }
     def validate_will_settings(self,will_settings):
-        print("validate will settings")
         if int(will_settings['tx_fees'])<1:
             will_settings['tx_fees']=1
         if will_settings['threshold'] =='':

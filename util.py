@@ -53,8 +53,8 @@ def parse_locktime_string(locktime,w=None):
             locktime+=int(height) 
         return int(locktime) 
     except Exception as e: 
-        #print("parse_locktime_string",e) 
-        raise e
+        print("parse_locktime_string",e) 
+        #raise e
 
 
 def int_locktime(seconds=0,minutes=0,hours=0, days=0, blocks = 0):
