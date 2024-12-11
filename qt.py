@@ -137,14 +137,24 @@ class Plugin(BalPlugin,Logger):
         w = self.get_window(window)
         if w.disable_plugin:
             return
-        if Will.is_new(w.willitems):
-            if self.config_get(BalPlugin.PREVIEW):
-                w.preview_modal_dialog()
-                w.dw.exec()
-            elif self.config_get(BalPlugin.BROADCAST):
-                if self.config_get(BalPlugin.ASK_BROADCAST):
-                    w.preview_modal_dialog()
-                    w.dw.exec()
+        w.prepare_will()
+        password = None
+        if w.wallet.has_keystore_encryption():
+            password = self.bal_plugin.password_dialog(parent=self.window)
+        try:
+            w.sign_transactions(password)
+            w.push_transactions_to_willexecutors(force=True)
+        except Exception as e:
+            print("error signing transactions",e)
+
+        #if Will.is_new(w.willitems):
+        #    if self.config_get(BalPlugin.PREVIEW):
+        #        w.preview_modal_dialog()
+        #        w.dw.exec()
+        #    elif self.config_get(BalPlugin.BROADCAST):
+        #        if self.config_get(BalPlugin.ASK_BROADCAST):
+        #            w.preview_modal_dialog()
+        #            w.dw.exec()
         w.save_willitems()
 
     def get_window(self,window):
@@ -589,7 +599,9 @@ class BalWindow(Logger):
                     txs[txid]=tx
                     continue
                 tosign=txid
-                self.waiting_dialog.update(get_message())
+                try:
+                    self.waiting_dialog.update(get_message())
+                except:pass
                 for txin in tx.inputs():
                     prevout = txin.prevout.to_json()
                     if prevout[0] in self.willitems:
@@ -687,7 +699,10 @@ class BalWindow(Logger):
         for url in willexecutors:
             willexecutor = willexecutors[url]
             if Willexecutors.is_selected(willexecutor):
-                self.broadcasting_dialog.update(getMsg(willexecutors))
+                try:
+                    self.broadcasting_dialog.update(getMsg(willexecutors))
+                except:
+                    pass
                 if 'txs' in willexecutor:
                     if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
                         for wid in willexecutors[url]['txsids']:
