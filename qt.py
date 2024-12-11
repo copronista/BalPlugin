@@ -15,6 +15,7 @@ import sys
 import copy
 
 import sys
+import time
 
 from electrum.plugin import hook
 from electrum.i18n import _
@@ -734,13 +735,21 @@ class BalWindow(Logger):
             raise FileImportFailed(_("Invalid will file"))
 
     def check_transactions_task(self,will):
+        import time
+        start = time.time()
         for wid,w in will.items():
-            self.pingwaiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w.we['url']))
-            resp = Willexecutors.check_transaction(wid,w.we['url'])
-            if not resp:
+            try:
+                self.pingwaiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w.we['url']))
+                resp = Willexecutors.check_transaction(wid,w.we['url'])
+                if not resp:
+                    w.set_status('CHECK_FAIL',True)
+                else:
+                    w.set_status('CHECKED',True)
+            except:
                 w.set_status('CHECK_FAIL',True)
-            else:
-                w.set_status('CHECKED',True)
+
+        if time.time()-start < 3:
+            time.sleep(3-(time.time()-start))
 
     def check_transactions(self,will):
         def on_success(result):
@@ -750,6 +759,7 @@ class BalWindow(Logger):
         def on_failure(e):
             self.logger.error(f"error checking transactions {e}")
             pass
+
         self.logger.debug("check Transaction")
         task = partial(self.check_transactions_task,will)
         msg = _('Check Transaction')
