@@ -1,5 +1,7 @@
 from . import willexecutors as Willexecutors
 from . import util as Util
+from electrum.i18n import _
+
 from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTransaction,PartialTxOutput,Transaction
 from electrum.util import bfh, decimal_point_to_base_unit_name
 from electrum.util import write_json_file,read_json_file,FileImportFailed
@@ -510,7 +512,7 @@ class WillItem(Logger):
         if self.STATUS[status] == bool(value):
             return None
         _logger.debug(f"set status {self._id}: {status} {value}")
-        self.status += "." +("NOT " if not value else "" +  self.STATUS[status][0])
+        self.status += "." +("NOT " if not value else "" +  _(self.STATUS[status][0]))
         self.STATUS[status][1] = bool(value)
         if value:
             if status in ['INVALIDATED','REPLACED','CONFIRMED']:

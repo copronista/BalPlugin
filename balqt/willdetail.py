@@ -191,20 +191,25 @@ class WillWidget(QWidget):
                 detaillayout.addStretch()
                 pal = QPalette()
                 if self.will[w].get_status('INVALIDATED'):
-                    pal.setColor(QPalette.ColorRole.Window, QColor(255,0, 0))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#ffce30"))
                 elif self.will[w].get_status('REPLACED'):
-                    pal.setColor(QPalette.ColorRole.Window, QColor(255, 255, 0))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#ffcd30"))
                 elif self.will[w].get_status('CONFIRMED'):
-                    pal.setColor(QPalette.ColorRole.Window, QColor(255, 0, 255))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#00c800"))
+                elif self.will[w].get_status('CHECK_FAIL'):
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#e83845"))
                 elif self.will[w].get_status('CHECKED'):
-                    pal.setColor(QPalette.ColorRole.Window, QColor(0, 255, 255))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#8afa6c"))
                 elif self.will[w].get_status('PUSHED'):
-                    pal.setColor(QPalette.ColorRole.Window, QColor(0, 200, 0))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#73f3c8"))
                 elif self.will[w].get_status('EXPORTED'):
-                    pal.setColor(QPalette.ColorRole.Window, QColor(0, 200, 200))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#73f4c8"))
+                elif self.will[w].get_status('COMPLETE'):
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#73dbf3"))
                 
                 else:
-                    pal.setColor(QPalette.ColorRole.Window, QColor("#57c7d4"))
+                    #pal.setColor(QPalette.ColorRole.Window, QColor("#57c7d4"))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#bfbfbf"))
                 detailw.setAutoFillBackground(True)
                 detailw.setPalette(pal)
 

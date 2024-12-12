@@ -55,6 +55,7 @@ def parse_locktime_string(locktime,w=None):
     except Exception as e: 
         print("parse_locktime_string",e) 
         #raise e
+    return 0
 
 
 def int_locktime(seconds=0,minutes=0,hours=0, days=0, blocks = 0):

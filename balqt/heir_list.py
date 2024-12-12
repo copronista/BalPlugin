@@ -230,8 +230,8 @@ class HeirList(MyTreeView,MessageBoxMixin):
         self.heir_tx_fees.setMinimum(1)
         self.heir_tx_fees.setMaximum(10000)
         def on_heir_tx_fees():
-            if not self.tx_fees.value():
-                self.tx_fees.set_value(1)
+            if not self.heir_tx_fees.value():
+                self.heir_tx_fees.set_value(1)
             self.bal_window.will_settings['tx_fees'] = self.heir_tx_fees.value()
             #self.bal_window.bal_plugin.config.set_key('will_settings',self.bal_window.will_settings,save = True)
         self.heir_tx_fees.valueChanged.connect(on_heir_tx_fees)
