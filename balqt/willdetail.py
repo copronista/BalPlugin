@@ -193,7 +193,7 @@ class WillWidget(QWidget):
                 if self.will[w].get_status('INVALIDATED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor("#ffce30"))
                 elif self.will[w].get_status('REPLACED'):
-                    pal.setColor(QPalette.ColorRole.Window, QColor("#ffcd30"))
+                    pal.setColor(QPalette.ColorRole.Window, QColor("#ffbd30"))
                 elif self.will[w].get_status('CONFIRMED'):
                     pal.setColor(QPalette.ColorRole.Window, QColor("#00c800"))
                 elif self.will[w].get_status('CHECK_FAIL'):

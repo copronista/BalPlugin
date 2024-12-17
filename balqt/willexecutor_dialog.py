@@ -18,13 +18,14 @@ from electrum.i18n import _
 from electrum.gui.qt.util import (Buttons,read_QIcon, import_meta_gui, export_meta_gui,MessageBoxMixin)
 from electrum.util import write_json_file,read_json_file
 from electrum.gui.qt.my_treeview import MyTreeView
-from electrum.logging import Logger
 
 from ..bal import BalPlugin
 from .. import util as Util
 from .. import willexecutors as Willexecutors
 from .baldialog import BalDialog,BalBlockingWaitingDialog
+from electrum.logging import get_logger,Logger
 
+_logger=get_logger(__name__)
 class WillExecutorList(MyTreeView):
     class Columns(MyTreeView.BaseColumnsEnum):
         SELECTED = enum.auto()
@@ -191,7 +192,7 @@ class WillExecutorList(MyTreeView):
                 self.set_current_idx(set_current)
             self.parent.save_willexecutors()
         except Exception as e:
-            print(e)
+            _logger.error(e)
 
 
 class WillExecutorDialog(BalDialog,MessageBoxMixin):

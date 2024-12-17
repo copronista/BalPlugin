@@ -10,6 +10,9 @@ else:
 
 from electrum.gui.qt.util import WindowModalDialog, TaskThread
 from electrum.i18n import _
+from electrum.logging import get_logger
+
+_logger = get_logger(__name__)
 
 class BalDialog(WindowModalDialog):
 
@@ -19,9 +22,9 @@ class BalDialog(WindowModalDialog):
         self.setWindowIcon(qt_resources.read_QIcon(icon))
 
 class BalWaitingDialog(BalDialog):
-    def __init__(self, bal_window: 'BalWindow', message: str, task, on_success=None, on_error=None, on_cancel=None):
+    def __init__(self, bal_window: 'BalWindow', message: str, task, on_success=None, on_error=None, on_cancel=None,exe=True):
         assert bal_window
-        BalDialog.__init__(self, bal_window, _("Please wait"))
+        BalDialog.__init__(self, bal_window.window, _("Please wait"))
         self.message_label = QLabel(message)
         vbox = QVBoxLayout(self)
         vbox.addWidget(self.message_label)
@@ -30,11 +33,24 @@ class BalWaitingDialog(BalDialog):
             self.cancel_button.clicked.connect(on_cancel)
             vbox.addLayout(Buttons(self.cancel_button))
         self.accepted.connect(self.on_accepted)
-        self.show()
+        self.task=task
+        self.on_success = on_success
+        self.on_error = on_error
+        self.on_cancel = on_cancel
+        if exe:
+            self.exe()
+
+    def exe(self):
         self.thread = TaskThread(self)
         self.thread.finished.connect(self.deleteLater)  # see #3956
-        self.thread.add(task, on_success, self.accept, on_error)
+        self.thread.finished.connect(self.finished)
+        self.thread.add(self.task, self.on_success, self.accept, self.on_error)
+        self.exec_()
 
+    def hello(self):
+        pass
+    def finished(self):
+        _logger.info("finished")
     def wait(self):
         self.thread.wait()
 
@@ -43,6 +59,14 @@ class BalWaitingDialog(BalDialog):
 
     def update(self, msg):
         self.message_label.setText(msg)
+
+    def getText(self):
+         return self.message_label.text()
+
+    def closeEvent(self,event):
+        self.thread.stop()
+
+
 
 class BalBlockingWaitingDialog(BalDialog):
     def __init__(self, bal_window: 'BalWindow', message: str, task: Callable[[], Any]):
@@ -87,4 +111,5 @@ class bal_checkbox(QCheckBox):
     def add_info_from_will(self,tx):
         for input in tx.inputs():
             pass
+
 

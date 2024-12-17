@@ -41,6 +41,7 @@ from .balqt.preview_dialog import PreviewDialog,PreviewList
 from .balqt.heir_list import HeirList
 from .balqt.amountedit import PercAmountEdit
 from .balqt.willdetail import WillDetailDialog
+from .balqt.closedialog import BalCloseDialog
 from .balqt import qt_resources
 from . import willexecutors as Willexecutors
 from electrum.transaction import tx_from_any
@@ -130,30 +131,11 @@ class Plugin(BalPlugin,Logger):
         w.init_will()
         w.disable_plugin = False
         w.ok=True
-    
     @hook
-    def on_close_window(self,window):
-        self.logger.info("HOOK on close_window")
-        w = self.get_window(window)
-        if w.disable_plugin:
-            return
-        w.prepare_will()
-        if Will.is_new(w.willitems):
-            try:
-                w.sign_transactions(w.get_wallet_password())
-                w.push_transactions_to_willexecutors()
-            except Exception as e:
-                print("error signing transactions",e)
-
-        #if Will.is_new(w.willitems):
-        #    if self.config_get(BalPlugin.PREVIEW):
-        #        w.preview_modal_dialog()
-        #        w.dw.exec()
-        #    elif self.config_get(BalPlugin.BROADCAST):
-        #        if self.config_get(BalPlugin.ASK_BROADCAST):
-        #            w.preview_modal_dialog()
-        #            w.dw.exec()
-        w.save_willitems()
+    def close_wallet(self,wallet):
+        for winid,win in self.bal_windows.items():
+            if win.wallet == wallet:
+                win.on_close()
 
     def get_window(self,window):
         w = self.bal_windows.get(window.winId,None)
@@ -188,25 +170,7 @@ class Plugin(BalPlugin,Logger):
         self.extension = bool(keystore.get_passphrase(password))
         return keystore.get_seed(password)
 
-    def on_close(self):
-        self.logger.info("close plugin")
-        try:
-            for winid,bal_window in self.bal_windows.items():
-                try:
-                    window=bal_window.window
-                    bal_window.heirs_tab.close()
-                    bal_window.will_tab.close()
-                    window.toggle_tab(bal_window.heirs_tab)
-                    window.toggle_tab(bal_window.will_tab)
-                    window.tabs.update()
-                    bal_window.will_tab.hide()
-                    bal_window.tools_menu.removeAction(bal_window.tools_menu.willexecutors_action)
-                except:
-                    pass
-        except Exception as e:
-            raise e
-            self.logger.error("error closing plugin",e)
-
+   
 class shown_cv():
     _type= bool
     def __init__(self,value):
@@ -281,7 +245,7 @@ class BalWindow(Logger):
                 except:
                     self.disable_plugin=True
                     self.show_warning(_('Please restart Electrum to activate the BAL plugin'), title=_('Success'))
-                    self.bal_plugin.on_close()
+                    self.close_wallet()
                     return
 
         if not self.will_settings:
@@ -425,7 +389,7 @@ class BalWindow(Logger):
                     tx['heirsvalue'] = txs[txid].heirsvalue
                     tx['description'] = txs[txid].description
                     tx['willexecutor'] = copy.deepcopy(txs[txid].willexecutor)
-                    tx['status'] = Will.WillItem.STATUS_DEFAULT['NEW'][0]
+                    tx['status'] = _("New")
                     tx['tx_fees'] = txs[txid].tx_fees
                     tx['time'] = creation_time
                     tx['heirs'] = copy.deepcopy(txs[txid].heirs)
@@ -447,6 +411,34 @@ class BalWindow(Logger):
         self.window.show_error(text)
     def show_critical(self,text):
         self.window.show_critical(text)
+
+
+
+    def init_heirs_to_locktime(self):
+        for heir in self.heirs:
+            h=self.heirs[heir]
+            self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
+            self.logger.debug("will_Settings locktime {}".format(self.will_settings['locktime']))
+            self.logger.debug(self.heirs[heir])
+
+    
+    def init_class_variables(self):
+            if not self.heirs:
+                self.show_error(_("no heirs"))
+                return
+            try: 
+                self.date_to_check = Util.parse_locktime_string(self.will_settings['threshold'])
+                found = False
+                self.locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
+                self.current_block = Util.get_current_height(self.wallet.network)
+                self.block_to_check = self.current_block + self.locktime_blocks
+                self.no_willexecutor = self.bal_plugin.config_get(BalPlugin.NO_WILLEXECUTOR)
+                self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=True,bal_window=self,task=False) 
+                self.init_heirs_to_locktime()
+
+            except Exception as e:
+                raise e
+
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
         try:
             if self.disable_plugin:
@@ -455,38 +447,20 @@ class BalWindow(Logger):
             if not self.heirs:
                 self.logger.warning("not heirs",self.heirs)
                 return
-            try: 
-                self.logger.info("start building transactions")
-                self.date_to_check = Util.parse_locktime_string(self.will_settings['threshold'])
-                self.logger.debug("date_to_check:",self.date_to_check)
-                locktime = Util.parse_locktime_string(self.will_settings['locktime'])
-                self.logger.debug("locktime-setting:",locktime)
-                if locktime < self.date_to_check:
-                    self.show_error(_("locktime is lower than threshold"))
+            self.init_class_variables()
+            locktime = Util.parse_locktime_string(self.will_settings['locktime'])
+            if locktime < self.date_to_check:
+                self.show_error(_("locktime is lower than threshold"))
+                return
+            if not self.no_willexecutor:
+                f=False
+                for k,we in self.willexecutors.items():
+                    if Willexecutors.is_selected(we):
+                        f=True
+                if not f:
+                    self.show_error(_(" no backup transaction or willexecutor selected"))
                     return
-                found = False
-                self.locktime_blocks=self.bal_plugin.config_get(BalPlugin.LOCKTIME_BLOCKS)
-                self.current_block = Util.get_current_height(self.wallet.network)
-                self.block_to_check = self.current_block + self.locktime_blocks
-                self.no_willexecutor = self.bal_plugin.config_get(BalPlugin.NO_WILLEXECUTOR)
-                self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin,update=True,bal_window=self,task=False) 
-                if not self.no_willexecutor:
-                    f=False
-                    for k,we in self.willexecutors.items():
-                        if Willexecutors.is_selected(we):
-                            f=True
-                    if not f:
-                        self.show_error(_(" no backup transaction or willexecutor selected"))
-                        return
-            except Exception as e:
-                raise e
             try:
-                self.logger.debug(self.heirs)
-                for heir in self.heirs:
-                    h=self.heirs[heir]
-                    self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
-                    self.logger.debug("will_Settings locktime",self.will_settings['locktime'])
-                    self.logger.debug(self.heirs[heir])
                 self.check_will()
             except Will.WillExpiredException as e:
                 self.invalidate_will()
@@ -494,7 +468,7 @@ class BalWindow(Logger):
             except Will.NoHeirsException:
                 return
             except Will.NotCompleteWillException as e:
-                self.logger.info(type(e),":",e)
+                self.logger.info("{}:{}".format(type(e),e))
                 message = False 
                 if isinstance(e,Will.HeirChangeException):
                     message ="Heirs changed:"
@@ -576,7 +550,8 @@ class BalWindow(Logger):
         fee_per_byte=self.will_settings.get('tx_fees',1)
         task = partial(Will.invalidate_will,self.willitems,self.wallet,fee_per_byte)
         msg = _("Calculating Transactions")
-        self.waiting_dialog = BalWaitingDialog(self.window, msg, task, on_success, on_failure)
+        self.waiting_dialog = BalWaitingDialog(self, msg, task, on_success, on_failure,exe=False)
+        self.waiting_dialog.exe()
 
     def sign_transactions(self,password):
         try:
@@ -622,23 +597,36 @@ class BalWindow(Logger):
                 self.logger.debug("tx: {} is complete:{}".format(txid, tx.is_complete()))
                 txs[txid]=tx
         except Exception as e:
-            print(e)
             return None
         return txs
-    def get_wallet_password(self,message=None):
+
+    def get_wallet_password(self,message=None,parent=None):
+        parent =self.window if not parent else parent
         password = None
         if self.wallet.has_keystore_encryption():
-            password = self.bal_plugin.password_dialog(parent=self.window)
+            password = self.bal_plugin.password_dialog(parent=parent,msg=message)
             if password is None:
-                return
+                return False
             try:
                 self.wallet.check_password(password)
             except Exception as e:
                 self.show_error(str(e))
-                self.get_wallet_password(message)
+                password = self.get_wallet_password(message)
         return password
 
-            
+
+    def on_close(self):
+        close_window=BalCloseDialog(self)
+        close_window.close_plugin_task()
+        self.save_willitems()
+        self.heirs_tab.close()
+        self.will_tab.close()
+        self.tools_menu.removeAction(self.tools_menu.willexecutors_action)
+        self.window.toggle_tab(self.heirs_tab)
+        self.window.toggle_tab(self.will_tab)
+        self.window.tabs.update()
+    
+
     def ask_password_and_sign_transactions(self,callback=None):
         def on_success(txs):
             if txs:
@@ -660,7 +648,8 @@ class BalWindow(Logger):
         password= self.get_wallet_password() 
         task = partial(self.sign_transactions,password)
         msg = _('Signing transactions...')
-        self.waiting_dialog = BalWaitingDialog(self.window, msg, task, on_success, on_failure)
+        self.waiting_dialog = BalWaitingDialog(self, msg, task, on_success, on_failure,exe=False)
+        self.waiting_dialog.exe()
 
     def broadcast_transactions(self,force=False):
         def on_success(sulcess):
@@ -677,26 +666,11 @@ class BalWindow(Logger):
 
         task = partial(self.push_transactions_to_willexecutors,force)
         msg = _('Selecting Will-Executors')
-        self.broadcasting_dialog = BalWaitingDialog(self.window,msg,task,on_success,on_failure)
+        self.waiting_dialog = BalWaitingDialog(self,msg,task,on_success,on_failure,exe=False)
+        self.waiting_dialog.exe()
 
     def push_transactions_to_willexecutors(self,force=False):
-        willexecutors ={}
-        for wid,willitem in self.willitems.items():
-            if willitem.get_status('VALID'):
-                if willitem.get_status('COMPLETE'):
-                    if not willitem.get_status('PUSHED') or force:
-                        if willexecutor := willitem.we:
-                            if  willexecutor and Willexecutors.is_selected(willexecutor):
-                                url=willexecutor['url']
-                                if not url in willexecutors:
-                                    willexecutor['txs']=""
-                                    willexecutor['txsids']=[]
-                                    willexecutor['broadcast_status']= _("Waiting...")
-                                    willexecutors[url]=willexecutor
-                                willexecutors[url]['txs']+=str(willitem.tx)+"\n"
-                                willexecutors[url]['txsids'].append(wid)
-        if not willexecutors:
-            return
+        willexecutors = Willexecutors.get_willexecutor_transactions(self.willitems)
         def getMsg(willexecutors):
             msg = "Broadcasting Transactions to Will-Executors:\n"
             for url in willexecutors:
@@ -705,13 +679,9 @@ class BalWindow(Logger):
         error=False
         for url in willexecutors:
             willexecutor = willexecutors[url]
-            if Willexecutors.is_selected(willexecutor):
-                try:
-                    self.broadcasting_dialog.update(getMsg(willexecutors))
-                except:
-                    pass
-                if 'txs' in willexecutor:
-                    if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
+            self.waiting_dialog.update(getMsg(willexecutors))
+            if 'txs' in willexecutor:
+                    if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]):
                         for wid in willexecutors[url]['txsids']:
                             self.willitems[wid].set_status('PUSHED', True)
                         willexecutors[url]['broadcast_stauts'] = _("Success")
@@ -758,22 +728,15 @@ class BalWindow(Logger):
     def check_transactions_task(self,will):
         start = time.time()
         for wid,w in will.items():
-            try:
-                self.pingwaiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w.we['url']))
-                resp = Willexecutors.check_transaction(wid,w.we['url'])
-                if not resp:
-                    w.set_status('CHECK_FAIL',True)
-                else:
-                    w.set_status('CHECKED',True)
-            except:
-                w.set_status('CHECK_FAIL',True)
+                self.waiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w.we['url']))
+                w.check_willexecutor()
 
         if time.time()-start < 3:
             time.sleep(3-(time.time()-start))
 
     def check_transactions(self,will):
         def on_success(result):
-            del self.pingwaiting_dialog
+            del self.waiting_dialog
             self.update_all()
             pass
         def on_failure(e):
@@ -783,7 +746,8 @@ class BalWindow(Logger):
         self.logger.debug("check Transaction")
         task = partial(self.check_transactions_task,will)
         msg = _('Check Transaction')
-        self.pingwaiting_dialog = BalWaitingDialog(self.window,msg,task,on_success,on_failure)
+        self.waiting_dialog = BalWaitingDialog(self,msg,task,on_success,on_failurei,exe=False)
+        self.waiting_dialog.exe()
 
     def ping_willexecutors_task(self,wes):
         self.logger.info("ping willexecutots task")
@@ -806,7 +770,7 @@ class BalWindow(Logger):
             return msg 
         for url,we in wes.items():
             try:
-                self.pingwaiting_dialog.update(get_title())
+                self.waiting_dialog.update(get_title())
             except:
                 pass
             wes[url]=Willexecutors.get_info_task(url,we)
@@ -817,7 +781,7 @@ class BalWindow(Logger):
             
     def ping_willexecutors(self,wes):
         def on_success(result):
-            del self.pingwaiting_dialog
+            del self.waiting_dialog
             try:
                 self.willexecutor_dialog.willexecutor_list.update()
             except:
@@ -828,7 +792,8 @@ class BalWindow(Logger):
         self.logger.info("ping willexecutors")
         task = partial(self.ping_willexecutors_task,wes)
         msg = _('Ping Will-Executors')
-        self.pingwaiting_dialog = BalWaitingDialog(self.window,msg,task,on_success,on_failure)
+        self.waiting_dialog = BalWaitingDialog(self,msg,task,on_success,on_failure,exe=False)
+        self.waiting_dialog.exe()
 
     def preview_modal_dialog(self):
         self.dw=WillDetailDialog(self)

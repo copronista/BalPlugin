@@ -28,7 +28,9 @@ def add_willtree(will):
     for willid in will:
         will[willid].children = get_children(will,willid)
         for child in will[willid].children:
-            if will[child[0]].father: will[child[0]].father = willid
+            if not will[child[0]].father: 
+                will[child[0]].father = willid
+
 
 #return a list of will sorted by locktime
 def get_sorted_will(will):
@@ -54,7 +56,6 @@ def get_tx_from_any(x):
         return tx_from_any(a)
         
     except Exception as e:
-        Util.print_var(x)
         raise e
 
     return x
@@ -91,12 +92,12 @@ def normalize_will(will,wallet = None,others_inputs = {}):
         txid = will[wid].tx.txid()
 
         if txid is None:
-            print("##########")
-            print(wid)
-            print(will[wid])
-            print(will[wid].tx.to_json())
+            _logger.error("##########")
+            _logger.error(wid)
+            _logger.error(will[wid])
+            _logger.error(will[wid].tx.to_json())
             
-            print("txid is none")
+            _logger.error("txid is none")
             will[wid].set_status('ERROR',True)
             errors[wid]=will[wid]
             continue
@@ -142,8 +143,10 @@ def check_anticipate(ow:'WillItem',nw:'WillItem'):
                     if int(ow.we['base_fee'])>int(nw.we['base_fee']):
                         return anticipate
                     else:
+                        _logger.debug("ow,base fee > nw.base_fee")
                         ow.tx.locktime
                 else:
+                    _logger.debug("ow.we['url']({ow.we['url']}) == nw.we['url']({nw.we['url']})")
                     ow.tx.locktime
             else:
                 if nw.we == ow.we:
@@ -190,7 +193,7 @@ def change_input(will, otxid, idx, change,others_inputs,to_delete,to_append):
 def get_all_inputs(will,only_valid = False):
     all_inputs = {}
     for w,wi in will.items():
-        if wi.get_status('VALID'):
+        if not only_valid or wi.get_status('VALID'):
             inputs = wi.tx.inputs()
             for i in inputs:
                 prevout_str = i.prevout.to_str()
@@ -220,7 +223,7 @@ def search_anticipate_rec(will,old_inputs):
     redo = False
     to_delete = []
     to_append = {}
-    new_inputs = get_all_inputs(will)
+    new_inputs = get_all_inputs(will,only_valid = True)
     for nid,nwi in will.items():
         if nwi.search_anticipate(new_inputs) or nwi.search_anticipate(old_inputs):
             if nid != nwi.tx.txid():
@@ -244,7 +247,7 @@ def search_anticipate_rec(will,old_inputs):
 
 
 def update_will(old_will,new_will):
-    all_old_inputs = get_all_inputs(old_will)
+    all_old_inputs = get_all_inputs(old_will,only_valid=True)
     all_inputs_min_locktime = get_all_inputs_min_locktime(all_old_inputs)
     all_new_inputs = get_all_inputs(new_will)
     #check if the new input is already spent by other transaction
@@ -371,18 +374,41 @@ def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
             else:
                 pass
 
+def utxos_strs(utxos):
+    return [Util.utxo_to_str(u) for u in utxos]
 
+
+def set_invalidate(wid,will=[]):
+    will[wid].set_status("INVALIDATED",True)
+    if will[wid].children:
+        for c in self.children.items():
+            set_invalidate(c[0],will)
+
+#check if transactions are stil valid tecnically valid
+def check_invalidated(willtree,utxos_list,wallet):
+    for wid,w in willtree.items():
+        if not w.father:
+            for inp in w.tx.inputs():
+                if not Util.utxo_to_str(inp) in utxos_list:
+                    if wallet:
+                        info = wallet.get_tx_info(w.tx)
+                        if info.tx_mined_status.height < 0:
+                            set_invalidate(wid,willtree)
+                        elif info.tx_mined_status.height == 0:
+                            w.set_status("PENDING",True)
+                        
+                        else:
+                            w.set_status('CONFIRMED',True)
+                                
 def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,heirs={},willexecutors={},self_willexecutor=False, wallet=False, callback_not_valid_tx=None):
     spent_utxos = []
     spent_utxos_tx = []
+    add_willtree(will)
+    utxos_list= utxos_strs(all_utxos)
+    #check if transactions are still valid
     #check transaction in bitcoin network:
     _logger.info("check transaction in bitcoin network")
-    for wid, w in will.items():
-        if not w.get_status('CONFIRMED'):
-            tt=wallet.db.get_transaction(wid)
-            if tt:
-                w.set_status('CONFIRMED',True)
-
+    check_invalidated(will,utxos_list,wallet)
     all_inputs=get_all_inputs(will,only_valid = True)
     #check all input spent are in wallet or valid txs 
     _logger.info("check all input spent are in wallet or valid txs")
@@ -491,34 +517,52 @@ def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,che
 class WillItem(Logger): 
 
     STATUS_DEFAULT = {
-        'NEW':['New',True],
-        'COMPLETE':['Signed',False],
-        'BROADCASTED':['Broadcasted',False],
-        'PUSHED':['Pushed',False],
-        'PUSH_FAIL':['Push failed',False],
-        'EXPORTED':['Exported',False],
-        'REPLACED':['Replaced',False],
-        'INVALIDATED':['Invalidated',False],
-        'ANTICIPATED':['Anticipated',False],
-        'RESTORED':['Restored',False],
-        'VALID':['Valid',True],
-        'CHECKED':['Checked',False],
-        'CHECK_FAIL':['Check Failed',False],
-        'CONFIRMED':['Confirmed',False],
-        'EXPIRED':['Expired',False],
-        'ERROR':['Error',False]
+        'ANTICIPATED':  ['Anticipated', False],
+        'BROADCASTED':  ['Broadcasted', False],
+        'CHECKED':      ['Checked',     False],
+        'CHECK_FAIL':   ['Check Failed',False],
+        'COMPLETE':     ['Signed',      False],
+        'CONFIRMED':    ['Confirmed',   False],
+        'ERROR':        ['Error',       False],
+        'EXPIRED':      ['Expired',     False],
+        'EXPORTED':     ['Exported',    False],
+        'IMPORTED':     ['Imported',    False],
+        'INVALIDATED':  ['Invalidated', False],
+        'PENDING':      ['Pending',     False],
+        'PUSH_FAIL':    ['Push failed', False],
+        'PUSHED':       ['Pushed',      False],
+        'REPLACED':     ['Replaced',    False],
+        'RESTORED':     ['Restored',    False],
+        'VALID':        ['Valid',       True],
     }
     def set_status(self,status,value=True):
-        if self.STATUS[status] == bool(value):
+        _logger.debug("set status {} - {} {} -> {}".format(self._id,status,self.STATUS[status][1],value))
+        if self.STATUS[status][1] == bool(value):
             return None
+
         _logger.debug(f"set status {self._id}: {status} {value}")
+
         self.status += "." +("NOT " if not value else "" +  _(self.STATUS[status][0]))
+
         self.STATUS[status][1] = bool(value)
+
         if value:
-            if status in ['INVALIDATED','REPLACED','CONFIRMED']:
+            if status in ['INVALIDATED','REPLACED','CONFIRMED','PENDING']:
                 self.STATUS['VALID'][1] = False
-            if status in ['CONFIRMED']:
+
+            if status in ['CONFIRMED','PENDING']:
                 self.STATUS['INVALIDATED'][1] = False
+
+            if status in ['PUSHED']:
+                self.STATUS['PUSH_FAIL'][1] = False
+
+            #if status in ['CHECK_FAIL']:
+            #    self.STATUS['PUSHED'][1] = False
+
+            if status in ['CHECKED']:
+                self.STATUS['PUSHED'][1] = True
+                self.STATUS['PUSH_FAIL'][1] = False
+
         return value
 
     def get_status(self,status):
@@ -568,7 +612,11 @@ class WillItem(Logger):
             'tx_fees':self.tx_fees
         }
         for key in self.STATUS:
-            out[key]=self.STATUS[key][1]
+            try:
+                out[key]=self.STATUS[key][1]
+            except Exception as e:
+                _logger.error(f"{key},{self.STATUS[key]} {e}")
+
         return out
 
     def __repr__(self):
@@ -577,23 +625,6 @@ class WillItem(Logger):
     def __str__(self):
         return str(self.to_dict())
 
-    #def print(self):
-    #    #Util.print_var(self)
-    #    print("tx:",self.tx)
-    #    print("Item:",self.tx.txid())
-    #    print("Locktime:",Util.locktime_to_str(self.tx.locktime),self.tx.locktime)
-    #    print("tx_fees:",self.tx_fees)
-    #    print("Heirs:")
-    #    print("WE:")
-    #    print("status:",self.status)
-    #    #print("description:",self.description)
-    #    print("time:",self.time)
-    #    #print("change:",self.change)
-    #    #print("tx:",str(self.tx))
-    #    for key in self.STATUS:
-    #        print(self.STATUS[key])
-
-    #    print("######################")
     def set_anticipate(self, ow:'WillItem'):
         nl = min(ow.tx.locktime,check_anticipate(ow,self))
         if int(nl) < self.tx.locktime:
@@ -629,6 +660,24 @@ class WillItem(Logger):
                 if inp[0]!= self._id:
                     iw = inp[1]
                     self.set_anticipate(iw)
+
+    def check_willexecutor(self):
+        try:
+            if resp:=Willexecutors.check_transaction(self._id,self.we['url']):
+                if resp['tx']==str(self.tx):
+                    self.set_status('CHECKED')
+                else:   
+                    self.set_status('CHECK_FAIL')
+                    self.set_status('PUSHED',False)
+                return True
+            else:
+                self.set_status('CHECK_FAIL')
+                self.set_status('PUSHED',False)
+                return False
+        except Exception as e:
+            _logger.error("exception checking transaction",e)
+            self.set_status('CHECK_FAIL')
+
 
 class WillExpiredException(Exception):
     pass

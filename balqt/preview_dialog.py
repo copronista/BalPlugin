@@ -86,7 +86,7 @@ class PreviewList(MyTreeView):
                                     for s_idx in self.selected_in_column(column))
 
             menu.addAction(_("details").format(column_title), lambda: self.show_transaction(selected_keys)).setEnabled(len(selected_keys)<2)
-            if len(selected_keys)==1 and self.will[selected_keys[0]].we:
+            if len(selected_keys)>0 and self.will[selected_keys[0]].we:
                 menu.addAction(_("check ").format(column_title), lambda: self.check_transactions(selected_keys))
 
             menu.addSeparator()

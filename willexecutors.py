@@ -51,35 +51,32 @@ def is_selected(willexecutor,value=None):
         willexecutor['selected']=False
         return False
 
-
-def push_transactions_to_willexecutors(will):
+def get_willexecutor_transactions(will):
     willexecutors ={}
-    for wid in will:
-        willitem = will[wid]
-        if willitem['Valid']:
-            if willitem['Signed']:
-                if not willitem['Pushed']:
-                    if 'willexecutor' in willitem:
-                        willexecutor=willitem['willexecutor']
+    for wid,willitem in will.items():
+        if willitem.get_status('VALID'):
+            if willitem.get_status('COMPLETE'):
+                if not willitem.get_status('PUSHED') or force:
+                    if willexecutor := willitem.we:
                         if  willexecutor and is_selected(willexecutor):
                             url=willexecutor['url']
                             if not url in willexecutors:
                                 willexecutor['txs']=""
                                 willexecutor['txsids']=[]
+                                willexecutor['broadcast_status']= _("Waiting...")
                                 willexecutors[url]=willexecutor
-                            willexecutors[url]['txs']+=str(willitem['tx'])+"\n"
+                            willexecutors[url]['txs']+=str(willitem.tx)+"\n"
                             willexecutors[url]['txsids'].append(wid)
-    if not willexecutors:
-        return
+
+    return willexecutors
+
+def push_transactions_to_willexecutors(will):
+    willexecutors = get_transactions_to_be_pushed()
     for url in willexecutors:
         willexecutor = willexecutors[url]
         if is_selected(willexecutor):
             if 'txs' in willexecutor:
-                if push_transactions_to_willexecutor(willexecutors[url]['txs'],url):
-                    for wid in willexecutors[url]['txsids']:
-                        will[wid]['Pushed']=True
-                        will[wid]['status']+='.Pushed'
-                del willexecutor['txs']
+                push_transactions_to_willexecutor(willexecutors[url]['txs'],url)
 
 def send_request(method, url, data=None, *, timeout=10):
     network = Network.get_instance()
@@ -106,11 +103,12 @@ def send_request(method, url, data=None, *, timeout=10):
         else:
             raise Exception(f"unexpected {method=!r}")
     except Exception as e:
+        _logger.errorr(f"exception sending request {e}")
         raise e
     else:
+        _logger.debug("response",response)
         _logger.debug(f'--> {response}')
         return response
-
 async def handle_response(resp:ClientResponse):
     r=await resp.text()
     try:
@@ -122,12 +120,28 @@ async def handle_response(resp:ClientResponse):
         pass    
     return r
 
-
-def push_transactions_to_willexecutor(strtxs,url):
+class AlreadyPresentException(Exception):
+    pass
+def push_transactions_to_willexecutor(willexecutor):
+    out=True
     try:
-        return send_request('post', url+"/"+constants.net.NET_NAME+"/pushtxs", data=strtxs.encode('ascii'))
-    except:
-        return False
+        _logger.debug(f"willexecutor['txs']")
+        if w:=send_request('post', willexecutor['url']+"/"+constants.net.NET_NAME+"/pushtxs", data=willexecutor['txs'].encode('ascii')):
+            willexecutor['broadcast_stauts'] = _("Success")
+            _logger.debug(f"pushed: {w}")
+            if w !='thx':
+                logger._debug(f"error: {w}")
+                raise Exception(w)
+        else:
+            raise Exception("empty reply from:{willexecutor['url']}")
+    except Exception as e:
+        _logger.debug(f"error:{e}",e)
+        if str(e) == "already present":
+            raise AlreadyPresentException()
+        out=False
+        willexecutor['broadcast_stauts'] = _("Failed")
+
+    return out
 
 def ping_servers(willexecutors):
     for url,we in willexecutors.items():
