@@ -616,16 +616,19 @@ class BalWindow(Logger):
 
 
     def on_close(self):
-        close_window=BalCloseDialog(self)
-        close_window.close_plugin_task()
-        self.save_willitems()
-        self.heirs_tab.close()
-        self.will_tab.close()
-        self.tools_menu.removeAction(self.tools_menu.willexecutors_action)
-        self.window.toggle_tab(self.heirs_tab)
-        self.window.toggle_tab(self.will_tab)
-        self.window.tabs.update()
-    
+        try:
+            if not self.disable_plugin:
+                close_window=BalCloseDialog(self)
+                close_window.close_plugin_task()
+                self.save_willitems()
+                self.heirs_tab.close()
+                self.will_tab.close()
+                self.tools_menu.removeAction(self.tools_menu.willexecutors_action)
+                self.window.toggle_tab(self.heirs_tab)
+                self.window.toggle_tab(self.will_tab)
+                self.window.tabs.update()
+        except: 
+            pass
 
     def ask_password_and_sign_transactions(self,callback=None):
         def on_success(txs):

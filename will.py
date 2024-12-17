@@ -677,6 +677,27 @@ class WillItem(Logger):
         except Exception as e:
             _logger.error("exception checking transaction",e)
             self.set_status('CHECK_FAIL')
+    def get_color(self):
+        if self.get_status("INVALIDATED"):
+            return "#f87838"
+        elif self.get_status("REPLACED"):
+            return "#ff97e9"
+        elif self.get_status("CONFIRMED"):
+            return "#bfbfbf"
+        elif self.get_status("PENDING"):
+            return "#ffce30"
+        elif self.get_status("CHECK_FAIL") and not self.get_status("CHECKED"):
+            return "#e83845"
+        elif self.get_status("CHECKED"):
+            return "#8afa6c"
+        elif self.get_status("PUSH_FAIL"):
+            return "#e83845"
+        elif self.get_status("PUSHED"):
+            return "#73f3c8"
+        elif self.get_status("COMPLETE"):
+            return "#2bc8ed"
+        else:
+            return "#ffffff"
 
 
 class WillExpiredException(Exception):

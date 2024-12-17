@@ -8,11 +8,11 @@ from functools import partial
 
 from . import qt_resources
 if qt_resources.QT_VERSION == 5:
-    from PyQt5.QtGui import QStandardItemModel, QStandardItem
+    from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPalette, QColor
     from PyQt5.QtCore import Qt,QPersistentModelIndex, QModelIndex
     from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
 else:
-    from PyQt6.QtGui import QStandardItemModel, QStandardItem
+    from PyQt6.QtGui import QStandardItemModel, QStandardItem, QPalette, QColor
     from PyQt6.QtCore import Qt,QPersistentModelIndex, QModelIndex
     from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,QMenu,QAbstractItemView,QWidget)
 
@@ -177,6 +177,13 @@ class PreviewList(MyTreeView):
                         pass
                 else:
                     items.append(QStandardItem(str(e)))
+
+                #pal = QPalette()
+                #pal.setColor(QPalette.ColorRole.Window, QColor(bal_tx.get_color()))
+                #items[-1].setAutoFillBackground(True)
+                #items[-1o].setPalette(pal)
+                items[-1].setBackground(QColor(bal_tx.get_color()))
+
 
             self.model().insertRow(self.model().rowCount(), items)
             if txid == current_key:
