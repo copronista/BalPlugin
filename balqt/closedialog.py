@@ -162,7 +162,7 @@ class BalCloseDialog(BalDialog):
                     for wid in willexecutor['txsids']:
                         row = self.msg_edit_row("checking {} - {} : {}".format(self.bal_window.willitems[wid].we['url'],wid, "Waiting"))
                         self.bal_window.willitems[wid].check_willexecutor()
-                        row = self.msg_edit_row("checked {} - {} : {}".format(self.bal_window.willitems[wid].we['url'],wid,self.bal_window.willitems[wid] ),row)
+                        row = self.msg_edit_row("checked {} - {} : {}".format(self.bal_window.willitems[wid].we['url'],wid,self.bal_window.willitems[wid].get_status("CHECKED" )),row)
                         
                             
                 except Exception as e:

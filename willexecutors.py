@@ -129,7 +129,7 @@ def push_transactions_to_willexecutor(willexecutor):
             willexecutor['broadcast_stauts'] = _("Success")
             _logger.debug(f"pushed: {w}")
             if w !='thx':
-                logger._debug(f"error: {w}")
+                _logger.debug(f"error: {w}")
                 raise Exception(w)
         else:
             raise Exception("empty reply from:{willexecutor['url']}")
@@ -191,5 +191,5 @@ def check_transaction(txid,url):
         w = send_request('post',url+"/searchtx",data=txid.encode('ascii'))
         return w
     except Exception as e:
-        raise e
         _logger.error(f"error contacting {url} for checking txs {e}")
+        raise e

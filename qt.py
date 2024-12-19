@@ -745,7 +745,7 @@ class BalWindow(Logger):
         self.logger.debug("check Transaction")
         task = partial(self.check_transactions_task,will)
         msg = _('Check Transaction')
-        self.waiting_dialog = BalWaitingDialog(self,msg,task,on_success,on_failurei,exe=False)
+        self.waiting_dialog = BalWaitingDialog(self,msg,task,on_success,on_failure,exe=False)
         self.waiting_dialog.exe()
 
     def ping_willexecutors_task(self,wes):

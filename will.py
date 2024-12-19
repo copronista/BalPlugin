@@ -714,7 +714,7 @@ class WillItem(Logger):
                 self.set_status('PUSHED',False)
                 return False
         except Exception as e:
-            _logger.error("exception checking transaction",e)
+            _logger.error(f"exception checking transaction: {e}")
             self.set_status('CHECK_FAIL')
     def get_color(self):
         if self.get_status("INVALIDATED"):
