@@ -567,7 +567,7 @@ class BalWindow(Logger):
                 wi = self.willitems[txid]
                 tx = copy.deepcopy(wi.tx)
                 if wi.get_status('COMPLETE'):
-                    self.logger.debug("altready signed",txid)
+                    self.logger.debug(f"altready signed {txid}")
                     txs[txid]=tx
                     continue
                 tosign=txid

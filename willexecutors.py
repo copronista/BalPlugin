@@ -51,7 +51,7 @@ def is_selected(willexecutor,value=None):
         willexecutor['selected']=False
         return False
 
-def get_willexecutor_transactions(will):
+def get_willexecutor_transactions(will, force=False):
     willexecutors ={}
     for wid,willitem in will.items():
         if willitem.get_status('VALID'):
@@ -103,10 +103,9 @@ def send_request(method, url, data=None, *, timeout=10):
         else:
             raise Exception(f"unexpected {method=!r}")
     except Exception as e:
-        _logger.errorr(f"exception sending request {e}")
+        _logger.error(f"exception sending request {e}")
         raise e
     else:
-        _logger.debug("response",response)
         _logger.debug(f'--> {response}')
         return response
 async def handle_response(resp:ClientResponse):
@@ -135,7 +134,7 @@ def push_transactions_to_willexecutor(willexecutor):
         else:
             raise Exception("empty reply from:{willexecutor['url']}")
     except Exception as e:
-        _logger.debug(f"error:{e}",e)
+        _logger.debug(f"error:{e}")
         if str(e) == "already present":
             raise AlreadyPresentException()
         out=False
@@ -183,7 +182,7 @@ def get_willexecutors_list_from_json(bal_plugin):
             bal_plugin.config.set_key(bal_plugin.WILLEXECUTORS,willexecutors,save=True)
             return h
     except Exception as e:
-        _logger.error("errore aprendo willexecutors.json:",e)
+        _logger.error(f"errore aprendo willexecutors.json: {e}")
         return {}
 
 def check_transaction(txid,url):

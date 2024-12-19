@@ -129,8 +129,11 @@ class BalCloseDialog(BalDialog):
     def loop_broadcast_invalidating(self,tx):
         self.msg_set_invalidating("Broadcasting")
         try:
-            txid = self.network.run_from_another_thread(self.network.broadcast_transaction(tx),timeout=30)
+            tx.add_info_from_wallet(self.bal_window.wallet)
+            self.network.run_from_another_thread(tx.add_info_from_network(self.network))
+            txid = self.network.run_from_another_thread(self.network.broadcast_transaction(tx,timeout=120),timeout=120)
             self.msg_set_invalidating("Ok")
+            _logger.error(f"txid: {txid}")
             
 
         except TxBroadcastError as e:
@@ -299,7 +302,7 @@ class BalCloseDialog(BalDialog):
         self.password=self.bal_window.get_wallet_password(msg,parent=self)
 
     def msg_edit_row(self,line,row=None):
-        _logger.debug(row,line)
+        _logger.debug(f"{row},{line}")
         msg=self.get_text()
         rows=msg.split("\n")
         try:
@@ -312,7 +315,7 @@ class BalCloseDialog(BalDialog):
         return row
 
     def msg_del_row(self,row):
-        _logger.debug("del row",row)
+        _logger.debug(f"del row: {row}")
         try:
             msg=self.get_text()
             rows=msg.split("\n")

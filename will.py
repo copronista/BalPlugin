@@ -411,30 +411,17 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
     check_invalidated(will,utxos_list,wallet)
     all_inputs=get_all_inputs(will,only_valid = True)
     #check all input spent are in wallet or valid txs 
-    _logger.info("check all input spent are in wallet or valid txs")
-    for inp,ws in all_inputs.items():
-        if not Util.in_utxo(inp,all_utxos):
-            for w in ws:
-                if w[1].get_status('VALID'):
-                    prevout_id = w[2].prevout.txid.hex()
-                    parentwill = will.get(prevout_id,False)
-                    if not parentwill or not parentwill.get_status('VALID'):
-                        w[1].set_status('INVALIDATED',True)
      
-    all_inputs_min_locktime = get_all_inputs_min_locktime(all_inputs)
+
     search_rai(all_inputs,all_utxos,will,wallet,callback_not_valid_tx= callback_not_valid_tx)
 
+    all_inputs=get_all_inputs(will,only_valid = True)
+    all_inputs_min_locktime = get_all_inputs_min_locktime(all_inputs)
+    check_will_expired(all_inputs_min_locktime,block_to_check,timestamp_to_check)
     if heirs:
         if not check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
             raise NotCompleteWillException()
 
-    _logger.info("check if some transaction is expired")
-    for prevout_str, wid in all_inputs_min_locktime.items():
-        for w in wid: 
-            if w[1].get_status('VALID'):
-                locktime = wid[0][1].tx.locktime
-                if int(locktime) < int(timestamp_to_check):
-                    raise WillExpiredException(f"Will Expired {wid[0][0]}: {locktime}<{timestamp_to_check}")
 
     _logger.info('check all utxo in wallet are spent')
     if all_inputs:
@@ -447,6 +434,27 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
 
     _logger.info('will ok')
     return True
+
+def check_will_expired(all_inputs_min_locktime,block_to_check,timestamp_to_check):
+    _logger.info("check if some transaction is expired")
+    for prevout_str, wid in all_inputs_min_locktime.items():
+        for w in wid: 
+            if w[1].get_status('VALID'):
+                locktime = wid[0][1].tx.locktime
+                if int(locktime) < int(timestamp_to_check):
+                    raise WillExpiredException(f"Will Expired {wid[0][0]}: {locktime}<{timestamp_to_check}")
+ 
+def check_all_input_spent_are_in_wallet():
+    _logger.info("check all input spent are in wallet or valid txs")
+    for inp,ws in all_inputs.items():
+        if not Util.in_utxo(inp,all_utxos):
+            for w in ws:
+                if w[1].get_status('VALID'):
+                    prevout_id = w[2].prevout.txid.hex()
+                    parentwill = will.get(prevout_id,False)
+                    if not parentwill or not parentwill.get_status('VALID'):
+                        w[1].set_status('INVALIDATED',True)
+
 
 def only_valid_list(will):
     out={}
@@ -540,12 +548,8 @@ class WillItem(Logger):
         if self.STATUS[status][1] == bool(value):
             return None
 
-        _logger.debug(f"set status {self._id}: {status} {value}")
-
         self.status += "." +("NOT " if not value else "" +  _(self.STATUS[status][0]))
-
         self.STATUS[status][1] = bool(value)
-
         if value:
             if status in ['INVALIDATED','REPLACED','CONFIRMED','PENDING']:
                 self.STATUS['VALID'][1] = False
