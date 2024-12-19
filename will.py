@@ -146,10 +146,10 @@ def check_anticipate(ow:'WillItem',nw:'WillItem'):
                     if int(ow.we['base_fee'])>int(nw.we['base_fee']):
                         return anticipate
                     else:
-                        _logger.debug("ow,base fee > nw.base_fee")
+                        #_logger.debug("ow,base fee > nw.base_fee")
                         ow.tx.locktime
                 else:
-                    _logger.debug("ow.we['url']({ow.we['url']}) == nw.we['url']({nw.we['url']})")
+                    #_logger.debug("ow.we['url']({ow.we['url']}) == nw.we['url']({nw.we['url']})")
                     ow.tx.locktime
             else:
                 if nw.we == ow.we:
@@ -667,11 +667,11 @@ class WillItem(Logger):
     def set_anticipate(self, ow:'WillItem'):
         nl = min(ow.tx.locktime,check_anticipate(ow,self))
         if int(nl) < self.tx.locktime:
-            _logger.debug("actually anticipating")
+            #_logger.debug("actually anticipating")
             self.tx.locktime = int(nl)
             return True
         else:
-            _logger.debug("keeping the same locktime")
+            #_logger.debug("keeping the same locktime")
             return False
 
 

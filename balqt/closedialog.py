@@ -78,7 +78,7 @@ class BalCloseDialog(BalDialog):
             if isinstance(e,Will.HeirChangeException):
                 message ="Heirs changed:"
             elif isinstance(e,Will.WillExecutorNotPresent):
-                message = "Will-Executor not present:"
+                message = "Will-Executor not present"
             elif isinstance(e,Will.WillexecutorChangeException):
                 message = "Will-Executor changed"
             elif isinstance(e,Will.TxFeesChangedException):

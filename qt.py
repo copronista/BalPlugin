@@ -783,7 +783,8 @@ class BalWindow(Logger):
             del self.waiting_dialog
             try:
                 self.willexecutor_dialog.willexecutor_list.update()
-            except:
+            except Exception as e:
+                _logger.error("error updating willexecutors {e}")
                 pass
         def on_failure(e):
             self.logger.error(e)

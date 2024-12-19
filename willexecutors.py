@@ -144,7 +144,7 @@ def push_transactions_to_willexecutor(willexecutor):
 
 def ping_servers(willexecutors):
     for url,we in willexecutors.items():
-        willexecutors[url]=get_info_task(url,we)
+        get_info_task(url,we)
 
 
 def get_info_task(url,willexecutor):
@@ -161,14 +161,14 @@ def get_info_task(url,willexecutor):
         _logger.debug(f"response_data {w['address']}")
     except Exception as e:
         _logger.error(f"error {e} contacting {url}: {w}")
-        willexecutor['stauts']="KO"
-    
+        willexecutor['status']="KO"
+
     willexecutor['last_update'] = datetime.now().timestamp()
     return willexecutor
 
 def initialize_willexecutor(willexecutor,url,status=None,selected=None):
-    willexecutor['url']=url
     if not status is None:
+        print(willexecutor['status'])
         willexecutor['status'] = status
     willexecutor['selected'] = is_selected(willexecutor,selected)
 
