@@ -305,7 +305,7 @@ class Heirs(dict, Logger):
         locktimes = self.get_locktimes(from_locktime);
         if willexecutor:
             for locktime in locktimes:
-                if Util.int_locktime(locktime) > from_locktime:
+                if int(Util.int_locktime(locktime)) > int(from_locktime):
                     try:
                         base_fee = int(willexecutor['base_fee'])
                         willexecutors_amount += base_fee
@@ -316,7 +316,10 @@ class Heirs(dict, Logger):
                         h[HEIR_ADDRESS] = willexecutor['address']
                         willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
                     except Exception as e:
+                        print(f"error willexecutor: {e}")
                         return [],False
+                else:
+                    _logger.error(f"heir excluded from will locktime({locktime}){Util.int_locktime(locktime)}<minimum{from_locktime}"), 
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
         for key in self.keys():
@@ -399,7 +402,10 @@ class Heirs(dict, Logger):
             elif 0 <= j:
                 url, willexecutor = willexecutorsitems[j]
                 if not Willexecutors.is_selected(willexecutor):
+                    print(f"not selected willexecutor {url}")
                     continue
+                else:
+                    willexecutor['url']=url
             elif j == -1:
                 if not no_willexecutors:
                     continue
@@ -417,6 +423,7 @@ class Heirs(dict, Logger):
                     total_fees += int(fees[fee])
                 newbalance = balance 
                 locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor, from_locktime)
+                print(locktimes)
                 try:
                     txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)
                     if not txs:

@@ -99,6 +99,8 @@ class BalCloseDialog(BalDialog):
                     self.bal_window.wallet.set_label(wid,"BAL Transaction")
                 self.msg_set_building("Ok")
             except Exception as e:
+                print(e)
+                raise e
                 self.msg_set_building(self.msg_error(e))
 
         have_to_sign = False
@@ -151,13 +153,14 @@ class BalCloseDialog(BalDialog):
             willexecutors=Willexecutors.get_willexecutor_transactions(self.bal_window.willitems)
             for url,willexecutor in willexecutors.items():
                 try:
-                    if not Willexecutors.push_transactions_to_willexecutor(willexecutor):
-                        for wid in willexecutor['txsids']:
-                            self.bal_window.willitems[wid].set_status('PUSH_FAIL',True)
-                        retry=True
-                    else:
-                        for wid in willexecutor['txsids']:
-                            self.bal_window.willitems[wid].set_status('PUSHED',True)
+                    if Willexecutors.is_selected(self.bal_window.willexecutors.get(url)):
+                        if not Willexecutors.push_transactions_to_willexecutor(willexecutor):
+                            for wid in willexecutor['txsids']:
+                                self.bal_window.willitems[wid].set_status('PUSH_FAIL',True)
+                            retry=True
+                        else:
+                            for wid in willexecutor['txsids']:
+                                self.bal_window.willitems[wid].set_status('PUSHED',True)
                 except Willexecutors.AlreadyPresentException:
                     for wid in willexecutor['txsids']:
                         row = self.msg_edit_row("checking {} - {} : {}".format(self.bal_window.willitems[wid].we['url'],wid, "Waiting"))
@@ -166,7 +169,7 @@ class BalCloseDialog(BalDialog):
                         
                             
                 except Exception as e:
-                    _logger.error(e)
+                    _logger.error(f"dddddddddddderror{e}")
                     raise e
             if retry:
                 raise Exception("retry")
