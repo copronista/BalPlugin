@@ -1,12 +1,15 @@
+import copy
+
 from . import willexecutors as Willexecutors
 from . import util as Util
+
 from electrum.i18n import _
 
 from electrum.transaction import TxOutpoint,PartialTxInput,tx_from_any,PartialTransaction,PartialTxOutput,Transaction
 from electrum.util import bfh, decimal_point_to_base_unit_name
 from electrum.util import write_json_file,read_json_file,FileImportFailed
 from electrum.logging import get_logger,Logger
-import copy
+from electrum.bitcoin import NLOCKTIME_BLOCKHEIGHT_MAX
 
 MIN_LOCKTIME = 1
 MIN_BLOCK = 1
@@ -319,12 +322,15 @@ def invalidate_will(will,wallet,fees_per_byte):
             out = PartialTxOutput.from_address_and_value(change_addresses[0],balance - fee)
             tx = PartialTransaction.from_io(utxo_to_spend,[out], locktime=locktime, version=2)
             tx.set_rbf(True)
-
+            
+            _logger.debug(f"invalidation tx: {tx}")
             return tx
 
         else:
+            _logger.debug("balance - fee <=0")
             pass
     else:
+        _logger.debug("len utxo_to_spend <=0")
         pass
 
 
@@ -339,14 +345,14 @@ def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
         inutxo = Util.in_utxo(inp,all_utxos)
         for w in ws:
             wi=w[1]
-            if wi.get_status('VALID') or wi.get_status('CONFIRMED'):
+            if wi.get_status('VALID') or wi.get_status('CONFIRMED') or wi.get_status('PENDING'):
                 prevout_id=w[2].prevout.txid.hex()
                 if not inutxo:
                     if prevout_id in will:
                         wo=will[prevout_id]
-                        if wo.replaced:
+                        if wo.get_status('REPLACED'):
                             wi.set_status('REPLACED',True)
-                        if wo.invalidated:
+                        if wo.get_status("INVALIDATED"):
                             wi.set_status('INVALIDATED',True)
                         
                     else:
@@ -359,17 +365,15 @@ def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
                         wo = will[prevout_id]
                         ttx= wallet.db.get_transaction(prevout_id)
                         if ttx:
-                            pass
-                            #print("if ttx")
-                            #Util.print_var(ttx,"TTX")
-                            #Util.print_var(wallet,"WALLET")
-                        
+                            _logger.error("transaction in wallet should be early detected")
                             #wi.set_status('CONFIRMED',True)
-                        else:
-                            wi.set_status('INVALIDATED',True)
+                    #else:
+                    #    _logger.error("transaction not in will or utxo")
+                    #    wi.set_status('INVALIDATED',True)
     
                 for child in wi.search(all_inputs):
                     if child.tx.locktime < wi.tx.locktime:
+                        _logger.debug("a child was found")
                         wi.set_status('REPLACED',True)
             else:
                 pass
@@ -384,40 +388,67 @@ def set_invalidate(wid,will=[]):
         for c in self.children.items():
             set_invalidate(c[0],will)
 
+def check_tx_height(tx, wallet):
+    info=wallet.get_tx_info(tx)
+    return info.tx_mined_status.height
+
 #check if transactions are stil valid tecnically valid
 def check_invalidated(willtree,utxos_list,wallet):
     for wid,w in willtree.items():
         if not w.father:
             for inp in w.tx.inputs():
-                if not Util.utxo_to_str(inp) in utxos_list:
+                inp_str = Util.utxo_to_str(inp)
+                #print(utxos_list)
+                #print(inp_str)
+                #print(inp_str in utxos_list)
+                #print("notin: ",not inp_str in utxos_list)
+                if not inp_str in utxos_list:
+                    #print("quindi qua non ci arrivo?")
                     if wallet:
-                        info = wallet.get_tx_info(w.tx)
-                        if info.tx_mined_status.height < 0:
+                        height= check_tx_height(w.tx,wallet)
+
+                        if height < 0:
+                            #_logger.debug(f"heigth {height}")
                             set_invalidate(wid,willtree)
-                        elif info.tx_mined_status.height == 0:
+                        elif height == 0:
                             w.set_status("PENDING",True)
-                        
                         else:
                             w.set_status('CONFIRMED',True)
+
+def reflect_to_children(treeitem):
+    if not treeitem.get_status("VALID"):
+        _logger.debug(f"{tree:item._id} status not valid looking for children")
+        for child in treeitem.children:
+            wc = willtree[child]
+            if wc.get_status("VALID"):
+                if treeitem.get_status("INVALIDATED"):
+                    wc.set_status("INVALIDATED",True)
+                if treeitem.get_status("REPLACED"):
+                    wc.set_status("REPLACED",True)
+                    if wc.children:
+                        reflect_to_children(wc)
                                 
 def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,heirs={},willexecutors={},self_willexecutor=False, wallet=False, callback_not_valid_tx=None):
     spent_utxos = []
     spent_utxos_tx = []
     add_willtree(will)
     utxos_list= utxos_strs(all_utxos)
-    #check if transactions are still valid
-    #check transaction in bitcoin network:
-    _logger.info("check transaction in bitcoin network")
-    check_invalidated(will,utxos_list,wallet)
-    all_inputs=get_all_inputs(will,only_valid = True)
-    #check all input spent are in wallet or valid txs 
-     
 
+    check_invalidated(will,utxos_list,wallet)
+    #from pprint import pprint
+    #for wid,w in will.items():
+    #    pprint(w.to_dict())
+
+    all_inputs=get_all_inputs(will,only_valid = True)
+
+    all_inputs_min_locktime = get_all_inputs_min_locktime(all_inputs)
+
+    check_will_expired(all_inputs_min_locktime,block_to_check,timestamp_to_check)
+
+    all_inputs=get_all_inputs(will,only_valid = True)
+     
     search_rai(all_inputs,all_utxos,will,wallet,callback_not_valid_tx= callback_not_valid_tx)
 
-    all_inputs=get_all_inputs(will,only_valid = True)
-    all_inputs_min_locktime = get_all_inputs_min_locktime(all_inputs)
-    check_will_expired(all_inputs_min_locktime,block_to_check,timestamp_to_check)
     if heirs:
         if not check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
             raise NotCompleteWillException()
@@ -440,9 +471,13 @@ def check_will_expired(all_inputs_min_locktime,block_to_check,timestamp_to_check
     for prevout_str, wid in all_inputs_min_locktime.items():
         for w in wid: 
             if w[1].get_status('VALID'):
-                locktime = wid[0][1].tx.locktime
-                if int(locktime) < int(timestamp_to_check):
-                    raise WillExpiredException(f"Will Expired {wid[0][0]}: {locktime}<{timestamp_to_check}")
+                locktime = int(wid[0][1].tx.locktime)
+                if locktime <= NLOCKTIME_BLOCKHEIGHT_MAX:
+                    if locktime < int(block_to_check):
+                        raise WillExpiredException(f"Will Expired {wid[0][0]}: {locktime}<{block_to_check}")
+                else:
+                    if locktime < int(timestamp_to_check):
+                        raise WillExpiredException(f"Will Expired {wid[0][0]}: {locktime}<{timestamp_to_check}")
  
 def check_all_input_spent_are_in_wallet():
     _logger.info("check all input spent are in wallet or valid txs")

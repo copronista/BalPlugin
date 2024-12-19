@@ -179,12 +179,19 @@ class BalCloseDialog(BalDialog):
 
 
     def invalidate_task(self,tx,password):
+        _logger.debug(f"invalidate tx: {tx}")
         tx = self.bal_window.wallet.sign_transaction(tx,password)
-        if tx.is_complete():
-            _logger.debug("is complete")
-            self.loop_broadcast_invalidating(tx)
-            self.wait(5)
-        else:
+        try:
+            if tx:
+                if tx.is_complete():
+                    _logger.debug("is complete")
+                    self.loop_broadcast_invalidating(tx)
+                    self.wait(5)
+                else:
+                    raise
+            else:
+                raise
+        except:
             self.msg_set_invalidating("Error")
             raise Exception("Impossible to sign")
     def on_success_invalidate(self,success):
@@ -214,7 +221,7 @@ class BalCloseDialog(BalDialog):
             if password is False:
                 self.msg_set_signing('Aborted')
         else:
-            self.msg_set_signing('Skipped')
+            self.msg_set_signing('Nothig to do')
         self.thread.add(partial(self.task_phase2,password),on_success=self.on_success_phase2,on_done=self.on_accept_phase2,on_error=self.on_error_phase2)
         return
     
@@ -246,7 +253,7 @@ class BalCloseDialog(BalDialog):
                 have_to_push = True
         _logger.debug(f"have to push: :{have_to_push}")
         if not have_to_push:
-            self.msg_set_pushing("Skipped")
+            self.msg_set_pushing("Nothing to do")
         else:
             try:
                 self.loop_push()

@@ -418,8 +418,6 @@ class BalWindow(Logger):
         for heir in self.heirs:
             h=self.heirs[heir]
             self.heirs[heir]=[h[0],h[1],self.will_settings['locktime']]
-            self.logger.debug("will_Settings locktime {}".format(self.will_settings['locktime']))
-            self.logger.debug(self.heirs[heir])
 
     
     def init_class_variables(self):
@@ -567,7 +565,6 @@ class BalWindow(Logger):
                 wi = self.willitems[txid]
                 tx = copy.deepcopy(wi.tx)
                 if wi.get_status('COMPLETE'):
-                    self.logger.debug(f"altready signed {txid}")
                     txs[txid]=tx
                     continue
                 tosign=txid
@@ -594,7 +591,6 @@ class BalWindow(Logger):
                 if tx.is_complete():
                     is_complete=True
                     wi.set_status('COMPLETE',True)
-                self.logger.debug("tx: {} is complete:{}".format(txid, tx.is_complete()))
                 txs[txid]=tx
         except Exception as e:
             return None
