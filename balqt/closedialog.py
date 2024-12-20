@@ -13,7 +13,7 @@ import time
 from electrum.i18n import _
 from electrum.gui.qt.util import WindowModalDialog, TaskThread
 from electrum.network import Network,TxBroadcastError, BestEffortRequestFailed
-from electrum.logging import get_logger,Logger
+from electrum.logging import get_logger
 
 
 from functools import partial
@@ -52,7 +52,8 @@ class BalCloseDialog(BalDialog):
         self.thread = TaskThread(self)
         self.thread.finished.connect(self.task_finished)  # see #3956
     def task_finished(self):
-        _logger.debug("task finished")
+        pass
+        #_logger.trace("task finished")
         
     def close_plugin_task(self):
         self.thread.add(self.task_phase1,on_success=self.on_success_phase1,on_done=self.on_accept,on_error=self.on_error_phase1)
@@ -135,7 +136,8 @@ class BalCloseDialog(BalDialog):
             self.network.run_from_another_thread(tx.add_info_from_network(self.network))
             txid = self.network.run_from_another_thread(self.network.broadcast_transaction(tx,timeout=120),timeout=120)
             self.msg_set_invalidating("Ok")
-            _logger.error(f"txid: {txid}")
+            if not txid:
+                _logger.debug(f"should not be none txid: {txid}")
             
 
         except TxBroadcastError as e:
@@ -169,7 +171,7 @@ class BalCloseDialog(BalDialog):
                         
                             
                 except Exception as e:
-                    _logger.error(f"dddddddddddderror{e}")
+                    _logger.error(e)
                     raise e
             if retry:
                 raise Exception("retry")
@@ -187,7 +189,6 @@ class BalCloseDialog(BalDialog):
         try:
             if tx:
                 if tx.is_complete():
-                    _logger.debug("is complete")
                     self.loop_broadcast_invalidating(tx)
                     self.wait(5)
                 else:
@@ -198,14 +199,12 @@ class BalCloseDialog(BalDialog):
             self.msg_set_invalidating("Error")
             raise Exception("Impossible to sign")
     def on_success_invalidate(self,success):
-        _logger.debug("SUCCESS")
         self.thread.add(self.task_phase1,on_success=self.on_success_phase1,on_done=self.on_accept,on_error=self.on_error_phase1)
     def on_error(self,error):
         _logger.error(error)
         pass
     def on_success_phase1(self,result):
         have_to_sign,tx = list(result)
-        _logger.debug(f"have to sign: {have_to_sign}")
         password=None
         if have_to_sign is None:
             self.msg_set_invalidating()
@@ -254,7 +253,6 @@ class BalCloseDialog(BalDialog):
             w=self.bal_window.willitems[wid]
             if w.we and w.get_status("COMPLETE") and not w.get_status("PUSHED"):
                 have_to_push = True
-        _logger.debug(f"have to push: :{have_to_push}")
         if not have_to_push:
             self.msg_set_pushing("Nothing to do")
         else:
@@ -312,7 +310,7 @@ class BalCloseDialog(BalDialog):
         self.password=self.bal_window.get_wallet_password(msg,parent=self)
 
     def msg_edit_row(self,line,row=None):
-        _logger.debug(f"{row},{line}")
+        #_logger.trace(f"{row},{line}")
         msg=self.get_text()
         rows=msg.split("\n")
         try:
@@ -325,7 +323,7 @@ class BalCloseDialog(BalDialog):
         return row
 
     def msg_del_row(self,row):
-        _logger.debug(f"del row: {row}")
+        #_logger.trace(f"del row: {row}")
         try:
             msg=self.get_text()
             rows=msg.split("\n")
@@ -336,8 +334,6 @@ class BalCloseDialog(BalDialog):
 
     def update(self,msg):
         self.message_label.setText(msg)
-        self.message_label.update()
-        self.message_label.repaint()
 
     def get_text(self):
         return self.message_label.text()

@@ -360,16 +360,16 @@ def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
                             wi.set_status('CONFIRMED',True)
                         else:
                             wi.set_status('INVALIDATED',True)
-                else:
-                    if prevout_id in will:
-                        wo = will[prevout_id]
-                        ttx= wallet.db.get_transaction(prevout_id)
-                        if ttx:
-                            _logger.error("transaction in wallet should be early detected")
-                            #wi.set_status('CONFIRMED',True)
-                    #else:
-                    #    _logger.error("transaction not in will or utxo")
-                    #    wi.set_status('INVALIDATED',True)
+                #else:
+                #    if prevout_id in will:
+                #        wo = will[prevout_id]
+                #        ttx= wallet.db.get_transaction(prevout_id)
+                #        if ttx:
+                #            _logger.error("transaction in wallet should be early detected")
+                #            #wi.set_status('CONFIRMED',True)
+                #    #else:
+                #    #    _logger.error("transaction not in will or utxo")
+                #    #    wi.set_status('INVALIDATED',True)
     
                 for child in wi.search(all_inputs):
                     if child.tx.locktime < wi.tx.locktime:

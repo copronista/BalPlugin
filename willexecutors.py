@@ -60,7 +60,6 @@ def get_willexecutor_transactions(will, force=False):
                     if willexecutor := willitem.we:
                         url=willexecutor['url']
                         if  willexecutor and is_selected(willexecutor):
-                            print(f"isselected {url}")
                             if not url in willexecutors:
                                 willexecutor['txs']=""
                                 willexecutor['txsids']=[]
@@ -170,7 +169,6 @@ def get_info_task(url,willexecutor):
 def initialize_willexecutor(willexecutor,url,status=None,selected=None):
     willexecutor['url']=url
     if not status is None:
-        print(willexecutor['status'])
         willexecutor['status'] = status
     willexecutor['selected'] = is_selected(willexecutor,selected)
 
