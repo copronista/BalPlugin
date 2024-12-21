@@ -727,6 +727,8 @@ class BalWindow(Logger):
     def check_transactions_task(self,will):
         start = time.time()
         for wid,w in will.items():
+            if w.we:
+                print(w.we)
                 self.waiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w.we['url']))
                 w.check_willexecutor()
 
@@ -742,7 +744,6 @@ class BalWindow(Logger):
             self.logger.error(f"error checking transactions {e}")
             pass
 
-        self.logger.debug("check Transaction")
         task = partial(self.check_transactions_task,will)
         msg = _('Check Transaction')
         self.waiting_dialog = BalWaitingDialog(self,msg,task,on_success,on_failure,exe=False)

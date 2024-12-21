@@ -594,6 +594,7 @@ class WillItem(Logger):
 
             if status in ['PUSHED']:
                 self.STATUS['PUSH_FAIL'][1] = False
+                self.STATUS['CHECK_FAIL'][1] = False
 
             #if status in ['CHECK_FAIL']:
             #    self.STATUS['PUSHED'][1] = False
@@ -703,7 +704,7 @@ class WillItem(Logger):
     def check_willexecutor(self):
         try:
             if resp:=Willexecutors.check_transaction(self._id,self.we['url']):
-                if resp['tx']==str(self.tx):
+                if 'tx' in resp and resp['tx']==str(self.tx):
                     self.set_status('CHECKED')
                 else:   
                     self.set_status('CHECK_FAIL')

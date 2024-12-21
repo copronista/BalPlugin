@@ -86,8 +86,7 @@ class PreviewList(MyTreeView):
                                     for s_idx in self.selected_in_column(column))
 
             menu.addAction(_("details").format(column_title), lambda: self.show_transaction(selected_keys)).setEnabled(len(selected_keys)<2)
-            if len(selected_keys)>0 and self.will[selected_keys[0]].we:
-                menu.addAction(_("check ").format(column_title), lambda: self.check_transactions(selected_keys))
+            menu.addAction(_("check ").format(column_title), lambda: self.check_transactions(selected_keys))
 
             menu.addSeparator()
             menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
@@ -199,6 +198,7 @@ class PreviewList(MyTreeView):
         menu.addAction(_("Export"), self.export_will)
         #menu.addAction(_("Import"), self.import_will)
         menu.addAction(_("Broadcast"), self.broadcast)
+        menu.addAction(_("Check"), self.check)
         menu.addAction(_("Invalidate"), self.invalidate_will)
         prepareButton = QPushButton(_("Prepare"))
         prepareButton.clicked.connect(self.build_transactions)
@@ -224,7 +224,7 @@ class PreviewList(MyTreeView):
         self.update()
 
     def hide_invalidated(self):
-        self.bal_window.bal_plugin.hide_invalidated()
+        f.bal_window.bal_plugin.hide_invalidated()
         self.update()
 
     def build_transactions(self):
@@ -247,7 +247,11 @@ class PreviewList(MyTreeView):
                     
     def broadcast(self):
         self.bal_window.broadcast_transactions()
-        self.update
+        self.update()
+
+    def check(self):
+        self.bal_window.check_transactions(self.bal_window.willitems)
+        self.update()
 
     def invalidate_will(self):
         self.bal_window.invalidate_will()
