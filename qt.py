@@ -129,6 +129,7 @@ class Plugin(BalPlugin,Logger):
         w = self.get_window(main_window)
         w.wallet = wallet
         w.init_will()
+        w.willexecutors = Willexecutors.get_willexecutors(self, update=False, bal_window=w)
         w.disable_plugin = False
         w.ok=True
     @hook

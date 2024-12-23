@@ -45,7 +45,7 @@ class BalWaitingDialog(BalDialog):
         self.thread.finished.connect(self.deleteLater)  # see #3956
         self.thread.finished.connect(self.finished)
         self.thread.add(self.task, self.on_success, self.accept, self.on_error)
-        self.exec_()
+        self.exec()
 
     def hello(self):
         pass

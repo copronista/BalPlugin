@@ -61,6 +61,7 @@ class BalCloseDialog(BalDialog):
         self.exec()
 
     def task_phase1(self):
+        self.bal_window.init_class_variables()
         try:
                 Will.check_amounts(self.bal_window.heirs,self.bal_window.willexecutors,self.bal_window.window.wallet.get_utxos(),self.bal_window.date_to_check,self.bal_window.window.wallet.dust_threshold())
         except Will.AmountException:
@@ -69,7 +70,6 @@ class BalCloseDialog(BalDialog):
         self.msg_set_checking()
         have_to_build=False
         try:
-            self.bal_window.init_class_variables()
             self.bal_window.check_will()
             self.msg_set_checking('Ok')
         except Will.WillExpiredException as e:
