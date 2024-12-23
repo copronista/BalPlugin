@@ -256,11 +256,12 @@ class Heirs(dict, Logger):
             self.save()
             return res
 
-    def get_locktimes(self,from_locktime):
+    def get_locktimes(self,from_locktime, a=False):
         locktimes = {}
         for key in self.keys():
             locktime = Util.parse_locktime_string(self[key][HEIR_LOCKTIME])
-            if locktime > from_locktime:
+            if locktime > from_locktime and not a \
+            or locktime <=from_locktime and a:
                 locktimes[int(locktime)]=None
         return locktimes.keys()
 
@@ -291,13 +292,34 @@ class Heirs(dict, Logger):
             except:
                 return 0.0
 
+    def fixed_percent_lists_amount(self,from_locktime,dust_threshold,reverse = False):
+        fixed_heirs = {}
+        fixed_amount = 0.0
+        percent_heirs= {}
+        percent_amount = 0.0
+        for key in self.keys():
+            try:
+                cmp= Util.parse_locktime_string(self[key][HEIR_LOCKTIME]) - from_locktime
+                if cmp<=0:
+                    continue
+                if Util.is_perc(self[key][HEIR_AMOUNT]):
+                    percent_amount += float(self[key][HEIR_AMOUNT][:-1])
+                    percent_heirs[key] =list(self[key])
+                else:
+                    heir_amount = int(math.floor(float(self[key][HEIR_AMOUNT])))
+                    if heir_amount>dust_threshold:
+                        fixed_amount += heir_amount
+                        fixed_heirs[key] = list(self[key])
+                        fixed_heirs[key].insert(HEIR_REAL_AMOUNT,heir_amount)
+                    else:
+                        pass
+            except Exception as e: 
+                _logger.error(e)
+        return fixed_heirs,fixed_amount,percent_heirs,percent_amount
+
 
     def prepare_lists(self, balance, total_fees, wallet, willexecutor = False, from_locktime = 0):
-        fixed_amount = 0
-        percent_amount = 0.0
         willexecutors_amount = 0 
-        fixed_heirs = {}
-        percent_heirs = {}
         willexecutors = {}
         heir_list = {}
         onlyfixed = False
@@ -322,25 +344,7 @@ class Heirs(dict, Logger):
                     _logger.error(f"heir excluded from will locktime({locktime}){Util.int_locktime(locktime)}<minimum{from_locktime}"), 
             heir_list.update(willexecutors)
             newbalance -= willexecutors_amount
-        for key in self.keys():
-            try:
-                if not Util.parse_locktime_string(self[key][HEIR_LOCKTIME]) > from_locktime:
-                    continue
-                else:
-                    pass
-                if Util.is_perc(self[key][HEIR_AMOUNT]):
-                    percent_amount += float(self[key][HEIR_AMOUNT][:-1])
-                    percent_heirs[key] =list(self[key])
-                else:
-                    heir_amount = int(math.floor(float(self[key][HEIR_AMOUNT])))
-                    if heir_amount>wallet.dust_threshold():
-                        fixed_amount += heir_amount
-                        fixed_heirs[key] = list(self[key])
-                        fixed_heirs[key].insert(HEIR_REAL_AMOUNT,heir_amount)
-                    else:
-                        pass
-            except Exception as e: 
-                pass
+        fixed_heirs,fixed_amount,percent_heirs,percent_amount = self.fixed_percent_lists_amount(from_locktime,wallet.dust_threshold()) 
         if fixed_amount > newbalance:
             fixed_amount = self.normalize_perc(fixed_heirs,newbalance,fixed_amount,wallet)
             onlyfixed = True
@@ -402,7 +406,6 @@ class Heirs(dict, Logger):
             elif 0 <= j:
                 url, willexecutor = willexecutorsitems[j]
                 if not Willexecutors.is_selected(willexecutor):
-                    print(f"not selected willexecutor {url}")
                     continue
                 else:
                     willexecutor['url']=url
@@ -423,7 +426,6 @@ class Heirs(dict, Logger):
                     total_fees += int(fees[fee])
                 newbalance = balance 
                 locktimes, onlyfixed = self.prepare_lists(balance, total_fees, wallet, willexecutor, from_locktime)
-                print(locktimes)
                 try:
                     txs = prepare_transactions(locktimes, available_utxos[:], fees, wallet)
                     if not txs:
@@ -573,20 +575,23 @@ class Heirs(dict, Logger):
             raise AmountNotValid(f"amount not properly formatted, {e}")
         return amount
 
-    def validate_locktime(locktime):
+    def validate_locktime(locktime,timestamp_to_check=False):
         try:
-            flocktime = Util.parse_locktime_string(locktime,None)
+            locktime = Util.parse_locktime_string(locktime,None)
+            if timestamp_to_check:
+                if locktime < timestamp_to_check:
+                    raise HeirExpiredException()
         except Exception as e:
             raise LocktimeNotValid(f"locktime string not properly formatted, {e}")
         return locktime
 
-    def validate_heir(k,v):     
+    def validate_heir(k,v,timestamp_to_check=False):     
         address = Heirs.validate_address(v[HEIR_ADDRESS])
         amount = Heirs.validate_amount(v[HEIR_AMOUNT])
-        locktime = Heirs.validate_locktime(v[HEIR_LOCKTIME])
+        locktime = Heirs.validate_locktime(v[HEIR_LOCKTIME],timestamp_to_check)
         return (address,amount,locktime)
 
-    def _validate(data):
+    def _validate(data,timestamp_to_check=False):
         for k, v in list(data.items()):
             if k == 'heirs':
                 return Heirs._validate(v)
@@ -601,4 +606,6 @@ class NotAnAddress(ValueError):
 class AmountNotValid(ValueError):
     pass
 class LocktimeNotValid(ValueError):
+    pass
+class HeirExpiredException(LocktimeNotValid):
     pass

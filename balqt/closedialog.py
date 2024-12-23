@@ -61,6 +61,11 @@ class BalCloseDialog(BalDialog):
         self.exec()
 
     def task_phase1(self):
+        try:
+                Will.check_amounts(self.bal_window.heirs,self.bal_window.willexecutors,self.bal_window.window.wallet.get_utxos(),self.bal_window.date_to_check,self.bal_window.window.wallet.dust_threshold())
+        except Will.AmountException:
+            self.show_warning(_("In the inheritance process, the entire wallet will always be fully emptied. Your settings require an adjustment of the amounts"))
+
         self.msg_set_checking()
         have_to_build=False
         try:

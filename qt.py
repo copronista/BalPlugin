@@ -446,6 +446,10 @@ class BalWindow(Logger):
                 self.logger.warning("not heirs",self.heirs)
                 return
             self.init_class_variables()
+            try:
+                Will.check_amounts(self.heirs,self.willexecutors,self.window.wallet.get_utxos(),self.date_to_check,self.window.wallet.dust_threshold())
+            except Will.AmountException as e:
+                self.show_warning(_(f"In the inheritance process, the entire wallet will always be fully emptied. Your settings require an adjustment of the amounts.\n{e}"))
             locktime = Util.parse_locktime_string(self.will_settings['locktime'])
             if locktime < self.date_to_check:
                 self.show_error(_("locktime is lower than threshold"))
@@ -458,6 +462,7 @@ class BalWindow(Logger):
                 if not f:
                     self.show_error(_(" no backup transaction or willexecutor selected"))
                     return
+
             try:
                 self.check_will()
             except Will.WillExpiredException as e:
@@ -728,7 +733,6 @@ class BalWindow(Logger):
         start = time.time()
         for wid,w in will.items():
             if w.we:
-                print(w.we)
                 self.waiting_dialog.update("checking transaction: {}\n willexecutor: {}".format(wid,w.we['url']))
                 w.check_willexecutor()
 

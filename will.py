@@ -339,7 +339,7 @@ def is_new(will):
         if w.get_status('VALID') and not w.get_status('COMPLETE'):
             return True
 
-def search_rai (all_inputs,all_utxos,will,wallet,callback_not_valid_tx=None):
+def search_rai (all_inputs,all_utxos,will,wallet):
     will_only_valid = only_valid_or_replaced_list(will)
     for inp,ws in all_inputs.items():
         inutxo = Util.in_utxo(inp,all_utxos)
@@ -427,10 +427,26 @@ def reflect_to_children(treeitem):
                     wc.set_status("REPLACED",True)
                     if wc.children:
                         reflect_to_children(wc)
-                                
-def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,heirs={},willexecutors={},self_willexecutor=False, wallet=False, callback_not_valid_tx=None):
-    spent_utxos = []
-    spent_utxos_tx = []
+
+def check_amounts(heirs,willexecutors,all_utxos,timestamp_to_check,dust):
+    fixed_heirs,fixed_amount,perc_heirs,perc_amount = heirs.fixed_percent_lists_amount(timestamp_to_check,dust,reverse=True)
+    wallet_balance = 0
+    for utxo in all_utxos:
+        wallet_balance += utxo.value_sats()
+
+    if fixed_amount >= wallet_balance:
+        raise FixedAmountException(f"Fixed amount({fixed_amount}) >= {wallet_balance}")
+    if perc_amount != 100:
+        raise PercAmountException(f"Perc amount({perc_amount}) =! 100%")
+
+    for url,wex in willexecutors.items():
+        if Willexecutors.is_selected(wex):
+            temp_balance = wallet_balance - int(wex['base_fee'])
+            if fixed_amount >= temp_balance:
+                raise FixedAmountException(f"Willexecutor{url} excess base fee({wex['base_fee']}), {fixed_amount} >={temp_balance}")
+
+
+def check_will(will,all_utxos,wallet,block_to_check,timestamp_to_check):
     add_willtree(will)
     utxos_list= utxos_strs(all_utxos)
 
@@ -447,12 +463,19 @@ def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,h
 
     all_inputs=get_all_inputs(will,only_valid = True)
      
-    search_rai(all_inputs,all_utxos,will,wallet,callback_not_valid_tx= callback_not_valid_tx)
+    search_rai(all_inputs,all_utxos,will,wallet)
+
+def is_will_valid(will, block_to_check, timestamp_to_check, tx_fees, all_utxos,heirs={},willexecutors={},self_willexecutor=False, wallet=False, callback_not_valid_tx=None):
+
+    check_will(will,all_utxos,wallet,block_to_check,timestamp_to_check)
+
 
     if heirs:
         if not check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,timestamp_to_check,tx_fees):
             raise NotCompleteWillException()
 
+
+    all_inputs=get_all_inputs(will,only_valid = True)
 
     _logger.info('check all utxo in wallet are spent')
     if all_inputs:
@@ -757,4 +780,10 @@ class NoWillExecutorNotPresent(NotCompleteWillException):
 class WillExecutorNotPresent(NotCompleteWillException):
     pass
 class NoHeirsException(Exception):
+    pass
+class AmountException(Exception):
+    pass
+class PercAmountException(AmountException):
+    pass
+class FixedAmountException(AmountException):
     pass
