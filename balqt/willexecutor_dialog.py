@@ -91,7 +91,7 @@ class WillExecutorList(MyTreeView):
             menu.addSeparator()
             menu.addAction(_("delete").format(column_title), lambda: self.delete(selected_keys))
 
-        menu.exec_(self.viewport().mapToGlobal(position))
+        menu.exec(self.viewport().mapToGlobal(position))
 
     def ping_willexecutors(self,selected_keys):
         wout={}

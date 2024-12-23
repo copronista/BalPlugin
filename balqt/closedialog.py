@@ -111,7 +111,6 @@ class BalCloseDialog(BalDialog):
                     self.bal_window.wallet.set_label(wid,"BAL Transaction")
                 self.msg_set_building("Ok")
             except Exception as e:
-                raise e
                 self.msg_set_building(self.msg_error(e))
 
         have_to_sign = False
