@@ -618,7 +618,6 @@ class BalWindow(Logger):
 
 
     def on_close(self):
-        print("non qua22")
         try:
             if not self.disable_plugin:
                 close_window=BalCloseDialog(self)
@@ -631,7 +630,6 @@ class BalWindow(Logger):
                 self.window.toggle_tab(self.will_tab)
                 self.window.tabs.update()
         except Exception as e: 
-            print(e)
             pass
 
     def ask_password_and_sign_transactions(self,callback=None):
