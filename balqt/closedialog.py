@@ -3,12 +3,12 @@ from . import qt_resources
 
 if qt_resources.QT_VERSION == 5:
     from PyQt5.QtCore import Qt
-    from PyQt5.QtWidgets import QLabel, QVBoxLayout, QCheckBox
+    from PyQt5.QtWidgets import QLabel, QVBoxLayout, QCheckBox,QWidget
     from PyQt5.QtCore import pyqtProperty, pyqtSignal, pyqtSlot, QObject,QEventLoop
 else:
     from PyQt6.QtCore import pyqtProperty, pyqtSignal, pyqtSlot, QObject,QEventLoop
     from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QLabel, QVBoxLayout, QCheckBox
+    from PyQt6.QtWidgets import QLabel, QVBoxLayout, QCheckBox, QWidget
 import time
 from electrum.i18n import _
 from electrum.gui.qt.util import WindowModalDialog, TaskThread
@@ -27,13 +27,17 @@ _logger = get_logger(__name__)
 
 
 class BalCloseDialog(BalDialog):
-
+    updatemessage=pyqtSignal()
     def __init__(self,bal_window):
         BalDialog.__init__(self,bal_window.window,"Closing BAL")
+        self.updatemessage.connect(self.update)
         self.bal_window=bal_window
         self.message_label = QLabel("Closing BAL:")
-        vbox = QVBoxLayout(self)
-        vbox.addWidget(self.message_label)
+        self.vbox = QVBoxLayout(self)
+        self.vbox.addWidget(self.message_label)
+        self.qwidget=QWidget()
+        self.vbox.addWidget(self.qwidget)
+        self.labels=[]
         #self.checking.connect(self.msg_set_checking)
         #self.invalidating.connect(self.msg_set_invalidating)
         #self.building.connect(self.msg_set_building)
@@ -62,10 +66,12 @@ class BalCloseDialog(BalDialog):
 
     def task_phase1(self):
         self.bal_window.init_class_variables()
+
         try:
-                Will.check_amounts(self.bal_window.heirs,self.bal_window.willexecutors,self.bal_window.window.wallet.get_utxos(),self.bal_window.date_to_check,self.bal_window.window.wallet.dust_threshold())
+            Will.check_amounts(self.bal_window.heirs,self.bal_window.willexecutors,self.bal_window.window.wallet.get_utxos(),self.bal_window.date_to_check,self.bal_window.window.wallet.dust_threshold())
         except Will.AmountException:
-            self.show_warning(_("In the inheritance process, the entire wallet will always be fully emptied. Your settings require an adjustment of the amounts"))
+            self.msg_edit_row('<font color="#ff0000">'+_("In the inheritance process, the entire wallet will always be fully emptied. Your settings require an adjustment of the amounts"+"</font>"))
+            #self.bal_window.show_warning(_("In the inheritance process, the entire wallet will always be fully emptied. Your settings require an adjustment of the amounts"),parent=self)
 
         self.msg_set_checking()
         have_to_build=False
@@ -105,7 +111,6 @@ class BalCloseDialog(BalDialog):
                     self.bal_window.wallet.set_label(wid,"BAL Transaction")
                 self.msg_set_building("Ok")
             except Exception as e:
-                print(e)
                 raise e
                 self.msg_set_building(self.msg_error(e))
 
@@ -176,6 +181,7 @@ class BalCloseDialog(BalDialog):
                         
                             
                 except Exception as e:
+
                     _logger.error(e)
                     raise e
             if retry:
@@ -200,7 +206,7 @@ class BalCloseDialog(BalDialog):
                     raise
             else:
                 raise
-        except:
+        except Exception as e:
             self.msg_set_invalidating("Error")
             raise Exception("Impossible to sign")
     def on_success_invalidate(self,success):
@@ -214,7 +220,8 @@ class BalCloseDialog(BalDialog):
         if have_to_sign is None:
             self.msg_set_invalidating()
            #need to sign invalidate and restart phase 1
-            password = self.bal_window.get_wallet_password("Invalidate your old will",parent=self)
+
+            password = self.bal_window.get_wallet_password("Invalidate your old will",parent=self.bal_window.window)
             if password is False:
                 self.msg_set_invalidating("Aborted")
                 self.wait(3)
@@ -224,7 +231,7 @@ class BalCloseDialog(BalDialog):
             
             return
         elif have_to_sign:
-            password = self.bal_window.get_wallet_password("Sign your will",parent=self)
+            password = self.bal_window.get_wallet_password("Sign your will",parent=self.bal_window.window)
             if password is False:
                 self.msg_set_signing('Aborted')
         else:
@@ -316,29 +323,48 @@ class BalCloseDialog(BalDialog):
 
     def msg_edit_row(self,line,row=None):
         #_logger.trace(f"{row},{line}")
-        msg=self.get_text()
-        rows=msg.split("\n")
+        
+        #msg=self.get_text()
+        #rows=msg.split("\n")
+        #try:
+        #    rows[row]=line
+        #except Exception as e:
+        #    rows.append(line)
+        #row=len(rows)-1
+        #self.update("\n".join(rows))
+    
+        #return row
+
+    #def msg_edit_label(self,line,row=None):
+        #_logger.trace(f"{row},{line}")
+       
+        #msg=self.get_text()
+        #rows=msg.split("\n")
         try:
-            rows[row]=line
-        except:
-            rows.append(line)
-        row=len(rows)-1
-        self.update("\n".join(rows))
+            self.labels[row]=line
+        except Exception as e:
+            self.labels.append(line)
+            row=len(self.labels)-1
+        
+        self.updatemessage.emit()
     
         return row
 
     def msg_del_row(self,row):
         #_logger.trace(f"del row: {row}")
         try:
-            msg=self.get_text()
-            rows=msg.split("\n")
-            del rows[row]
-            self.update("\n".join(rows))
-        except:
+            del self.labels[row]
+        except Exception as e:
             pass
+        self.updatemessage.emit()
 
-    def update(self,msg):
-        self.message_label.setText(msg)
+    def update(self):
+        self.vbox.removeWidget(self.qwidget)
+        self.qwidget=QWidget(self)
+        labelsbox = QVBoxLayout(self.qwidget)
+        for label in self.labels:
+            labelsbox.addWidget(QLabel(label))
+        self.vbox.addWidget(self.qwidget)
 
     def get_text(self):
         return self.message_label.text()

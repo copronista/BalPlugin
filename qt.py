@@ -406,8 +406,8 @@ class BalWindow(Logger):
         return Will.is_will_valid(self.willitems, self.block_to_check, self.date_to_check, self.will_settings['tx_fees'],self.window.wallet.get_utxos(),heirs=self.heirs,willexecutors=self.willexecutors ,self_willexecutor=self.no_willexecutor, wallet = self.wallet, callback_not_valid_tx=self.delete_not_valid)
     def show_message(self,text):
         self.window.show_message(text)
-    def show_warning(self,text):
-        self.window.show_warning(text)
+    def show_warning(self,text,parent =None):
+        self.window.show_warning(text, parent= None)
     def show_error(self,text):
         self.window.show_error(text)
     def show_critical(self,text):
@@ -618,6 +618,7 @@ class BalWindow(Logger):
 
 
     def on_close(self):
+        print("non qua22")
         try:
             if not self.disable_plugin:
                 close_window=BalCloseDialog(self)
@@ -629,7 +630,8 @@ class BalWindow(Logger):
                 self.window.toggle_tab(self.heirs_tab)
                 self.window.toggle_tab(self.will_tab)
                 self.window.tabs.update()
-        except: 
+        except Exception as e: 
+            print(e)
             pass
 
     def ask_password_and_sign_transactions(self,callback=None):
