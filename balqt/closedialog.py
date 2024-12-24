@@ -60,13 +60,18 @@ class BalCloseDialog(BalDialog):
         #_logger.trace("task finished")
         
     def close_plugin_task(self):
+        _logger.debug("close task to be started")
         self.thread.add(self.task_phase1,on_success=self.on_success_phase1,on_done=self.on_accept,on_error=self.on_error_phase1)
         self.show()
         self.exec()
 
     def task_phase1(self):
-        self.bal_window.init_class_variables()
-
+        _logger.debug("close plugin phase 1 started")
+        try:
+            self.bal_window.init_class_variables()
+        except Will.NoHeirsException:
+            return False, None
+        self.msg_set_status("checking variables","Waiting")
         try:
             Will.check_amounts(self.bal_window.heirs,self.bal_window.willexecutors,self.bal_window.window.wallet.get_utxos(),self.bal_window.date_to_check,self.bal_window.window.wallet.dust_threshold())
         except Will.AmountException:
@@ -112,7 +117,7 @@ class BalCloseDialog(BalDialog):
                 self.msg_set_building("Ok")
             except Exception as e:
                 self.msg_set_building(self.msg_error(e))
-
+                return False,None
         have_to_sign = False
         for wid in Will.only_valid(self.bal_window.willitems):
             if not self.bal_window.willitems[wid].get_status("COMPLETE"):
@@ -165,6 +170,7 @@ class BalCloseDialog(BalDialog):
             for url,willexecutor in willexecutors.items():
                 try:
                     if Willexecutors.is_selected(self.bal_window.willexecutors.get(url)):
+                        _logger.debug(f"{url}: {willexecutor}")
                         if not Willexecutors.push_transactions_to_willexecutor(willexecutor):
                             for wid in willexecutor['txsids']:
                                 self.bal_window.willitems[wid].set_status('PUSH_FAIL',True)
@@ -214,9 +220,14 @@ class BalCloseDialog(BalDialog):
         _logger.error(error)
         pass
     def on_success_phase1(self,result):
-        have_to_sign,tx = list(result)
+        self.have_to_sign,tx = list(result)
+        #if have_to_sign is False and tx is None:
+            #self._stopping=True
+            #self.on_success_phase2()
+        #   return
+        print("have to sign",self.have_to_sign)
         password=None
-        if have_to_sign is None:
+        if self.have_to_sign is None:
             self.msg_set_invalidating()
            #need to sign invalidate and restart phase 1
 
@@ -229,16 +240,17 @@ class BalCloseDialog(BalDialog):
             self.thread.add(partial(self.invalidate_task,tx,password),on_success=self.on_success_invalidate, on_done=self.on_accept, on_error=self.on_error)
             
             return
-        elif have_to_sign:
+        
+        elif self.have_to_sign:
             password = self.bal_window.get_wallet_password("Sign your will",parent=self.bal_window.window)
             if password is False:
                 self.msg_set_signing('Aborted')
         else:
-            self.msg_set_signing('Nothig to do')
+            self.msg_set_signing('Nothing to do')
         self.thread.add(partial(self.task_phase2,password),on_success=self.on_success_phase2,on_done=self.on_accept_phase2,on_error=self.on_error_phase2)
         return
     
-    def on_success_phase2(self,arg):
+    def on_success_phase2(self,arg=False):
         self.thread.stop()
         self.bal_window.save_willitems()
         self.msg_edit_row("Finished")
@@ -249,15 +261,16 @@ class BalCloseDialog(BalDialog):
         self.thread.stop()
 
     def task_phase2(self,password):
+        if self.have_to_sign:
+            try:
+                if txs:=self.bal_window.sign_transactions(password):
+                    for txid,tx in txs.items():
+                        self.bal_window.willitems[txid].tx = copy.deepcopy(tx)
+                    self.bal_window.save_willitems()
+                    self.msg_set_signing("Ok")
+            except Exception as e:
+                self.msg_set_signing(self.msg_error(e))
 
-        try:
-            if txs:=self.bal_window.sign_transactions(password):
-                for txid,tx in txs.items():
-                    self.bal_window.willitems[txid].tx = copy.deepcopy(tx)
-                self.bal_window.save_willitems()
-                self.msg_set_signing("Ok")
-        except Exception as e:
-            self.msg_set_signing(self.msg_error(e))
         self.msg_set_pushing()
         have_to_push = False
         for wid in Will.only_valid(self.bal_window.willitems):
@@ -321,7 +334,7 @@ class BalCloseDialog(BalDialog):
         self.password=self.bal_window.get_wallet_password(msg,parent=self)
 
     def msg_edit_row(self,line,row=None):
-        #_logger.trace(f"{row},{line}")
+        _logger.debug(f"{row},{line}")
         
         #msg=self.get_text()
         #rows=msg.split("\n")

@@ -43,6 +43,8 @@ def get_willexecutors(bal_plugin, update = False,bal_window=False,force=False,ta
     return willexecutors
 
 def is_selected(willexecutor,value=None):
+    if not willexecutor:
+        return False
     if not value is None:
         willexecutor['selected']=value
     try:
@@ -70,6 +72,11 @@ def get_willexecutor_transactions(will, force=False):
 
     return willexecutors
 
+def only_selected_list(willexecutors):
+    out = {}
+    for url,v in willexectors.items():
+        if is_selected(willexecutor):
+            out[url]=v
 def push_transactions_to_willexecutors(will):
     willexecutors = get_transactions_to_be_pushed()
     for url in willexecutors:
@@ -153,6 +160,7 @@ def get_info_task(url,willexecutor):
         _logger.info("GETINFO_WILLEXECUTOR")
         _logger.debug(url)
         w = send_request('get',url+"/"+constants.net.NET_NAME+"/info")
+        willexecutor['url']=url
         willexecutor['status'] = w['status']
         willexecutor['base_fee'] = w['base_fee']
         willexecutor['address'] = w['address']

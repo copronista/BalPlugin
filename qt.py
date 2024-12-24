@@ -190,6 +190,7 @@ class BalWindow(Logger):
         self.heirs = {}
         self.will = {}
         self.willitems = {}
+        self.willexecutors = {}
         self.will_settings = None
         self.heirs_tab = self.create_heirs_tab()
         self.will_tab = self.create_will_tab()
@@ -235,6 +236,8 @@ class BalWindow(Logger):
 
     def init_will(self):
         self.logger.info("********************init_____will____________**********")
+        if not self.willexecutors:
+            self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=False, bal_window=self) 
         if not self.heirs:
             self.heirs = Heirs._validate(Heirs(self.wallet.db))
         if not self.will:
@@ -251,9 +254,11 @@ class BalWindow(Logger):
 
         if not self.will_settings:
             self.will_settings=self.wallet.db.get_dict("will_settings")
-            self.logger.info("will_settings:",self.will_settings)
+            self.logger.info("will_settings: {}".format(self.will_settings))
             if not self.will_settings:
-                self.will_settings = self.bal_plugin.default_will_settings()
+                Util.copy(self.will_settings,self.bal_plugin.default_will_settings())
+                self.logger.debug("not_will_settings {}".format(self.will_settings))
+
             self.bal_plugin.validate_will_settings(self.will_settings)
             self.heir_list.update_will_settings()
                 
@@ -372,11 +377,21 @@ class BalWindow(Logger):
         Will.normalize_will(self.willitems,self.wallet)
 
     def build_will(self, ignore_duplicate = True, keep_original = True ):
+
         will = {}
         willtodelete=[]
         willtoappend={}
         try:
+            self.init_class_variables()
             self.willexecutors = Willexecutors.get_willexecutors(self.bal_plugin, update=False, bal_window=self) 
+            
+            if not self.no_willexecutor:
+                f=False
+                for u,w in self.willexecutors.items():
+                    if Willexecutors.is_selected(w):
+                        f=True
+                if not f:
+                    raise Will.NoWillExecutorNotPresent("No Will-Executor or backup transaction selected")
             txs = self.heirs.get_transactions(self.bal_plugin,self.window.wallet,self.will_settings['tx_fees'],None,self.date_to_check)
             self.logger.info(txs)
             creation_time = time.time()
@@ -423,7 +438,7 @@ class BalWindow(Logger):
     
     def init_class_variables(self):
             if not self.heirs:
-                self.show_error(_("no heirs"))
+                raise Will.NoHeirsException()
                 return
             try: 
                 self.date_to_check = Util.parse_locktime_string(self.will_settings['threshold'])
@@ -436,6 +451,7 @@ class BalWindow(Logger):
                 self.init_heirs_to_locktime()
 
             except Exception as e:
+                self.logger.error(e)
                 raise e
 
     def build_inheritance_transaction(self,ignore_duplicate = True, keep_original = True):
@@ -444,7 +460,7 @@ class BalWindow(Logger):
                 self.logger.info("plugin is disabled")
                 return
             if not self.heirs:
-                self.logger.warning("not heirs",self.heirs)
+                self.logger.warning("not heirs {}".format(self.heirs))
                 return
             self.init_class_variables()
             try:

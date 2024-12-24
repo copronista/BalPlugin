@@ -27,6 +27,7 @@ def get_will(x):
     return x
 
 
+
 class BalPlugin(BasePlugin):
     LOCKTIME_TIME = "bal_locktime_time"
     LOCKTIME_BLOCKS = "bal_locktime_blocks"
@@ -115,16 +116,16 @@ class BalPlugin(BasePlugin):
 
     def default_will_settings(self):
         return {
-            'tx_fees':1, 
+            'tx_fees':100, 
             'threshold':'180d',
             'locktime':'1y',
         }
     def validate_will_settings(self,will_settings):
-        if int(will_settings['tx_fees'])<1:
+        if int(will_settings.get('tx_fees',1))<1:
             will_settings['tx_fees']=1
-        if will_settings['threshold'] =='':
+        if not will_settings.get('threshold'):
             will_settings['threshold']='180d'
-        if will_settings['locktime']=='':
+        if not will_settings.get('locktime')=='':
             will_settings['locktime']='1y'
         return will_settings
 

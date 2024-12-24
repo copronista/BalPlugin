@@ -451,3 +451,6 @@ def export_meta_gui(electrum_window: 'ElectrumWindow', title, exporter):
                                  .format(title, str(filename)))
 
 
+def copy(dicto,dictfrom):
+    for k,v in dictfrom.items():
+        dicto[k]=v

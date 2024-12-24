@@ -141,15 +141,23 @@ def check_anticipate(ow:'WillItem',nw:'WillItem'):
     anticipate = Util.anticipate_locktime(ow.tx.locktime,days=1)
     if int(nw.tx.locktime) >= int(anticipate):
         if Util.cmp_heirs_by_values(ow.heirs,nw.heirs,[0,1],exclude_willexecutors = True):
+            print("same heirs",ow._id,nw._id)
             if nw.we and ow.we:
                 if ow.we['url'] == nw.we['url']:
+                    print("same willexecutors", ow.we['url'],nw.we['url'])
                     if int(ow.we['base_fee'])>int(nw.we['base_fee']):
+                        print("anticipate")
                         return anticipate
                     else:
-                        #_logger.debug("ow,base fee > nw.base_fee")
-                        ow.tx.locktime
+                        if int(ow.tx_fees) != int(nw.tx_fees):
+                            return anticipate
+                        else:
+                            print("keep the same")
+                            #_logger.debug("ow,base fee > nw.base_fee")
+                            ow.tx.locktime
                 else:
                     #_logger.debug("ow.we['url']({ow.we['url']}) == nw.we['url']({nw.we['url']})")
+                    print("keep the same")
                     ow.tx.locktime
             else:
                 if nw.we == ow.we:
@@ -272,9 +280,11 @@ def update_will(old_will,new_will):
             new_will[oid]=old_will[oid]
             new_will[oid].heirs = new_heirs
             new_will[oid].we = new_we
+            print(f"found {oid}")
 
             continue
         else:
+            print(f"not found {oid}")
             continue
 
 def get_higher_input_for_tx(will):
@@ -540,6 +550,7 @@ def check_willexecutors_and_heirs(will,heirs,willexecutors,self_willexecutor,che
     for wid in only_valid_list(will):
         w = will[wid]
         if w.tx_fees != tx_fees:
+            #w.set_status('VALID',False)
             raise TxFeesChangedException(f"{tx_fees}:",w.tx_fees)
         for wheir in w.heirs:
             if not 'w!ll3x3c"' == wheir[:9]:
@@ -712,7 +723,8 @@ class WillItem(Logger):
             oinps = all_inputs.get(prevout_str,[])
             for oinp in oinps:
                 ow=oinp[1]
-                yield ow
+                if ow._id!=self._id:
+                    yield ow
 
     def normalize_locktime(self,all_inputs):
         outputs = self.tx.outputs()
