@@ -74,7 +74,9 @@ def decode_amount(amount,decimal_point):
     if is_perc(amount):
         return amount
     else:
-        return str(float(amount)/pow(10,decimal_point))
+        num=8-decimal_point
+        basestr="{{:0{}.{}f}}".format(num,num)
+        return "{:08.8f}".format(float(amount)/pow(10,decimal_point))
 
 def is_perc(value): 
         try:

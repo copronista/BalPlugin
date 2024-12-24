@@ -104,7 +104,7 @@ def prepare_transactions(locktimes, available_utxos, fees, wallet):
                 if in_amount > out_amount:
                     break
 
-        except IndexError:
+        except IndexError as e:
             pass
         if int(in_amount) < int(out_amount):
             break
@@ -338,7 +338,6 @@ class Heirs(dict, Logger):
                         h[HEIR_ADDRESS] = willexecutor['address']
                         willexecutors["w!ll3x3c\""+willexecutor['url']+"\""+str(locktime)] = h
                     except Exception as e:
-                        print(f"error willexecutor: {e}")
                         return [],False
                 else:
                     _logger.error(f"heir excluded from will locktime({locktime}){Util.int_locktime(locktime)}<minimum{from_locktime}"), 
@@ -372,7 +371,6 @@ class Heirs(dict, Logger):
             locktime=Util.parse_locktime_string(value[HEIR_LOCKTIME])
             if not locktime in  locktimes: locktimes[locktime]={key:value}
             else: locktimes[locktime][key]=value
-
         return locktimes, onlyfixed
     def is_perc(self,key):
         return Util.is_perc(self[key][HEIR_AMOUNT])

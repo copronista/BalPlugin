@@ -740,6 +740,7 @@ class WillItem(Logger):
         try:
             if resp:=Willexecutors.check_transaction(self._id,self.we['url']):
                 if 'tx' in resp and resp['tx']==str(self.tx):
+                    self.set_status('PUSHED')
                     self.set_status('CHECKED')
                 else:   
                     self.set_status('CHECK_FAIL')

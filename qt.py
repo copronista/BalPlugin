@@ -606,7 +606,7 @@ class BalWindow(Logger):
                         txin._TxInput__address=change.address
                         txin._TxInput__scriptpubkey = change.scriptpubkey
                         txin._TxInput__value_sats = change.value
-
+                
                 self.wallet.sign_transaction(tx, password,ignore_warnings=True)
                 signed=tosign
                 is_complete=False
@@ -665,7 +665,8 @@ class BalWindow(Logger):
                         raise e
 
         def on_failure(exc_info):
-            self.logger.info("sign fail",exc_info)
+            self.logger.info("sign fail: {}".format(exc_info))
+            self.show_error(exc_info)
         password= self.get_wallet_password() 
         task = partial(self.sign_transactions,password)
         msg = _('Signing transactions...')
@@ -702,6 +703,7 @@ class BalWindow(Logger):
             willexecutor = willexecutors[url]
             self.waiting_dialog.update(getMsg(willexecutors))
             if 'txs' in willexecutor:
+                try:
                     if Willexecutors.push_transactions_to_willexecutor(willexecutors[url]):
                         for wid in willexecutors[url]['txsids']:
                             self.willitems[wid].set_status('PUSHED', True)
@@ -712,6 +714,12 @@ class BalWindow(Logger):
                             error=True
                         willexecutors[url]['broadcast_stauts'] = _("Failed")
                     del willexecutor['txs']
+                except Willexecutors.AlreadyPresentException:
+                    for wid in willexecutor['txsids']:
+                        row = self.waiting_dialog.update("checking {} - {} : {}".format(self.willitems[wid].we['url'],wid, "Waiting"))
+                        self.willitems[wid].check_willexecutor()
+                        row = self.waiting_dialog.update("checked {} - {} : {}".format(self.willitems[wid].we['url'],wid,self.willitems[wid].get_status("CHECKED" )))
+
         if error:
             return True
 

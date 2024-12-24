@@ -2,10 +2,10 @@ from typing import Callable,Any
 
 from . import qt_resources
 if qt_resources.QT_VERSION == 5:
-    from PyQt5.QtCore import Qt
+    from PyQt5.QtCore import Qt,pyqtSignal
     from PyQt5.QtWidgets import QLabel, QVBoxLayout, QCheckBox
 else:
-    from PyQt6.QtCore import Qt
+    from PyQt6.QtCore import Qt,pyqtSignal
     from PyQt6.QtWidgets import QLabel, QVBoxLayout, QCheckBox
 
 from electrum.gui.qt.util import WindowModalDialog, TaskThread
@@ -22,12 +22,14 @@ class BalDialog(WindowModalDialog):
         self.setWindowIcon(qt_resources.read_QIcon(icon))
 
 class BalWaitingDialog(BalDialog):
+    updatemessage=pyqtSignal([str], arguments=['message'])
     def __init__(self, bal_window: 'BalWindow', message: str, task, on_success=None, on_error=None, on_cancel=None,exe=True):
         assert bal_window
         BalDialog.__init__(self, bal_window.window, _("Please wait"))
         self.message_label = QLabel(message)
         vbox = QVBoxLayout(self)
         vbox.addWidget(self.message_label)
+        self.updatemessage.connect(self.update_message)
         if on_cancel:
             self.cancel_button = CancelButton(self)
             self.cancel_button.clicked.connect(on_cancel)
@@ -56,9 +58,11 @@ class BalWaitingDialog(BalDialog):
 
     def on_accepted(self):
         self.thread.stop()
+    def update_message(self,msg):
+        self.message_label.setText(msg)
 
     def update(self, msg):
-        self.message_label.setText(msg)
+        self.updatemessage.emit(msg)
 
     def getText(self):
          return self.message_label.text()
